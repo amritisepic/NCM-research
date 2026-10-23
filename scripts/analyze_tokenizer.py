@@ -34,13 +34,15 @@ ap = argparse.ArgumentParser()
 ap.add_argument("--n", type=int, default=2000)
 ap.add_argument("--bs", type=int, default=250)
 ap.add_argument("--seed", type=int, default=0)
+ap.add_argument("--tokenizer", default="released", help="released, or path to our final.pt")
 ap.add_argument("--out", default=os.path.join(ROOT, "results", "phase0_tokenizer_analysis.json"))
 a = ap.parse_args()
 torch.manual_seed(a.seed)
 
 t0 = time.time()
-B = load_ncm(os.path.join(ROOT, "artifacts", "tinystories"))
-vqvae, vq, tok = B.vqvae, B.vqvae.vq, B.pre_tokenizer
+from ncmr.models import load_text_tokenizer  # noqa: E402
+vqvae, tok = load_text_tokenizer(a.tokenizer)
+vq = vqvae.vq
 levels = [int(l) for l in vq.levels]
 K = len(levels)
 sl = level_slices(levels)
@@ -111,7 +113,7 @@ with torch.no_grad():
         samples.append({"example": int(i), "level": "input", "text": tok.decode(X[i].tolist())})
 
 res = {
-    "run": "phase0_tokenizer_analysis", "checkpoint": "hazyresearch/ncm-checkpoints tinystories/tokenizer.pt",
+    "run": "phase0_tokenizer_analysis", "checkpoint": a.tokenizer if a.tokenizer != "released" else "hazyresearch/ncm-checkpoints tinystories/tokenizer.pt",
     "split": "val", "n": len(X), "seed": a.seed,
     "tokenizer_params_trainable": int(sum(p.numel() for p in vqvae.parameters() if p.requires_grad)),
     "tokenizer_params_total": int(sum(p.numel() for p in vqvae.parameters())),

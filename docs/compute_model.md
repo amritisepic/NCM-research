@@ -24,11 +24,12 @@ FLOP-matched (primary) and read the data-matched point off the AR learning curve
 ## Planned runs (estimates; actuals go to log.md)
 | Run | Where | Params | Train FLOPs | Est. time | Est. CU |
 |---|---|---|---|---|---|
-| tok_s (4000 x 64) | CPU / Colab | 8.4M (incl. codebooks) | 1.3 PFLOP | CPU ~0.9 h @0.4 TFLOPS | T4 0.04 |
-| ncm_s (3000 x 32) | CPU / Colab | 5.5M | 2.0 PFLOP | CPU ~1.4 h | T4 0.07 |
-| ts_fact_s, ts_ar_s (3000 x 32) | Colab | 5.5M + 2.9M emb | 4.0 PFLOP each | CPU ~2.8 h each | T4 0.13 each |
-| ar_s (3000 x 128) | CPU / Colab | 6.8M | 2.1 PFLOP | CPU ~1.4 h | T4 0.07 |
+| tok_s (6000 x 64) | CPU / Colab | 8.4M (incl. codebooks) | 2.0 PFLOP | CPU ~1.4 h @0.4 TFLOPS | T4 0.06 |
+| ncm_s (6000 x 32) | CPU / Colab | 5.5M | 4.0 PFLOP | CPU ~2.8 h | T4 0.13 |
+| ts_fact_s, ts_ar_s (6000 x 32) | Colab | 5.5M + 2.9M emb | 7.9 PFLOP each | CPU ~5.5 h each | T4 0.26 each |
+| ar_s (6000 x 128) | CPU / Colab | 6.8M | 4.1 PFLOP | CPU ~2.9 h | T4 0.14 |
 | tok_m, 1 epoch | Colab | 8.4M | 13.8 PFLOP | T4 0.38 h | 0.46 |
+| Sudoku C4 pilot: tok + ncm_s + rncm_s (20k x 64) | Colab | 3.2M + 2 x 4.8M | ~35 PFLOP | T4 ~1.5-2 h | ~2.5 |
 | ncm_m, 1 epoch | Colab | 20.5M | 208 PFLOP | T4 5.8 h / L4 2.3 h | 6.9 / 3.9 |
 | ar_m, FLOP-matched | Colab | 23.1M | 208 PFLOP | T4 5.8 h / L4 2.3 h | 6.9 / 3.9 |
 T4 assumed 10 TFLOPS effective and L4 25 TFLOPS until calibrated (p1_tc_pilot notebook includes

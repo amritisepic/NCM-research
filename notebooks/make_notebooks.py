@@ -23,7 +23,7 @@ RUNS: dict[str, dict] = {
                 "the factorized NCM generator, the two-stream TC probes (factorized vs within-level AR), and a "
                 "FLOP-matched AR baseline; then 300-step calibration runs at the matched 'm' scale. "
                 "Answers: how much of NCM's NLL gap to AR is within-level dependence (TC)?",
-        "gpu": "T4 (any GPU works)", "units": 1.0,
+        "gpu": "T4 (any GPU works)", "units": 1.5,
         "cmds": [
             "python scripts/train.py tokenizer --config configs/pilot/tok_s.yaml --run_dir {R}/tok_s",
             "python scripts/train.py ncm --config configs/pilot/ncm_s.yaml --tokenizer {R}/tok_s/final.pt --run_dir {R}/ncm_s",
@@ -34,6 +34,23 @@ RUNS: dict[str, dict] = {
             "python scripts/train.py ar --config configs/calib/ar_m.yaml --run_dir {R}/calib_ar_m",
             "python scripts/train.py ncm --config configs/calib/ncm_m.yaml --tokenizer {R}/calib_tok_m/final.pt "
             "--run_dir {R}/calib_ncm_m",
+        ],
+    },
+    "c4_sudoku_pilot": {
+        "desc": "Kill experiment for C4 (Recurrent NCM) on Sudoku-hard, small scale, 1 seed per arm. Trains our "
+                "Sudoku tokenizer, then (a) upstream-style NCM generator and (b) the same generator with its hidden "
+                "state carried across levels and trained with backprop through levels. Same params, same NFE (12). "
+                "Pre-registered: (b) beats (a) by >= 3 points on our held-out puzzles, and by >= 10 points on "
+                "puzzles needing >= 9 propagation rounds; otherwise C4 is killed. Released test set scored once "
+                "at the end (--final), not used for selection.",
+        "gpu": "T4 (any GPU works)", "units": 3.0,
+        "cmds": [
+            "python scripts/train_sudoku.py tokenizer --config configs/sudoku/tok.yaml --level hard "
+            "--data assets/sudoku_train/hard.npz --run_dir {R}/sdk_tok_hard",
+            "python scripts/train_sudoku.py ncm --config configs/sudoku/gen_s.yaml --level hard "
+            "--data assets/sudoku_train/hard.npz --tokenizer {R}/sdk_tok_hard/final.pt --run_dir {R}/sdk_ncm_s_hard --final",
+            "python scripts/train_sudoku.py rncm --config configs/sudoku/gen_s.yaml --level hard "
+            "--data assets/sudoku_train/hard.npz --tokenizer {R}/sdk_tok_hard/final.pt --run_dir {R}/sdk_rncm_s_hard --final",
         ],
     },
     "calib_t4": {
@@ -57,6 +74,8 @@ DRIVE = '/content/drive/MyDrive/ncm-research'
 R = f'{DRIVE}/runs'; D = f'{DRIVE}/data/tinystories'
 os.makedirs(R, exist_ok=True); os.makedirs(D, exist_ok=True)
 REPO, BRANCH = '__REPO__', '__BRANCH__'
+CMDS = __CMDS__
+NEED_TS = any('scripts/train.py ' in c for c in CMDS)
 if not os.path.exists('/content/NCM-research'):
     subprocess.run(['git', 'clone', '-b', BRANCH, REPO, '/content/NCM-research'], check=True)
 else:
@@ -68,27 +87,34 @@ subprocess.run([sys.executable, '-m', 'pip', 'install', '-q', 'omegaconf', 'hydr
 
 DATA = r'''
 import urllib.request
-B = 'https://huggingface.co/datasets/hazyresearch/ncm-datasets/resolve/main/tinystories/'
-for f in ['bpe_vocab_8192.pickle', 'bpe_merges_8192.pickle', 'valid_bpe_8192.pickle',
-          'train_bpe_8192_offsets.npy', 'train_bpe_8192.bin']:
-    p = f'{D}/{f}'
-    if not os.path.exists(p):
-        print('downloading', f, flush=True)
-        urllib.request.urlretrieve(B + f, p + '.tmp'); os.replace(p + '.tmp', p)
 os.makedirs('data', exist_ok=True)
-if not os.path.exists('data/tinystories'):
-    os.symlink(D, 'data/tinystories')
-# local copy of the big stream for fast random access (Drive reads are slow)
-if not os.path.exists('/content/ts'):
-    os.makedirs('/content/ts');
-    for f in os.listdir(D): shutil.copy(f'{D}/{f}', f'/content/ts/{f}')
+if NEED_TS:
+    B = 'https://huggingface.co/datasets/hazyresearch/ncm-datasets/resolve/main/tinystories/'
+    for f in ['bpe_vocab_8192.pickle', 'bpe_merges_8192.pickle', 'valid_bpe_8192.pickle',
+              'train_bpe_8192_offsets.npy', 'train_bpe_8192.bin']:
+        p = f'{D}/{f}'
+        if not os.path.exists(p):
+            print('downloading', f, flush=True)
+            urllib.request.urlretrieve(B + f, p + '.tmp'); os.replace(p + '.tmp', p)
+    if not os.path.exists('data/tinystories'):
+        os.symlink(D, 'data/tinystories')
+    # local copy of the big stream for fast random access (Drive reads are slow)
+    if not os.path.exists('/content/ts'):
+        os.makedirs('/content/ts')
+        for f in os.listdir(D):
+            shutil.copy(f'{D}/{f}', f'/content/ts/{f}')
+S = 'https://huggingface.co/datasets/hazyresearch/ncm-datasets/resolve/main/sudoku/'
+for lvl in ['easy', 'medium', 'hard']:
+    os.makedirs(f'data/sudoku/{lvl}', exist_ok=True)
+    for f in ['puzzles.pickle', 'solutions.pickle']:
+        if not os.path.exists(f'data/sudoku/{lvl}/{f}'):
+            urllib.request.urlretrieve(f'{S}{lvl}/{f}', f'data/sudoku/{lvl}/{f}')
 import torch; print('GPU:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'none')
 '''
 
 RUN = r'''
-CMDS = __CMDS__
 for c in CMDS:
-    c = c.format(R=R, D=D) + ' --data_dir /content/ts'
+    c = c.format(R=R, D=D) + (' --data_dir /content/ts' if 'scripts/train.py ' in c else '')
     print('>>>', c, flush=True)
     t = time.time()
     p = subprocess.run(c, shell=True)
@@ -131,9 +157,10 @@ def make(name: str, spec: dict) -> dict:
                      "kernelspec": {"name": "python3", "display_name": "Python 3"}},
         "cells": [
             cell(head, "markdown"),
-            cell(SETUP.replace("__REPO__", REPO).replace("__BRANCH__", BRANCH)),
+            cell(SETUP.replace("__REPO__", REPO).replace("__BRANCH__", BRANCH)
+                 .replace("__CMDS__", json.dumps(spec["cmds"], indent=1))),
             cell(DATA),
-            cell(RUN.replace("__CMDS__", json.dumps(spec["cmds"], indent=1))),
+            cell(RUN),
             cell(COLLECT.replace("__NAME__", name)),
         ],
     }

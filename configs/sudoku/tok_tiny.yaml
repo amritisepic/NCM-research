@@ -1,0 +1,2 @@
+model: {embed_dim: 64, codebook: 16, n_heads: 2, dropout: 0.0, learned_l1: false, fine_drop: 0.5, decay: 0.99}
+train: {steps: 20, batch_size: 16, lr: 1.0e-3, warmup: 5, weight_decay: 0.0, ckpt_every: 10, eval_every: 20, eval_n: 64, seed: 0, log_every: 10}

@@ -73,6 +73,25 @@ def build_tokenizer(**kw) -> TiedOutputVQVAE:
     return TiedOutputVQVAE(**tokenizer_kwargs(**kw))
 
 
+def load_text_tokenizer(path: str | None = None, device: str = "cpu"):
+    """(vqvae, bpe) for analyses: our trained tokenizer from `path` (final.pt from train.py), or the released
+    NCM TinyStories tokenizer when path is None/'released'."""
+    import os
+    from ncmr.ncm_ref_loader import load_ncm, safe_pickle_load
+    from tokenization.bpe_tokenizer import BPETokenizer
+    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    if not path or path == "released":
+        b = load_ncm(os.path.join(root, "artifacts", "tinystories"), device=device)
+        return b.vqvae, b.pre_tokenizer
+    st = torch.load(path, map_location="cpu", weights_only=False)  # our own file
+    tok = build_tokenizer(**st["tok_kwargs"])
+    tok.load_state_dict(st["model"])
+    d = os.path.join(root, "data", "tinystories")
+    bpe = BPETokenizer(safe_pickle_load(f"{d}/bpe_vocab_8192.pickle"), safe_pickle_load(f"{d}/bpe_merges_8192.pickle"),
+                       {"eos_token": "<|endoftext|>", "pad_token": "<|pad|>"})
+    return tok.to(device).eval(), bpe
+
+
 def tokenizer_loss(vqvae: VQVAE, x: torch.Tensor, vq_weight: float = 1.0):
     """Reconstruction CE over all 128 positions + upstream vq loss (commitment + cumulative-reconstruction
     MSE). Same computation as upstream VQVAE.forward, except that quantization runs with autocast disabled:

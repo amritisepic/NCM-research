@@ -38,12 +38,14 @@ NAMES = [" Lily", " Tom", " Ben", " Sue", " Timmy", " Max", " Mia", " Anna", " S
 ap = argparse.ArgumentParser()
 ap.add_argument("--n", type=int, default=1000)
 ap.add_argument("--seed", type=int, default=0)
+ap.add_argument("--tokenizer", default="released", help="released, or path to our final.pt")
 ap.add_argument("--out", default=os.path.join(ROOT, "results", "phase0_invariance_probe.json"))
 a = ap.parse_args()
 rng = np.random.default_rng(a.seed)
 
-B = load_ncm(os.path.join(ROOT, "artifacts", "tinystories"))
-vqvae, vq, tok = B.vqvae, B.vqvae.vq, B.pre_tokenizer
+from ncmr.models import load_text_tokenizer  # noqa: E402
+vqvae, tok = load_text_tokenizer(a.tokenizer)
+vq = vqvae.vq
 levels = [int(l) for l in vq.levels]
 sl = level_slices(levels)
 X = examples("val", a.n)

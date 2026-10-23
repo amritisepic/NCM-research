@@ -1,0 +1,4 @@
+# Sudoku generator, small scale (C4 kill experiment): d256 x 6 layers, 4 heads (~4.8M). Used for both
+# `ncm` (upstream NCM, no carry) and `rncm` (carry across levels).
+model: {n_layer: 6, n_head: 4, n_embd: 256, dropout: 0.1}
+train: {steps: 20000, batch_size: 64, lr: 1.0e-3, warmup: 500, weight_decay: 0.1, ckpt_every: 500, eval_every: 2000, eval_n: 1000, seed: 0, log_every: 200}

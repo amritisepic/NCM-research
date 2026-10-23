@@ -188,6 +188,11 @@ if a.kind in ("ncm", "ts_fact", "ts_ar"):
             l0 = tok.encode(xb)[:, 0]
             counts += torch.bincount(l0.cpu(), minlength=counts.numel()).float()
     final["level0_unigram"] = counts / counts.sum()
+    # NLL of val level-0 codes under that unigram (NCM's level-0 "model"), add-one smoothed, nats/window
+    with torch.no_grad():
+        l0v = torch.cat([tok.encode(val_x[s:s + 250].to(device))[:, 0].cpu() for s in range(0, len(val_x), 250)])
+    p0 = (counts + 1) / (counts.sum() + counts.numel())
+    last["val_nll_level0_unigram"] = float(-torch.log(p0[l0v]).mean())
 torch.save(final, os.path.join(a.run_dir, "final.pt"))
 wall = trainer.wall_prev + time.time() - trainer.t_start
 res = {"run": os.path.basename(a.run_dir.rstrip("/")), "kind": a.kind, "config": OmegaConf.to_container(cfg),
