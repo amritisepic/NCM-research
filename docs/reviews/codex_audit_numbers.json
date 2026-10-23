@@ -1,0 +1,2328 @@
+{
+  "ref": "1c7185c0e0de23d364c8bad33b2606c852bbd00d",
+  "log_entry_sha256": {
+    "R018": "282ebd1fcdcc2b89c6904e45ec769484b17d729d4d863fee79ed2bba04a881ec",
+    "R019": "235d56af44cd6d1439841a7746b0eb2ed0f0a0bf848c171aecd423c84e31d430",
+    "R020": "4c5643fedbcac7ff9c5c93690cf1f91f96eaddfd6c65db5dd363b108fc714d19",
+    "R021": "93b27a95adefda25ac0d477ab5629b94f452f5a4cca838cc226d603703073c7c"
+  },
+  "source_sha256": {
+    "log.md": "21da0fbdf8b18b60be5d4f1a28886e1634c562ac0de59d9f38e551f639dd71f9",
+    "results/b2_jacobi_levels_hard.json": "afedc6f93c56d87561cb11edb98bc852895cc5c7577b00c462d2a60f96463389",
+    "results/b2_jacobi_wmt14_n6.json": "5bceca0c5820ad28f4c623b4a28fe1bc152e9afb1bcd5c7943c13452c499c5d9",
+    "results/colab/c4_sudoku_pilot/sdk_ncm_s_hard__result.json": "35d8c7602e136474cb8b565a9321a421d3d496ceb6c045b9bf9411c2e004a8bd",
+    "results/colab/c4_sudoku_pilot/sdk_rncm_s_hard__result.json": "d7e4a1d21cfc96f88b51d6f297f6436ccd90c6dabdf93d1cf40522c639f7e9ef",
+    "results/colab/c4_sudoku_pilot/sdk_tok_hard__result.json": "3b10edc9d9e1e284fc8e0314100e8a5f36031b59a9acc4d84287b48d5608987b",
+    "results/colab/p1_tc_pilot/ar_s__result.json": "9060b58a81b15b9a012b61dd777579125d1f7ac7318e4de68b384ea5e40683de",
+    "results/colab/p1_tc_pilot/ncm_s__result.json": "40685c59c941141bbec0d35cc313d94261826ce68cf5512caf5dcb34cf7202c1",
+    "results/colab/p1_tc_pilot/tok_s__result.json": "e07e51dee14ce864f96a1e53f39d98f6791c6f6ca8e075765aa8fd9ea4d67c96",
+    "results/colab/p1_tc_pilot/ts_ar_s__result.json": "05e4cd551c83c74523c4bc74a64740b3bf329f535b1cee8da58f623bc1109682",
+    "results/colab/p1_tc_pilot/ts_fact_s__result.json": "e46d4261550ffe52c944b4d652325ef78046c94b3233f4b62100c8a77b67d438",
+    "results/colab/w0_calib_diag/L_ts_released__result.json": "cff01364df276303012327ef9e89561672be38f2d8aa48c8b7871511fc7bdd1c",
+    "results/colab/w0_calib_diag/b2_jacobi_levels_hard.json": "afedc6f93c56d87561cb11edb98bc852895cc5c7577b00c462d2a60f96463389",
+    "results/colab/w0_calib_diag/b2_jacobi_sudoku_hard.json": "3d0bf712aa39473387e00d2b5836238621837b4cbe3c5897777849fee9628371",
+    "results/colab/w0_calib_diag/b2_jacobi_tinystories_seed0.json": "2d55bee4d7fa926c5648de03f6e109aa7bf653f9fe3af60ee7db8a8c5d553cd4",
+    "results/colab/w0_calib_diag/b2_jacobi_wmt14_n3003.json": "a72a607abcb66f3932d1dadadfde8e2f70867280c61ceaf8ffae831c09f1a146",
+    "results/colab/w0_calib_diag/b2_jacobi_wmt14_n6.json": "5bceca0c5820ad28f4c623b4a28fe1bc152e9afb1bcd5c7943c13452c499c5d9",
+    "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json": "8d78055e8e74b912fa87942ffb13f7220fd6803cf5858022a53fffd3dfe8289e",
+    "results/p1_tc_decomposition.json": "6819bbc114b0edb194758e41fe178902b7ca481fb3bf2056d187e866e0db91fb",
+    "results/phase0_released_generator_nll.json": "a71db0743772db68e4ac273125eafe97bdeeaceaed96dfb470a31bd4df5df29f",
+    "results/phase0_released_ncm_tinystories_eval.json": "8248056faeee9d7d2701f1cc491a6d06347605dc68617477e71c82d3ed6ff297",
+    "results/phase0_sudoku_repro_hard.json": "e59d19df7958acb23878c715ac5ccca38ec8a876db5106d0c5dae043e121b049",
+    "results/sudoku_repair_ceiling_val.json": "3e747935615ea36799bb3a77bc8690422fec1e87a6cee03773f699a9478412f5"
+  },
+  "counts": {
+    "agrees": 135,
+    "readback": 82,
+    "mismatch": 6,
+    "unverifiable": 8
+  },
+  "checks": [
+    {
+      "entry": "R018",
+      "claim": "tokenizer parameters (million)",
+      "logged": 8.4,
+      "actual": 8.42816,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/p1_tc_pilot/{ncm_s,ts_fact_s,ts_ar_s,ar_s}__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "NCM parameters (million)",
+      "logged": 5.5,
+      "actual": 5.529355,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/p1_tc_pilot/{ncm_s,ts_fact_s,ts_ar_s,ar_s}__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "seed",
+      "logged": 0,
+      "actual": 0,
+      "status": "agrees",
+      "tolerance": 0,
+      "source": "results/colab/p1_tc_pilot/{ncm_s,ts_fact_s,ts_ar_s,ar_s}__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "validation windows",
+      "logged": 1000,
+      "actual": 1000,
+      "status": "agrees",
+      "tolerance": 0,
+      "source": "results/colab/p1_tc_pilot/{ncm_s,ts_fact_s,ts_ar_s,ar_s}__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "final steps",
+      "logged": 6000,
+      "actual": 6000,
+      "status": "agrees",
+      "tolerance": 0,
+      "source": "results/colab/p1_tc_pilot/{ncm_s,ts_fact_s,ts_ar_s,ar_s}__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "level-0 NLL",
+      "logged": 4.51,
+      "actual": 4.510337829589844,
+      "status": "agrees",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/p1_tc_pilot/{ncm_s,ts_fact_s,ts_ar_s,ar_s}__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "NCM NLL",
+      "logged": 1232.7,
+      "actual": 1232.7090878295899,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/p1_tc_pilot/{ncm_s,ts_fact_s,ts_ar_s,ar_s}__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "factorized NLL",
+      "logged": 1232.8,
+      "actual": 1232.824348449707,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/p1_tc_pilot/{ncm_s,ts_fact_s,ts_ar_s,ar_s}__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "within-level AR NLL",
+      "logged": 1290.1,
+      "actual": 1290.1413459777832,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/p1_tc_pilot/{ncm_s,ts_fact_s,ts_ar_s,ar_s}__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "AR FLOP-matched NLL",
+      "logged": 173.6,
+      "actual": 173.62512890625,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/p1_tc_pilot/{ncm_s,ts_fact_s,ts_ar_s,ar_s}__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "AR data-matched NLL",
+      "logged": 212.4,
+      "actual": 212.432791015625,
+      "status": "readback",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/p1_tc_pilot/{ncm_s,ts_fact_s,ts_ar_s,ar_s}__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "AR data-matched step",
+      "logged": 1500,
+      "actual": 1500,
+      "status": "readback",
+      "tolerance": 0,
+      "source": "results/colab/p1_tc_pilot/{ncm_s,ts_fact_s,ts_ar_s,ar_s}__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "AR batch size",
+      "logged": 128,
+      "actual": 128,
+      "status": "agrees",
+      "tolerance": 0,
+      "source": "results/colab/p1_tc_pilot/{ncm_s,ts_fact_s,ts_ar_s,ar_s}__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "AR FLOPs (PFLOP proxy)",
+      "logged": 4.1,
+      "actual": 4.136959475712,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/p1_tc_pilot/{ncm_s,ts_fact_s,ts_ar_s,ar_s}__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "NCM FLOPs (PFLOP proxy)",
+      "logged": 4.0,
+      "actual": 3.96271484928,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/p1_tc_pilot/{ncm_s,ts_fact_s,ts_ar_s,ar_s}__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "FLOP-matched gap",
+      "logged": 1059.1,
+      "actual": 1059.0839589233399,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/p1_tc_pilot/{ncm_s,ts_fact_s,ts_ar_s,ar_s}__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "data-matched gap",
+      "logged": 1020.3,
+      "actual": 1020.2762968139648,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/p1_tc_pilot/{ncm_s,ts_fact_s,ts_ar_s,ar_s}__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "TC",
+      "logged": -57.3,
+      "actual": -57.31699752807617,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/p1_tc_pilot/{ncm_s,ts_fact_s,ts_ar_s,ar_s}__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "TC share (%)",
+      "logged": -5.4,
+      "actual": -5.411940861265086,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/p1_tc_pilot/{ncm_s,ts_fact_s,ts_ar_s,ar_s}__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "factorized relative difference (%)",
+      "logged": 0.01,
+      "actual": 0.009350188236229096,
+      "status": "agrees",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/p1_tc_pilot/{ncm_s,ts_fact_s,ts_ar_s,ar_s}__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "tokenizer full accuracy (%)",
+      "logged": 99.17,
+      "actual": 99.17,
+      "status": "agrees",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/p1_tc_pilot/{ncm_s,ts_fact_s,ts_ar_s,ar_s}__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "truncated accuracy first (%)",
+      "logged": 7.6,
+      "actual": 7.62,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/p1_tc_pilot/{ncm_s,ts_fact_s,ts_ar_s,ar_s}__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "truncated accuracy last (%)",
+      "logged": 99.2,
+      "actual": 99.17,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/p1_tc_pilot/{ncm_s,ts_fact_s,ts_ar_s,ar_s}__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "representation/excess term",
+      "logged": 1116.5,
+      "actual": 1116.5162170715332,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/p1_tc_pilot/{ncm_s,ts_fact_s,ts_ar_s,ar_s}__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "NCM excess lower bound (rounded nats)",
+      "logged": 1059,
+      "actual": 1059.0839589233399,
+      "status": "agrees",
+      "tolerance": 0.5000000001,
+      "source": "results/colab/p1_tc_pilot/{ncm_s,ts_fact_s,ts_ar_s,ar_s}__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "AR-code excess lower bound (conservative integer nats)",
+      "logged": 1116,
+      "actual": 1116,
+      "status": "agrees",
+      "tolerance": 0,
+      "source": "results/colab/p1_tc_pilot/{ncm_s,ts_fact_s,ts_ar_s,ar_s}__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "NCM excess fraction (%)",
+      "logged": 86,
+      "actual": 85.91515787297806,
+      "status": "agrees",
+      "tolerance": 0.5000000001,
+      "source": "results/colab/p1_tc_pilot/{ncm_s,ts_fact_s,ts_ar_s,ar_s}__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "TC level 1",
+      "logged": 1.1,
+      "actual": 1.0669975280761719,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/p1_tc_pilot/{ncm_s,ts_fact_s,ts_ar_s,ar_s}__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "TC level 2",
+      "logged": 1.9,
+      "actual": 1.8780059814453125,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/p1_tc_pilot/{ncm_s,ts_fact_s,ts_ar_s,ar_s}__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "TC level 3",
+      "logged": 1.0,
+      "actual": 0.9659957885742188,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/p1_tc_pilot/{ncm_s,ts_fact_s,ts_ar_s,ar_s}__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "TC level 4",
+      "logged": 0.3,
+      "actual": 0.27700042724609375,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/p1_tc_pilot/{ncm_s,ts_fact_s,ts_ar_s,ar_s}__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "TC level 5",
+      "logged": -2.0,
+      "actual": -2.0159912109375,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/p1_tc_pilot/{ncm_s,ts_fact_s,ts_ar_s,ar_s}__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "TC level 6",
+      "logged": -2.7,
+      "actual": -2.66400146484375,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/p1_tc_pilot/{ncm_s,ts_fact_s,ts_ar_s,ar_s}__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "TC level 7",
+      "logged": -2.6,
+      "actual": -2.6149978637695312,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/p1_tc_pilot/{ncm_s,ts_fact_s,ts_ar_s,ar_s}__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "TC level 8",
+      "logged": -21.0,
+      "actual": -20.979995727539062,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/p1_tc_pilot/{ncm_s,ts_fact_s,ts_ar_s,ar_s}__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "TC level 9",
+      "logged": -14.7,
+      "actual": -14.667007446289062,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/p1_tc_pilot/{ncm_s,ts_fact_s,ts_ar_s,ar_s}__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "TC level 10",
+      "logged": -17.3,
+      "actual": -17.335006713867188,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/p1_tc_pilot/{ncm_s,ts_fact_s,ts_ar_s,ar_s}__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "TC level 11",
+      "logged": -1.2,
+      "actual": -1.227996826171875,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/p1_tc_pilot/{ncm_s,ts_fact_s,ts_ar_s,ar_s}__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "TC evaluations",
+      "logged": 12,
+      "actual": 12,
+      "status": "agrees",
+      "tolerance": 0,
+      "source": "results/p1_tc_decomposition.json#/by_step",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "TC first evaluation",
+      "logged": -142,
+      "actual": -142.14501953125,
+      "status": "agrees",
+      "tolerance": 0.5000000001,
+      "source": "results/p1_tc_decomposition.json#/by_step",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "TC last evaluation",
+      "logged": -57,
+      "actual": -57.31699752807617,
+      "status": "agrees",
+      "tolerance": 0.5000000001,
+      "source": "results/p1_tc_decomposition.json#/by_step",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "TC rises monotonically over all evaluations",
+      "logged": true,
+      "actual": false,
+      "status": "mismatch",
+      "tolerance": 0,
+      "source": "results/p1_tc_decomposition.json#/by_step",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "TC negative at end",
+      "logged": true,
+      "actual": true,
+      "status": "agrees",
+      "tolerance": 0,
+      "source": "results/p1_tc_decomposition.json#/by_step",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "truncated accuracy monotonic",
+      "logged": true,
+      "actual": true,
+      "status": "agrees",
+      "tolerance": 0,
+      "source": "results/p1_tc_decomposition.json#/by_step",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "stored TC arithmetic at step 500",
+      "logged": -142.14501953125,
+      "actual": -142.14501953125,
+      "status": "agrees",
+      "tolerance": 5.1e-09,
+      "source": "results/p1_tc_decomposition.json#/by_step",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "stored TC arithmetic at step 1000",
+      "logged": -148.93302536010742,
+      "actual": -148.93302536010742,
+      "status": "agrees",
+      "tolerance": 5.1e-09,
+      "source": "results/p1_tc_decomposition.json#/by_step",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "stored TC arithmetic at step 1500",
+      "logged": -112.81899642944336,
+      "actual": -112.81899642944336,
+      "status": "agrees",
+      "tolerance": 5.1e-09,
+      "source": "results/p1_tc_decomposition.json#/by_step",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "stored TC arithmetic at step 2000",
+      "logged": -92.77101516723633,
+      "actual": -92.77101516723633,
+      "status": "agrees",
+      "tolerance": 5.1e-09,
+      "source": "results/p1_tc_decomposition.json#/by_step",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "stored TC arithmetic at step 2500",
+      "logged": -82.26200485229492,
+      "actual": -82.26200485229492,
+      "status": "agrees",
+      "tolerance": 5.1e-09,
+      "source": "results/p1_tc_decomposition.json#/by_step",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "stored TC arithmetic at step 3000",
+      "logged": -75.31501770019531,
+      "actual": -75.31501770019531,
+      "status": "agrees",
+      "tolerance": 5.1e-09,
+      "source": "results/p1_tc_decomposition.json#/by_step",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "stored TC arithmetic at step 3500",
+      "logged": -67.75497817993164,
+      "actual": -67.75497817993164,
+      "status": "agrees",
+      "tolerance": 5.1e-09,
+      "source": "results/p1_tc_decomposition.json#/by_step",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "stored TC arithmetic at step 4000",
+      "logged": -64.75100708007812,
+      "actual": -64.75100708007812,
+      "status": "agrees",
+      "tolerance": 5.1e-09,
+      "source": "results/p1_tc_decomposition.json#/by_step",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "stored TC arithmetic at step 4500",
+      "logged": -62.05299758911133,
+      "actual": -62.05299758911133,
+      "status": "agrees",
+      "tolerance": 5.1e-09,
+      "source": "results/p1_tc_decomposition.json#/by_step",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "stored TC arithmetic at step 5000",
+      "logged": -59.807003021240234,
+      "actual": -59.807003021240234,
+      "status": "agrees",
+      "tolerance": 5.1e-09,
+      "source": "results/p1_tc_decomposition.json#/by_step",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "stored TC arithmetic at step 5500",
+      "logged": -58.19099044799805,
+      "actual": -58.19099044799805,
+      "status": "agrees",
+      "tolerance": 5.1e-09,
+      "source": "results/p1_tc_decomposition.json#/by_step",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "stored TC arithmetic at step 6000",
+      "logged": -57.31699752807617,
+      "actual": -57.31699752807617,
+      "status": "agrees",
+      "tolerance": 5.1e-09,
+      "source": "results/p1_tc_decomposition.json#/by_step",
+      "note": ""
+    },
+    {
+      "entry": "R018",
+      "claim": "NCM -11 nats over last 500 steps; all four curves falling",
+      "status": "unverifiable",
+      "source": "results/colab/p1_tc_pilot/*__result.json",
+      "note": "JSON stores final values only for NCM/token AR; trajectories are in JSONL."
+    },
+    {
+      "entry": "R018",
+      "claim": "embedding norms 7--15; default norm ~16 at width 256; P1b ~1 CU",
+      "status": "unverifiable",
+      "source": "results/**/*.json",
+      "note": "Norm measurement not saved in JSON; init theory and future compute estimate are not run results."
+    },
+    {
+      "entry": "R018",
+      "claim": "128-token window length",
+      "status": "unverifiable",
+      "source": "results/colab/p1_tc_pilot/*__result.json",
+      "note": "The JSON has no sequence-length field; length is a data-pipeline/design constant."
+    },
+    {
+      "entry": "R019",
+      "claim": "tokenizer val_token_acc (%)",
+      "logged": 100,
+      "actual": 100.0,
+      "status": "readback",
+      "tolerance": 0.5000000001,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "tokenizer val_board_exact (%)",
+      "logged": 100,
+      "actual": 100.0,
+      "status": "readback",
+      "tolerance": 0.5000000001,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "NCM params (million)",
+      "logged": 5.66,
+      "actual": 5.661196,
+      "status": "readback",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "NCM steps",
+      "logged": 20000,
+      "actual": 20000,
+      "status": "readback",
+      "tolerance": 0,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "NCM batch",
+      "logged": 64,
+      "actual": 64,
+      "status": "readback",
+      "tolerance": 0,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "NCM NFE",
+      "logged": 12,
+      "actual": 12,
+      "status": "readback",
+      "tolerance": 0,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "NCM val solve (%)",
+      "logged": 2.1,
+      "actual": 2.1,
+      "status": "readback",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "NCM test solve (%)",
+      "logged": 3.0,
+      "actual": 3.0,
+      "status": "readback",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "NCM val puzzles",
+      "logged": 1000,
+      "actual": 1000,
+      "status": "readback",
+      "tolerance": 0,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "RNCM params (million)",
+      "logged": 5.66,
+      "actual": 5.661196,
+      "status": "readback",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "RNCM steps",
+      "logged": 20000,
+      "actual": 20000,
+      "status": "readback",
+      "tolerance": 0,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "RNCM batch",
+      "logged": 64,
+      "actual": 64,
+      "status": "readback",
+      "tolerance": 0,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "RNCM NFE",
+      "logged": 12,
+      "actual": 12,
+      "status": "readback",
+      "tolerance": 0,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "RNCM val solve (%)",
+      "logged": 0.4,
+      "actual": 0.4,
+      "status": "readback",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "RNCM test solve (%)",
+      "logged": 1.05,
+      "actual": 1.05,
+      "status": "readback",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "RNCM val puzzles",
+      "logged": 1000,
+      "actual": 1000,
+      "status": "readback",
+      "tolerance": 0,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "NCM le6 count",
+      "logged": 563,
+      "actual": 563,
+      "status": "readback",
+      "tolerance": 0,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "NCM le6 solve (%)",
+      "logged": 6.7,
+      "actual": 6.74955595026643,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "NCM 7-8 count",
+      "logged": 705,
+      "actual": 705,
+      "status": "readback",
+      "tolerance": 0,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "NCM 7-8 solve (%)",
+      "logged": 2.4,
+      "actual": 2.4113475177304964,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "NCM 9-10 count",
+      "logged": 322,
+      "actual": 322,
+      "status": "readback",
+      "tolerance": 0,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "NCM 9-10 solve (%)",
+      "logged": 0.6,
+      "actual": 0.6211180124223602,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "NCM ge11 count",
+      "logged": 119,
+      "actual": 119,
+      "status": "readback",
+      "tolerance": 0,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "NCM ge11 solve (%)",
+      "logged": 0.8,
+      "actual": 0.8403361344537815,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "NCM search count",
+      "logged": 291,
+      "actual": 291,
+      "status": "readback",
+      "tolerance": 0,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "NCM search solve (%)",
+      "logged": 0.7,
+      "actual": 0.6872852233676976,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "NCM test puzzles",
+      "logged": 2000,
+      "actual": 2000,
+      "status": "agrees",
+      "tolerance": 0,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "NCM weighted overall test (%)",
+      "logged": 3.0,
+      "actual": 3.0,
+      "status": "agrees",
+      "tolerance": 6e-10,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "RNCM le6 count",
+      "logged": 563,
+      "actual": 563,
+      "status": "readback",
+      "tolerance": 0,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "RNCM le6 solve (%)",
+      "logged": 3.4,
+      "actual": 3.374777975133215,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "RNCM 7-8 count",
+      "logged": 705,
+      "actual": 705,
+      "status": "readback",
+      "tolerance": 0,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "RNCM 7-8 solve (%)",
+      "logged": 0.3,
+      "actual": 0.28368794326241137,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "RNCM 9-10 count",
+      "logged": 322,
+      "actual": 322,
+      "status": "readback",
+      "tolerance": 0,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "RNCM 9-10 solve (%)",
+      "logged": 0.0,
+      "actual": 0.0,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "RNCM ge11 count",
+      "logged": 119,
+      "actual": 119,
+      "status": "readback",
+      "tolerance": 0,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "RNCM ge11 solve (%)",
+      "logged": 0.0,
+      "actual": 0.0,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "RNCM search count",
+      "logged": 291,
+      "actual": 291,
+      "status": "readback",
+      "tolerance": 0,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "RNCM search solve (%)",
+      "logged": 0.0,
+      "actual": 0.0,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "RNCM test puzzles",
+      "logged": 2000,
+      "actual": 2000,
+      "status": "agrees",
+      "tolerance": 0,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "RNCM weighted overall test (%)",
+      "logged": 1.05,
+      "actual": 1.05,
+      "status": "agrees",
+      "tolerance": 6e-10,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "deep puzzles",
+      "logged": 441,
+      "actual": 441,
+      "status": "agrees",
+      "tolerance": 0,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "NCM deep solved",
+      "logged": 3,
+      "actual": 3,
+      "status": "agrees",
+      "tolerance": 0,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "RNCM deep solved",
+      "logged": 0,
+      "actual": 0,
+      "status": "agrees",
+      "tolerance": 0,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "val difference (points)",
+      "logged": -1.7,
+      "actual": -1.7000000000000002,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "test difference (points)",
+      "logged": -1.95,
+      "actual": -1.95,
+      "status": "agrees",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "deep difference (points)",
+      "logged": -0.68,
+      "actual": -0.6802721088435374,
+      "status": "agrees",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "puzzle exposures (million)",
+      "logged": 1.28,
+      "actual": 1.28,
+      "status": "agrees",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "registered +1-point falsification fires",
+      "logged": true,
+      "actual": true,
+      "status": "agrees",
+      "tolerance": 0,
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "final train CE 0.159 / 0.127",
+      "status": "unverifiable",
+      "source": "results/colab/c4_sudoku_pilot/{sdk_ncm_s_hard,sdk_rncm_s_hard,sdk_tok_hard}__result.json",
+      "note": "Not present in JSON; training records are JSONL."
+    },
+    {
+      "entry": "R019",
+      "claim": "paper 51.2M exposures; released 25.5M parameters; 5x smaller body",
+      "status": "unverifiable",
+      "source": "results/**/*.json",
+      "note": "External/model-architecture provenance; not reconstructible from the saved result JSON."
+    },
+    {
+      "entry": "R020",
+      "claim": "reference val NLL",
+      "logged": 861.8,
+      "actual": 861.8385234375,
+      "status": "readback",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/w0_calib_diag/L_ts_released__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "GPT2 Gen-PPL",
+      "logged": 16.35,
+      "actual": 16.354138531169113,
+      "status": "agrees",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/w0_calib_diag/L_ts_released__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "GPT2 group SD",
+      "logged": 0.51,
+      "actual": 0.513380014128241,
+      "status": "agrees",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/w0_calib_diag/L_ts_released__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "TinyStories Gen-PPL",
+      "logged": 12.01,
+      "actual": 12.005005875512527,
+      "status": "agrees",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/w0_calib_diag/L_ts_released__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "entropy",
+      "logged": 3.976,
+      "actual": 3.9759374448153753,
+      "status": "readback",
+      "tolerance": 0.0005000001,
+      "source": "results/colab/w0_calib_diag/L_ts_released__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "MAUVE",
+      "logged": 0.888,
+      "actual": 0.88764081890029,
+      "status": "agrees",
+      "tolerance": 0.0005000001,
+      "source": "results/colab/w0_calib_diag/L_ts_released__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "MAUVE SD",
+      "logged": 0.021,
+      "actual": 0.02147675479425705,
+      "status": "agrees",
+      "tolerance": 0.0005000001,
+      "source": "results/colab/w0_calib_diag/L_ts_released__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "rep-2",
+      "logged": 0.1,
+      "actual": 0.1001834823671333,
+      "status": "readback",
+      "tolerance": 0.0005000001,
+      "source": "results/colab/w0_calib_diag/L_ts_released__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "NFE",
+      "logged": 11,
+      "actual": 11.0,
+      "status": "readback",
+      "tolerance": 0,
+      "source": "results/colab/w0_calib_diag/L_ts_released__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "groups",
+      "logged": 4,
+      "actual": 4,
+      "status": "agrees",
+      "tolerance": 0,
+      "source": "results/colab/w0_calib_diag/L_ts_released__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "samples per group",
+      "logged": 256,
+      "actual": 256.0,
+      "status": "agrees",
+      "tolerance": 0,
+      "source": "results/colab/w0_calib_diag/L_ts_released__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "stored genppl_gpt2-large",
+      "logged": 16.354138531169113,
+      "actual": 16.354138531169113,
+      "status": "agrees",
+      "tolerance": 1.5e-10,
+      "source": "results/colab/w0_calib_diag/L_ts_released__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "stored genppl_gpt2-large_sd",
+      "logged": 0.513380014128241,
+      "actual": 0.513380014128241,
+      "status": "agrees",
+      "tolerance": 1.5e-10,
+      "source": "results/colab/w0_calib_diag/L_ts_released__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "stored genppl_TinyStories-33M",
+      "logged": 12.005005875512529,
+      "actual": 12.005005875512527,
+      "status": "agrees",
+      "tolerance": 1.5e-10,
+      "source": "results/colab/w0_calib_diag/L_ts_released__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "stored genppl_TinyStories-33M_sd",
+      "logged": 0.3457938481994601,
+      "actual": 0.3457938481994601,
+      "status": "agrees",
+      "tolerance": 1.5e-10,
+      "source": "results/colab/w0_calib_diag/L_ts_released__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "stored mauve",
+      "logged": 0.88764081890029,
+      "actual": 0.88764081890029,
+      "status": "agrees",
+      "tolerance": 1.5e-10,
+      "source": "results/colab/w0_calib_diag/L_ts_released__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "stored mauve_sd",
+      "logged": 0.021476754794257053,
+      "actual": 0.02147675479425705,
+      "status": "agrees",
+      "tolerance": 1.5e-10,
+      "source": "results/colab/w0_calib_diag/L_ts_released__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "R010 reference genppl_gpt2-large",
+      "logged": 16.1,
+      "actual": 16.095380943507713,
+      "status": "readback",
+      "tolerance": 0.0050000001,
+      "source": "results/phase0_released_ncm_tinystories_eval.json",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "R010 reference genppl_gpt2-large_sd",
+      "logged": 0.59,
+      "actual": 0.5895279903318911,
+      "status": "readback",
+      "tolerance": 0.0050000001,
+      "source": "results/phase0_released_ncm_tinystories_eval.json",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "R008 reference NLL",
+      "logged": 870.5,
+      "actual": 870.4892905273438,
+      "status": "readback",
+      "tolerance": 0.050000000100000004,
+      "source": "results/phase0_released_generator_nll.json",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "R008 token-straddling NLL share (%)",
+      "logged": 43,
+      "actual": 43.36766177670753,
+      "status": "agrees",
+      "tolerance": 0.5000000001,
+      "source": "results/phase0_released_generator_nll.json",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "reference NLL change (%)",
+      "logged": -1.0,
+      "actual": -0.9937821388478096,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/w0_calib_diag/L_ts_released__result.json#/final_eval",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "diagnostic n",
+      "logged": 512,
+      "actual": 512,
+      "status": "readback",
+      "tolerance": 0,
+      "source": "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json#/by_j",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "diagnostic seed",
+      "logged": 0,
+      "actual": 0,
+      "status": "readback",
+      "tolerance": 0,
+      "source": "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json#/by_j",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "level 1 code positions",
+      "logged": 8,
+      "actual": 8,
+      "status": "readback",
+      "tolerance": 0,
+      "source": "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json#/by_j",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "level 3 code positions",
+      "logged": 24,
+      "actual": 24,
+      "status": "readback",
+      "tolerance": 0,
+      "source": "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json#/by_j",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "level 4 code positions",
+      "logged": 32,
+      "actual": 32,
+      "status": "readback",
+      "tolerance": 0,
+      "source": "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json#/by_j",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "level 5 code positions",
+      "logged": 40,
+      "actual": 40,
+      "status": "readback",
+      "tolerance": 0,
+      "source": "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json#/by_j",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "diagnostic GPT2 PPL j=-1",
+      "logged": 16.0,
+      "actual": 15.996700501016178,
+      "status": "readback",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json#/by_j",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "diagnostic GPT2 PPL j=0",
+      "logged": 15.88,
+      "actual": 15.883972768339833,
+      "status": "readback",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json#/by_j",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "diagnostic GPT2 PPL j=1",
+      "logged": 15.39,
+      "actual": 15.39460219943595,
+      "status": "readback",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json#/by_j",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "diagnostic GPT2 PPL j=2",
+      "logged": 14.47,
+      "actual": 14.472193340782013,
+      "status": "readback",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json#/by_j",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "diagnostic GPT2 PPL j=3",
+      "logged": 12.36,
+      "actual": 12.355118710093794,
+      "status": "readback",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json#/by_j",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "diagnostic GPT2 PPL j=4",
+      "logged": 10.6,
+      "actual": 10.595770908702342,
+      "status": "readback",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json#/by_j",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "diagnostic GPT2 PPL j=5",
+      "logged": 9.51,
+      "actual": 9.510929320838617,
+      "status": "readback",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json#/by_j",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "diagnostic GPT2 PPL j=6",
+      "logged": 9.15,
+      "actual": 9.15235196498048,
+      "status": "readback",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json#/by_j",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "diagnostic GPT2 PPL j=7",
+      "logged": 8.96,
+      "actual": 8.96197204387221,
+      "status": "readback",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json#/by_j",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "diagnostic GPT2 PPL j=8",
+      "logged": 8.81,
+      "actual": 8.810831435500686,
+      "status": "readback",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json#/by_j",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "diagnostic GPT2 PPL j=9",
+      "logged": 8.75,
+      "actual": 8.747056367650481,
+      "status": "readback",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json#/by_j",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "diagnostic GPT2 PPL j=10",
+      "logged": 8.67,
+      "actual": 8.66939817600715,
+      "status": "readback",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json#/by_j",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "diagnostic GPT2 PPL j=11",
+      "logged": 8.62,
+      "actual": 8.615446127807262,
+      "status": "readback",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json#/by_j",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "diagnostic TinyStories PPL j=-1",
+      "logged": 11.71,
+      "actual": 11.711076087247628,
+      "status": "readback",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json#/by_j",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "diagnostic TinyStories PPL j=11",
+      "logged": 3.49,
+      "actual": 3.4856904154008395,
+      "status": "readback",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json#/by_j",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "diagnostic PPL gap",
+      "logged": 7.38,
+      "actual": 7.381254373208916,
+      "status": "agrees",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json#/by_j",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "quality loss share level 0 (%)",
+      "logged": 2,
+      "actual": 1.5272164726567843,
+      "status": "agrees",
+      "tolerance": 0.5000000001,
+      "source": "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json#/by_j",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "quality loss share levels 1--3 (%)",
+      "logged": 48,
+      "actual": 47.80832470771372,
+      "status": "agrees",
+      "tolerance": 0.5000000001,
+      "source": "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json#/by_j",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "quality loss share levels 4--5 (%)",
+      "logged": 39,
+      "actual": 38.53260225766611,
+      "status": "agrees",
+      "tolerance": 0.5000000001,
+      "source": "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json#/by_j",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "quality loss share level 6 (%)",
+      "logged": 5,
+      "actual": 4.85794605805258,
+      "status": "agrees",
+      "tolerance": 0.5000000001,
+      "source": "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json#/by_j",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "quality loss share levels 7--11 (%)",
+      "logged": 5,
+      "actual": 7.273910503910801,
+      "status": "mismatch",
+      "tolerance": 0.5000000001,
+      "source": "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json#/by_j",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "quality loss share levels 8--10 (%)",
+      "logged": 3,
+      "actual": 3.963741839422173,
+      "status": "mismatch",
+      "tolerance": 0.5000000001,
+      "source": "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json#/by_j",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "quality loss share levels 1--5 (%)",
+      "logged": 87,
+      "actual": 86.34092696537984,
+      "status": "mismatch",
+      "tolerance": 0.5000000001,
+      "source": "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json#/by_j",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "straddling PPL cost (~0.2)",
+      "logged": 0.2,
+      "actual": 0.2925738678650607,
+      "status": "mismatch",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json#/by_j",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "entropy minimum",
+      "logged": 3.94,
+      "actual": 3.942675841811349,
+      "status": "agrees",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json#/by_j",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "entropy maximum",
+      "logged": 3.97,
+      "actual": 3.96824136206977,
+      "status": "agrees",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json#/by_j",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "MAUVE unconditional",
+      "logged": 0.82,
+      "actual": 0.8239648319737221,
+      "status": "agrees",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json#/by_j",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "MAUVE real level 0",
+      "logged": 0.87,
+      "actual": 0.871976193560539,
+      "status": "agrees",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json#/by_j",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "MAUVE j>=1 minimum",
+      "logged": 0.91,
+      "actual": 0.9085256966456946,
+      "status": "agrees",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json#/by_j",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "MAUVE j>=1 maximum",
+      "logged": 0.97,
+      "actual": 0.9647184212842672,
+      "status": "mismatch",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json#/by_j",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "levels 1--3 strict majority trigger",
+      "logged": false,
+      "actual": false,
+      "status": "agrees",
+      "tolerance": 0,
+      "source": "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json#/by_j",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "diagnostic SE ~0.4; ~0.2--0.3 schedule upside; A100 40GB, 5.4 CU/h, ~2.5 CU",
+      "status": "unverifiable",
+      "source": "results/colab/w0_calib_diag/diag_tf_levels_released_ts.json#/by_j",
+      "note": "Single diagnostic group cannot estimate SE. Upside/compute are estimates, not saved measurements."
+    },
+    {
+      "entry": "R020",
+      "claim": "Sudoku count",
+      "logged": 2000,
+      "actual": 2000,
+      "status": "agrees",
+      "tolerance": 0,
+      "source": "results/colab/w0_calib_diag/b2_jacobi_sudoku_hard.json",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "Sudoku histogram count matches n",
+      "logged": 2000,
+      "actual": 2000,
+      "status": "agrees",
+      "tolerance": 0,
+      "source": "results/colab/w0_calib_diag/b2_jacobi_sudoku_hard.json",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "Sudoku passes",
+      "logged": 6.41,
+      "actual": 6.406,
+      "status": "agrees",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/w0_calib_diag/b2_jacobi_sudoku_hard.json",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "Sudoku stored passes from histogram",
+      "logged": 6.406,
+      "actual": 6.406,
+      "status": "agrees",
+      "tolerance": 1.5e-10,
+      "source": "results/colab/w0_calib_diag/b2_jacobi_sudoku_hard.json",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "Sudoku stored NFE saving (%)",
+      "logged": 46.616666666666674,
+      "actual": 46.616666666666674,
+      "status": "agrees",
+      "tolerance": 1.5e-10,
+      "source": "results/colab/w0_calib_diag/b2_jacobi_sudoku_hard.json",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "Sudoku stored FLOP proxy ratio",
+      "logged": 1.8710594059405938,
+      "actual": 1.8710594059405938,
+      "status": "agrees",
+      "tolerance": 1.5e-10,
+      "source": "results/colab/w0_calib_diag/b2_jacobi_sudoku_hard.json",
+      "note": "Position-count proxy, not a measured FLOP ratio."
+    },
+    {
+      "entry": "R020",
+      "claim": "Sudoku sequential NFE",
+      "logged": 12,
+      "actual": 12,
+      "status": "agrees",
+      "tolerance": 0,
+      "source": "results/colab/w0_calib_diag/b2_jacobi_sudoku_hard.json",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "Sudoku NFE saving (%)",
+      "logged": 46.6,
+      "actual": 46.616666666666674,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/w0_calib_diag/b2_jacobi_sudoku_hard.json",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "Sudoku FLOP proxy ratio",
+      "logged": 1.87,
+      "actual": 1.8710594059405938,
+      "status": "agrees",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/w0_calib_diag/b2_jacobi_sudoku_hard.json",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "Sudoku fixed point equals sequential (%)",
+      "logged": 100,
+      "actual": 100.0,
+      "status": "readback",
+      "tolerance": 0,
+      "source": "results/colab/w0_calib_diag/b2_jacobi_sudoku_hard.json",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "Sudoku exact solve (%)",
+      "logged": 86.15,
+      "actual": 86.15,
+      "status": "readback",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/w0_calib_diag/b2_jacobi_sudoku_hard.json",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "Sudoku verifier passes",
+      "logged": 2.37,
+      "actual": 2.3655,
+      "status": "readback",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/w0_calib_diag/b2_jacobi_sudoku_hard.json",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "Sudoku verifier solve (%)",
+      "logged": 90.3,
+      "actual": 90.3,
+      "status": "readback",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/w0_calib_diag/b2_jacobi_sudoku_hard.json",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "Sudoku verifier gain (points)",
+      "logged": 4.15,
+      "actual": 4.1499999999999915,
+      "status": "agrees",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/w0_calib_diag/b2_jacobi_sudoku_hard.json",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "Sudoku stable passes",
+      "logged": 2.92,
+      "actual": 2.917,
+      "status": "readback",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/w0_calib_diag/b2_jacobi_sudoku_hard.json",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "Sudoku stable solve (%)",
+      "logged": 88.2,
+      "actual": 88.2,
+      "status": "readback",
+      "tolerance": 0.050000000100000004,
+      "source": "results/colab/w0_calib_diag/b2_jacobi_sudoku_hard.json",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "TinyStories count",
+      "logged": 512,
+      "actual": 512,
+      "status": "agrees",
+      "tolerance": 0,
+      "source": "results/colab/w0_calib_diag/b2_jacobi_tinystories_seed0.json",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "TinyStories histogram count matches n",
+      "logged": 512,
+      "actual": 512,
+      "status": "agrees",
+      "tolerance": 0,
+      "source": "results/colab/w0_calib_diag/b2_jacobi_tinystories_seed0.json",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "TinyStories passes",
+      "logged": 11.94,
+      "actual": 11.939453125,
+      "status": "agrees",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/w0_calib_diag/b2_jacobi_tinystories_seed0.json",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "TinyStories stored passes from histogram",
+      "logged": 11.939453125,
+      "actual": 11.939453125,
+      "status": "agrees",
+      "tolerance": 1.5e-10,
+      "source": "results/colab/w0_calib_diag/b2_jacobi_tinystories_seed0.json",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "TinyStories stored NFE saving (%)",
+      "logged": -8.540482954545459,
+      "actual": -8.540482954545459,
+      "status": "agrees",
+      "tolerance": 1.5e-10,
+      "source": "results/colab/w0_calib_diag/b2_jacobi_tinystories_seed0.json",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "TinyStories stored FLOP proxy ratio",
+      "logged": 11.756051387288787,
+      "actual": 11.756051387288787,
+      "status": "agrees",
+      "tolerance": 1.5e-10,
+      "source": "results/colab/w0_calib_diag/b2_jacobi_tinystories_seed0.json",
+      "note": "Position-count proxy, not a measured FLOP ratio."
+    },
+    {
+      "entry": "R020",
+      "claim": "TinyStories sequential NFE",
+      "logged": 11,
+      "actual": 11,
+      "status": "agrees",
+      "tolerance": 0,
+      "source": "results/colab/w0_calib_diag/b2_jacobi_tinystories_seed0.json",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "WMT14 count",
+      "logged": 3003,
+      "actual": 3003,
+      "status": "agrees",
+      "tolerance": 0,
+      "source": "results/colab/w0_calib_diag/b2_jacobi_wmt14_n3003.json",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "WMT14 histogram count matches n",
+      "logged": 3003,
+      "actual": 3003,
+      "status": "agrees",
+      "tolerance": 0,
+      "source": "results/colab/w0_calib_diag/b2_jacobi_wmt14_n3003.json",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "WMT14 passes",
+      "logged": 11.07,
+      "actual": 11.066600066600067,
+      "status": "agrees",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/w0_calib_diag/b2_jacobi_wmt14_n3003.json",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "WMT14 stored passes from histogram",
+      "logged": 11.066600066600067,
+      "actual": 11.066600066600067,
+      "status": "agrees",
+      "tolerance": 1.5e-10,
+      "source": "results/colab/w0_calib_diag/b2_jacobi_wmt14_n3003.json",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "WMT14 stored NFE saving (%)",
+      "logged": -0.6054551509097061,
+      "actual": -0.6054551509097061,
+      "status": "agrees",
+      "tolerance": 1.5e-10,
+      "source": "results/colab/w0_calib_diag/b2_jacobi_wmt14_n3003.json",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "WMT14 stored FLOP proxy ratio",
+      "logged": 3.3005649321438795,
+      "actual": 3.3005649321438795,
+      "status": "agrees",
+      "tolerance": 1.5e-10,
+      "source": "results/colab/w0_calib_diag/b2_jacobi_wmt14_n3003.json",
+      "note": "Position-count proxy, not a measured FLOP ratio."
+    },
+    {
+      "entry": "R020",
+      "claim": "WMT14 sequential NFE",
+      "logged": 11,
+      "actual": 11,
+      "status": "agrees",
+      "tolerance": 0,
+      "source": "results/colab/w0_calib_diag/b2_jacobi_wmt14_n3003.json",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "WMT14 fixed point equals sequential (%)",
+      "logged": 100,
+      "actual": 100.0,
+      "status": "readback",
+      "tolerance": 0,
+      "source": "results/colab/w0_calib_diag/b2_jacobi_wmt14_n3003.json",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "WMT14 exact BLEU",
+      "logged": 22.63,
+      "actual": 22.625980088896835,
+      "status": "readback",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/w0_calib_diag/b2_jacobi_wmt14_n3003.json",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "WMT14 stable passes",
+      "logged": 10.59,
+      "actual": 10.588411588411589,
+      "status": "readback",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/w0_calib_diag/b2_jacobi_wmt14_n3003.json",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "WMT14 stable BLEU",
+      "logged": 22.64,
+      "actual": 22.639255560616412,
+      "status": "readback",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/w0_calib_diag/b2_jacobi_wmt14_n3003.json",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "WMT14 criterion d passes",
+      "logged": 8.25,
+      "actual": 8.25,
+      "status": "agrees",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/w0_calib_diag/b2_jacobi_wmt14_n3003.json",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "WMT14 criterion d BLEU",
+      "logged": 21.63,
+      "actual": 21.625980088896835,
+      "status": "agrees",
+      "tolerance": 0.0050000001,
+      "source": "results/colab/w0_calib_diag/b2_jacobi_wmt14_n3003.json",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "b2_jacobi_levels_hard.json is a stale copy",
+      "logged": true,
+      "actual": true,
+      "status": "agrees",
+      "tolerance": 0,
+      "source": "results/b2_jacobi_levels_hard.json",
+      "note": ""
+    },
+    {
+      "entry": "R020",
+      "claim": "b2_jacobi_wmt14_n6.json is a stale copy",
+      "logged": true,
+      "actual": true,
+      "status": "agrees",
+      "tolerance": 0,
+      "source": "results/b2_jacobi_wmt14_n6.json",
+      "note": ""
+    },
+    {
+      "entry": "R019",
+      "claim": "released reference test solve (%)",
+      "logged": 86.3,
+      "actual": 86.3,
+      "status": "readback",
+      "tolerance": 0.050000000100000004,
+      "source": "results/phase0_sudoku_repro_hard.json",
+      "note": ""
+    },
+    {
+      "entry": "R021",
+      "claim": "puzzles",
+      "logged": 250,
+      "actual": 250,
+      "status": "readback",
+      "tolerance": 0,
+      "source": "results/sudoku_repair_ceiling_val.json",
+      "note": ""
+    },
+    {
+      "entry": "R021",
+      "claim": "CPU minutes (log: 1.6)",
+      "logged": 1.6,
+      "actual": 1.6464061935742695,
+      "status": "agrees",
+      "tolerance": 0.050000000100000004,
+      "source": "results/sudoku_repair_ceiling_val.json",
+      "note": "JSON records wall time, not process CPU time."
+    },
+    {
+      "entry": "R021",
+      "claim": "baseline solve (%)",
+      "logged": 88.0,
+      "actual": 88.0,
+      "status": "readback",
+      "tolerance": 0.050000000100000004,
+      "source": "results/sudoku_repair_ceiling_val.json",
+      "note": ""
+    },
+    {
+      "entry": "R021",
+      "claim": "failure count",
+      "logged": 30,
+      "actual": 30,
+      "status": "agrees",
+      "tolerance": 0,
+      "source": "results/sudoku_repair_ceiling_val.json",
+      "note": ""
+    },
+    {
+      "entry": "R021",
+      "claim": "oracle solved after 0 levels (%)",
+      "logged": 88.0,
+      "actual": 88.0,
+      "status": "readback",
+      "tolerance": 0.050000000100000004,
+      "source": "results/sudoku_repair_ceiling_val.json",
+      "note": ""
+    },
+    {
+      "entry": "R021",
+      "claim": "oracle solved after 1 levels (%)",
+      "logged": 88.8,
+      "actual": 88.8,
+      "status": "readback",
+      "tolerance": 0.050000000100000004,
+      "source": "results/sudoku_repair_ceiling_val.json",
+      "note": ""
+    },
+    {
+      "entry": "R021",
+      "claim": "oracle solved after 2 levels (%)",
+      "logged": 88.8,
+      "actual": 88.8,
+      "status": "readback",
+      "tolerance": 0.050000000100000004,
+      "source": "results/sudoku_repair_ceiling_val.json",
+      "note": ""
+    },
+    {
+      "entry": "R021",
+      "claim": "oracle solved after 3 levels (%)",
+      "logged": 90.4,
+      "actual": 90.4,
+      "status": "readback",
+      "tolerance": 0.050000000100000004,
+      "source": "results/sudoku_repair_ceiling_val.json",
+      "note": ""
+    },
+    {
+      "entry": "R021",
+      "claim": "oracle solved after 4 levels (%)",
+      "logged": 93.2,
+      "actual": 93.2,
+      "status": "readback",
+      "tolerance": 0.050000000100000004,
+      "source": "results/sudoku_repair_ceiling_val.json",
+      "note": ""
+    },
+    {
+      "entry": "R021",
+      "claim": "oracle solved after 5 levels (%)",
+      "logged": 95.2,
+      "actual": 95.2,
+      "status": "readback",
+      "tolerance": 0.050000000100000004,
+      "source": "results/sudoku_repair_ceiling_val.json",
+      "note": ""
+    },
+    {
+      "entry": "R021",
+      "claim": "oracle solved after 6 levels (%)",
+      "logged": 95.6,
+      "actual": 95.6,
+      "status": "readback",
+      "tolerance": 0.050000000100000004,
+      "source": "results/sudoku_repair_ceiling_val.json",
+      "note": ""
+    },
+    {
+      "entry": "R021",
+      "claim": "oracle solved after 7 levels (%)",
+      "logged": 95.6,
+      "actual": 95.6,
+      "status": "readback",
+      "tolerance": 0.050000000100000004,
+      "source": "results/sudoku_repair_ceiling_val.json",
+      "note": ""
+    },
+    {
+      "entry": "R021",
+      "claim": "oracle solved after 8 levels (%)",
+      "logged": 95.6,
+      "actual": 95.6,
+      "status": "readback",
+      "tolerance": 0.050000000100000004,
+      "source": "results/sudoku_repair_ceiling_val.json",
+      "note": ""
+    },
+    {
+      "entry": "R021",
+      "claim": "initial failures fixed after 1 levels (%)",
+      "logged": 7,
+      "actual": 6.67,
+      "status": "readback",
+      "tolerance": 0.5000000001,
+      "source": "results/sudoku_repair_ceiling_val.json",
+      "note": ""
+    },
+    {
+      "entry": "R021",
+      "claim": "net gain agrees with failure-fix aggregate after 1",
+      "logged": 6.67,
+      "actual": 6.666666666666643,
+      "status": "agrees",
+      "tolerance": 0.0050000001,
+      "source": "results/sudoku_repair_ceiling_val.json",
+      "note": "No per-board trajectories are stored to independently reclassify repairs."
+    },
+    {
+      "entry": "R021",
+      "claim": "initial failures fixed after 3 levels (%)",
+      "logged": 20,
+      "actual": 20.0,
+      "status": "readback",
+      "tolerance": 0.5000000001,
+      "source": "results/sudoku_repair_ceiling_val.json",
+      "note": ""
+    },
+    {
+      "entry": "R021",
+      "claim": "net gain agrees with failure-fix aggregate after 3",
+      "logged": 20.0,
+      "actual": 20.00000000000005,
+      "status": "agrees",
+      "tolerance": 0.0050000001,
+      "source": "results/sudoku_repair_ceiling_val.json",
+      "note": "No per-board trajectories are stored to independently reclassify repairs."
+    },
+    {
+      "entry": "R021",
+      "claim": "initial failures fixed after 6 levels (%)",
+      "logged": 63,
+      "actual": 63.33,
+      "status": "readback",
+      "tolerance": 0.5000000001,
+      "source": "results/sudoku_repair_ceiling_val.json",
+      "note": ""
+    },
+    {
+      "entry": "R021",
+      "claim": "net gain agrees with failure-fix aggregate after 6",
+      "logged": 63.33,
+      "actual": 63.333333333333286,
+      "status": "agrees",
+      "tolerance": 0.0050000001,
+      "source": "results/sudoku_repair_ceiling_val.json",
+      "note": "No per-board trajectories are stored to independently reclassify repairs."
+    },
+    {
+      "entry": "R021",
+      "claim": "plateau starts after six levels",
+      "logged": true,
+      "actual": true,
+      "status": "agrees",
+      "tolerance": 0,
+      "source": "results/sudoku_repair_ceiling_val.json",
+      "note": ""
+    },
+    {
+      "entry": "R021",
+      "claim": "released test comparison (%)",
+      "logged": 86.3,
+      "actual": 86.3,
+      "status": "readback",
+      "tolerance": 0.050000000100000004,
+      "source": "results/phase0_sudoku_repro_hard.json",
+      "note": ""
+    },
+    {
+      "entry": "R021",
+      "claim": "finest codebook has 16 codes",
+      "status": "unverifiable",
+      "source": "results/sudoku_repair_ceiling_val.json",
+      "note": "Architecture property: present in the released config, not this result JSON."
+    },
+    {
+      "entry": "R018--R021",
+      "claim": "registration thresholds, level labels, dates and identifiers",
+      "status": "unverifiable",
+      "source": "log.md; docs/preregistration.md",
+      "note": "Design/provenance constants are not measured outcomes; no numerical recomputation can validate them."
+    }
+  ]
+}

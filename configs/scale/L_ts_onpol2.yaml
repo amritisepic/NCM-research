@@ -8,6 +8,6 @@ train: {steps: 1080, batch_size: 256, grad_accum: 8, lr: 5.0e-05, warmup: 200, m
 sample_eval:
   every: 600
   n: 256
-  final_seeds: [42, 0, 1, 2]
+  final_seeds: [42, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]   # W1b: 16 groups
   final_n: 256
   mauve: true

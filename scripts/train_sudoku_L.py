@@ -210,21 +210,24 @@ def pool_loss():
 def evaluate(prompts, sols, caps=(4, 8, 12, 16, 24), bs=250, final=False):
     net.eval()
     res = {"n": len(prompts)}
-    seq_ok, d2 = [], {"check": [], "nocheck": []}
+    # S1b: for the repair arm, also board feedback zeroed (fb0) and taken from another puzzle's board (fbshuf)
+    d2 = {m: [] for m in ("check", "nocheck") + (("check_fb0", "check_fbshuf") if fb is not None else ())}
+    seq_ok = []
     for s in range(0, len(prompts), bs):
         p = torch.as_tensor(prompts[s:s + bs], device=dev)
         y = [cells(r) for r in np.asarray(sols[s:s + bs]).tolist()]
         g = net.generate(None, p, temperature=0.0, top_k=0, top_p=1.0, cfg_scale=0.0, cfg_null_eos=None)
         seq_ok += [cells(r) == t for r, t in zip(decode_ids(g).tolist(), y)]
-        for mode in ("check", "nocheck"):
+        for mode in d2:
             def prefix_fn(codes, has_prev):
                 z = wte(p)
-                if fb is None or not has_prev:
+                if fb is None or not has_prev or mode == "check_fb0":
                     return z
-                return fb(z, decode_ids(codes))
+                guess = decode_ids(codes)
+                return fb(z, guess.roll(1, 0) if mode == "check_fbshuf" else guess)
 
             out = jacobi_decode(net, prefix_fn, len(p), S, dev, max(caps), keep_history=True,
-                                check_fn=(lambda c: checks(decode_ids(c), p)) if mode == "check" else None)
+                                check_fn=(lambda c: checks(decode_ids(c), p)) if mode.startswith("check") else None)
             boards = [[cells(r) for r in decode_ids(h).tolist()] for h in out["history"]]
             nfe = out["nfe"].tolist()
             for j in range(len(p)):

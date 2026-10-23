@@ -19,6 +19,7 @@ Writes run_dir/{ckpt.pt, final.pt, metrics.jsonl, result.json, samples_final.jso
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 import os
 import sys
@@ -70,7 +71,22 @@ data_rng = np.random.default_rng(seed)
 stream = TrainStream(a.data_dir) if a.data_dir else TrainStream()
 val_x = torch.from_numpy(examples("val", int(tc.get("eval_n", 1000))))
 os.makedirs(a.run_dir, exist_ok=True)
-OmegaConf.save(cfg, os.path.join(a.run_dir, "config.yaml"))
+ckpt_path, cfg_path = os.path.join(a.run_dir, "ckpt.pt"), os.path.join(a.run_dir, "config.yaml")
+if a.eval_only and os.path.exists(ckpt_path):
+    sys.exit(f"--eval_only evaluates the initial model, but {a.run_dir} holds a training checkpoint")
+
+
+def _run_key(c):
+    """What defines a training run (micro-batching and eval/log cadence do not change it)."""
+    c = OmegaConf.to_container(c, resolve=True)
+    t = {k: v for k, v in c.get("train", {}).items() if k not in ("grad_accum", "eval_every", "ckpt_every", "log_every")}
+    return [c.get("init"), c.get("model"), c.get("corruption"), t]
+
+
+if os.path.exists(ckpt_path) and os.path.exists(cfg_path) and not a.calib_steps:
+    if _run_key(OmegaConf.load(cfg_path)) != _run_key(cfg):   # codex audit F5
+        sys.exit(f"{a.run_dir} holds a checkpoint of a different run (init / model / corruption / train differ)")
+OmegaConf.save(cfg, cfg_path)
 if device == "cuda":
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
@@ -93,9 +109,19 @@ cc = cfg.get("corruption", {})
 corr = CorruptionCfg(mode=str(cc.get("mode", "none")), mean_rate=float(cc.get("mean_rate", 0.5)),
                      spread=float(cc.get("spread", 0.5)), retarget=bool(cc.get("retarget", False)),
                      soft_tau=float(cc.get("soft_tau", 0.0)), soft_topm=int(cc.get("soft_topm", 16)))
+if corr.soft_tau > 0:
+    # W1b: freeze the per-level soft-label gap (mean nearest / second-nearest distance gap over 512 val windows), so
+    # the targets do not depend on the micro-batch (codex audit F7)
+    _gaps = [build_hierarchy(tok, val_x[s_:s_ + 128].to(device), corr,
+                             generator=torch.Generator(device=device).manual_seed(0))["soft_gap_per_level"]
+             for s_ in range(0, 512, 128)]
+    corr = dataclasses.replace(corr, soft_gap=tuple(float(np.mean(g)) for g in zip(*_gaps)))
+    print(f"[gen] frozen soft-label gap per level: {[round(g, 4) for g in corr.soft_gap]}", flush=True)
 policy_temp = float(cc.get("policy_temp", 1.0))
 policy_passes = int(cc.get("policy_passes", 1))   # 1 = one-step errors; t = errors after t parallel passes
 fwd = FL.ncm_gen_fwd_per_seq(n_embd, n_layer, levels, codebook=tok.vq.vqvae_vocab_sizes[0], vq_dim=tok.embed_dim)
+# FLOP-matching unit (W1): generator-only proxy = (fwd + 2x bwd + policy passes) x analytic forward per window. It omits
+# tokenizer / hierarchy work and prices masked attention as block-sparse (the same in every arm; codex audit F4).
 fl_step = (3 + (policy_passes if corr.mode == "onpolicy" else 0)) * fwd * int(tc.batch_size)
 params = [p for p in net.parameters() if p.requires_grad]
 trainer = Trainer(a.run_dir, params, max_lr=float(tc.lr), total_steps=int(tc.steps), warmup=int(tc.warmup),
@@ -103,7 +129,7 @@ trainer = Trainer(a.run_dir, params, max_lr=float(tc.lr), total_steps=int(tc.ste
                   ckpt_every=int(tc.ckpt_every), device=device, amp=bool(tc.get("amp", True)),
                   min_lr_frac=float(tc.get("min_lr_frac", 0.1)))
 modules = {"model": net}
-trainer.maybe_resume(modules, data_rng)
+resume_extra = trainer.maybe_resume(modules, data_rng)
 fnet = torch.compile(net) if (device == "cuda" and bool(tc.get("compile", False))) else net
 print(f"[gen] init={cfg.init} params {n_params(net) / 1e6:.2f}M | corruption {corr} policy_temp {policy_temp} | "
       f"{fl_step / 1e12:.2f} TFLOP/step, {fl_step * int(tc.steps) / 1e15:.1f} PFLOP total | device {device}", flush=True)
@@ -124,16 +150,18 @@ def policy_codes(x, gen):
     with torch.autocast(device_type=device, enabled=False):
         idx = tok.vq.z_to_idx(tok._encode_pre_quant(x))
     codes = idx
+    # inference level 0 (unigram), drawn once: pass 1 sees the clean levels, pass t > 1 sees pass t-1's hierarchy
+    # including this level 0 (codex audit F3)
+    lv0 = torch.multinomial(L0, x.shape[0] * l0, replacement=True, generator=gen).view(x.shape[0], l0)
     for _ in range(policy_passes):
         with torch.autocast(device_type=device, enabled=False):
             z_in = tok.vq.idx_to_ncm_input(codes)
-        with trainer.ctx:
-            logits = fnet(torch.cat([prefix_emb(x.shape[0]), z_in], 1)).float()
+        # runs inside compute_loss's autocast; entering another context here leaked autocast (codex audit F2)
+        logits = fnet(torch.cat([prefix_emb(x.shape[0]), z_in], 1)).float()
         samp = torch.distributions.Categorical(logits=logits / policy_temp).sample()
-        codes = torch.cat([idx[:, :l0], samp], 1)
+        codes = torch.cat([lv0, samp], 1)
     net.train(was)
-    lv0 = torch.multinomial(L0, x.shape[0] * l0, replacement=True, generator=gen).view(x.shape[0], l0)
-    return torch.cat([lv0, samp], 1)
+    return codes
 
 
 def compute_loss(x, gen):
@@ -149,7 +177,9 @@ def compute_loss(x, gen):
         loss = F.cross_entropy(logits.float().reshape(-1, V), tgt.reshape(-1))
     with torch.no_grad():
         agree = (logits.argmax(-1) == h["canonical"][:, l0:]).float().mean().item()
-    return loss, {"corrupted_frac": round(h["corrupted_frac"], 4), "argmax_eq_canonical": round(agree, 4),
+    return loss, {"corrupted_frac": round(h["corrupted_frac"], 4),
+                  "corrupted_frac_per_level": [round(f, 4) for f in h["corrupted_frac_per_level"]],
+                  "argmax_eq_canonical": round(agree, 4),
                   "labels_changed": round((h["targets"] != h["canonical"]).float().mean().item(), 4)}
 
 
@@ -182,7 +212,7 @@ def draw_samples(n, seed_, bs=256):
     for s in range(0, n, bs):
         b = min(bs, n - s)
         lv0 = torch.multinomial(L0, b * l0, replacement=True, generator=g).view(b, l0)
-        with trainer.ctx:
+        with torch.autocast(device_type=device, enabled=False):   # fp32 sampling incl. tokenizer (codex audit F8)
             codes = net.generate(lv0, torch.full((b, 1), EOS, device=device), temperature=1.0, top_k=0, top_p=1.0,
                                  cfg_scale=0.0, cfg_null_eos=EOS)
         with torch.autocast(device_type=device, enabled=False):
@@ -195,6 +225,18 @@ def draw_samples(n, seed_, bs=256):
 
 
 def sample_metrics(n, seeds, mauve=False):
+    """Isolated from the training RNG streams (codex audit F6), with TF32 off (F8)."""
+    devices = [torch.cuda.current_device()] if device == "cuda" else []
+    tf32 = (torch.backends.cuda.matmul.allow_tf32, torch.backends.cudnn.allow_tf32)
+    torch.backends.cuda.matmul.allow_tf32 = torch.backends.cudnn.allow_tf32 = False
+    try:
+        with torch.random.fork_rng(devices=devices):
+            return _sample_metrics(n, seeds, mauve)
+    finally:
+        torch.backends.cuda.matmul.allow_tf32, torch.backends.cudnn.allow_tf32 = tf32
+
+
+def _sample_metrics(n, seeds, mauve=False):
     from ncmr.eval_text import evaluate_samples, mauve_features
     ids, groups, nfe, wall = [], [], 0.0, 0.0
     for sd in seeds:
@@ -221,7 +263,19 @@ def sample_metrics(n, seeds, mauve=False):
 # ------------------------------------------------------------------------------------------------ loop
 net.train()
 deadline = time.time() + 60 * a.max_minutes if a.max_minutes else None
-gen = torch.Generator(device=device).manual_seed(seed * 7919 + trainer.step)
+gen = torch.Generator(device=device).manual_seed(seed * 7919)
+if trainer.step:
+    if "corruption_rng" in resume_extra:   # codex audit F1
+        gen.set_state(resume_extra["corruption_rng"].cpu())
+    else:   # checkpoints written before that fix
+        gen.manual_seed(seed * 7919 + trainer.step)
+        print("[resume] checkpoint has no corruption RNG state: reseeded (not bit-identical to an uninterrupted run)")
+
+
+def save_ckpt():
+    trainer.save(modules, data_rng, extra={"corruption_rng": gen.get_state()})
+
+
 accum = int(tc.get("grad_accum", 1))
 calib = Calib(a.run_dir, a.calib_steps, fl_step) if a.calib_steps else None
 every_s = int(sc.get("every", 0))
@@ -251,9 +305,9 @@ while trainer.step < int(tc.steps):
             ev.update({k: v for k, v in sm.items() if not k.endswith(("per_group", "per_seed"))})
         print(json.dumps(trainer.log({"eval": ev})), flush=True)
     if trainer.step % int(tc.ckpt_every) == 0:
-        trainer.save(modules, data_rng)
+        save_ckpt()
     if deadline and time.time() > deadline:
-        trainer.save(modules, data_rng)
+        save_ckpt()
         print("[stop] time budget reached; resume by re-running the same command", flush=True)
         sys.exit(0)
 
@@ -261,7 +315,7 @@ if calib:
     calib.report(trainer.step, {"init": cfg.init, "corruption": corr.mode, "batch_size": int(tc.batch_size), "grad_accum": accum})
     sys.exit(0)
 if not a.eval_only:
-    trainer.save(modules, data_rng)
+    save_ckpt()
     torch.save({"model": net.state_dict(), "init": cfg.init, "model_cfg": OmegaConf.to_container(cfg.model) if "model" in cfg else {},
                 "level0_unigram": L0.cpu()}, os.path.join(a.run_dir, "final.pt"))
 res_path = os.path.join(a.run_dir, "result.json")
@@ -277,6 +331,6 @@ wall = trainer.wall_prev + time.time() - trainer.t_start
 res = {"run": os.path.basename(a.run_dir.rstrip("/")), "config": OmegaConf.to_container(cfg),
        "params_total": n_params(net), "steps": trainer.step, "flops_est_total": fl_step * trainer.step,
        "wall_s": wall, "device": device, "gpu": torch.cuda.get_device_name() if device == "cuda" else None,
-       "torch": torch.__version__, "final_eval": final}
+       "torch": torch.__version__, "eval_precision": "fp32 sampling and scoring, TF32 off", "final_eval": final}
 json.dump(res, open(res_path, "w"), indent=1)
 print(json.dumps({k: v for k, v in res.items() if k != "config"}, indent=1, default=str))

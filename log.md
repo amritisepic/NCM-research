@@ -314,3 +314,67 @@ Compute units: CPU-h = wall-clock hours on the 4-core cloud container (Xeon w/ A
   newstest2013 (3000; 2953 within the 63-id target limit for NLL).
 - Notebooks: `w2b_L_sdk_*` (4), `w2c_L_wmt_*` (2), `p1b_tc_rerun`; seed-independent commands now run once per
   notebook. CPU: ~0.7 h this session.
+
+## R023 — external hostile review: corrections to R008, R018, R019, R020 (2026-10-23)
+- Review (GPT, of commit `1c7185c`) saved verbatim in `docs/reviews/gpt_hostile_review_2026-10-23.md`; triage of every
+  finding in `docs/reviews/triage_2026-10-23.md`. All its recomputed numbers were checked against `results/**.json`
+  and agree. The codex audit's numeric recomputation (231 checks, R024) found the same R020 slips plus two minor ones.
+- **R008 correction:** codes are a deterministic function of the text, so H(codes) <= H(text); equality would need
+  invertibility (full-depth reconstruction is ~99%, so near-equality is plausible, not shown).
+- **R018 corrections.** (1) The reading "≥ 86% of NCM's NLL is model excess ... mostly learnability cost, not
+  information" is **withdrawn**. The excess over H(codes) (point estimate 1059.1 / 1232.7 = 85.9%, small models,
+  one seed) contains the within-level factorization cost (TC) as well as approximation and optimization error; the
+  bound cannot split them. Counter-example: 8 copies of one fair bit have 1 bit of joint entropy and 8 bits of optimal
+  factorized cross-entropy, an 87.5% excess that is entirely TC. Consequence: the motivation of B7 / B1b ("canonical
+  codes are hard to learn") loses this support; R014 (near-equivalent codes at fine levels) still stands. (2) The TC
+  trend is -142.1, -148.9, then rising to -57.3, not monotone. (3) P1b's premise was false (the AR probe's attention
+  mask differs from the factorized probe's, so they differ at step 0); P1b withdrawn before launch, P1c planned
+  (`preregistration.md`).
+- **R019 correction (scope):** "almost no power" was wrong: RNCM's 0/441 on >= 9 rounds bounds its deep solve rate at
+  <= 0.68% (one-sided 95%), so a +10-point gain was detectable. The limit is the regime: both arms near floor, trained
+  from scratch at 5.7M parameters and 1.28M exposures. Verdict stands as registered, scoped to "carry hurts under this
+  recipe"; it says nothing about carry in a competent model. Lower training CE with worse decoding fits overfitting or
+  optimization differences as well as exposure bias. Carry stays out of S1; revisit only if S1 shows that a competent
+  model's remaining failures concentrate at high propagation depth.
+- **R020 corrections:** of the 7.381-point gap, levels 1-5 hold **86.3%** (not 87%: 47.8 + 38.5), level 6 4.9%,
+  levels 7-11 **7.3%** (not 5%), token-straddling L8-L10 **0.29 Gen-PPL = 4.0%** (not ~0.2 / 3%); levels 6-11 12%
+  (STATE said 10%). MAUVE for j >= 1: 0.91-0.96. Command JSONs do hold `wall_s` (only setup / billed time is missing).
+  **Interpretation narrowed:** the curve is an oracle intervention (real coarse codes supplied), not an attribution of
+  the loss to levels; it says nothing about fine levels after a wrong coarse plan or about a retrained level schedule.
+  Bet 7 stays demoted only for the stated reason (small fine-level cost under real coarse codes). The C2 trigger
+  (48% vs 50%) is inside the noise of a one-group diagnostic and is treated as uninformative; C2 waits for P1c.
+- **Criterion (d) accounting:** verifier halting is a legitimate adaptive rule (it uses only rules and clues). Logical
+  NFE is not realized GPU time (batched decoding keeps stopped examples), and the w0 "FLOPs ratios" are position
+  counts without attention. Any (d) claim now needs batch-1 wall-clock and an attention-inclusive cost (S1b, J1a).
+- **Plan changes (all registered before any run):** W1b (16 sample groups, fp32 eval, screen 0.35 against each
+  arm's registered comparators, step-matched A1 curve, conditional controls A1m / A6s), S1b (feedback zero / shuffle
+  ablation, H10 credit rule), J1a (capped-Jacobi curves at 6 / 8 / 9; J2 must beat capped J0 and J1 at equal or more
+  passes). Literature added to `phase1_literature_and_candidates.md` (scheduled sampling, GLAT, Infinity, CLLMs,
+  Jacobi decoding for MT, RRN / HRM / TRM): B1b is close to Infinity's re-quantized self-correction; J2 is CLLM-style
+  consistency across NCM levels. No prior work predicts which arm wins.
+
+## R024 — codex code audit of the W1 trainer: fixes and tests (2026-10-23)
+- Audit (`docs/reviews/codex_audit.md`, `codex_audit_numbers.json`) of `scripts/train_gen.py` and
+  `src/ncmr/corruption.py` at the W1 state, numeric recomputation of R018-R021 (`tests/recompute_r018_r021.py`), and
+  CPU tests on the released Sudoku-hard model. Triage in `docs/reviews/triage_2026-10-23.md`.
+- **Two bugs would have invalidated W1:** (F2) `policy_codes` re-entered the caller's `torch.autocast` object; on exit
+  autocast stayed on, so every later forward of the on-policy arms (val NLL, sampling, the GPT-2 large scorer) ran in
+  bf16 while the uniform arms ran in fp32. Only `train_gen.py` nested the context; P1, C4, w0, Sudoku and WMT14 code
+  never did, so no logged result is affected. (F3) two-pass policy codes conditioned pass 2 on the canonical level 0
+  while the hierarchy carried a unigram level 0.
+- **Fixed:** F2 (no nested context in `policy_codes`; `Trainer.ctx` now returns a fresh autocast context per use),
+  F3 (one unigram level 0 for every pass), F1 (corruption RNG checkpointed and restored), F5 (`--eval_only` refuses a
+  directory with a checkpoint; resume refuses a different init / model / corruption / train config), F6 (sample
+  metrics inside `torch.random.fork_rng`), F7 (A6's soft-label gap frozen per level from 512 val windows; partition
+  dependence 0.05 -> <= 3e-6), F8 (sampling and scoring in fp32 with TF32 off; A0 re-evaluated in the control
+  notebook). F4 (FLOP proxy omits tokenizer / hierarchy work) accepted as a description: the omitted work is ~1% of a
+  step and attention pricing is identical across arms; the proxy stays the matching unit, labelled as such.
+- Also: per-level corruption rates logged (`corrupted_frac_per_level`); WMT14 eval adds capped-Jacobi BLEU at 6 / 8 / 9,
+  length ratio and per-sentence passes (J1a); Sudoku eval adds feedback-zero / shuffled decoding for the repair arm
+  (S1b); Windows-safe `os.devnull` in `models.py`; P1b notebook removed; W1 configs and notebooks regenerated.
+- **Tests (CPU, `tests/`):** 34 passed: clean `build_hierarchy` equals upstream encoding and inputs (released Sudoku
+  tokenizer + small text tokenizers), `jacobi_decode`'s fixed point equals `net.generate` greedy on the first 20
+  released hard puzzles, and regression tests for F2 (also at the `Trainer` level), F3 and F7 (strict xfails in the
+  audit, now passing). Jacobi cap extraction checked with a stub network; the Sudoku repair arm's eval (new feedback
+  modes) ran end to end on val on CPU. Not run locally: a W1 training step and the WMT14 eval (released TinyStories /
+  WMT14 checkpoints not downloaded). CPU: ~0.5 h.

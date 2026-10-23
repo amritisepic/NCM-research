@@ -95,3 +95,18 @@ several sessions.
   budget goes to B2-trained (criterion d) and the tokenizer bets.
 - Wave 0 diagnostic: if most of the quality loss happens when levels 1-3 are sampled (incoherent plans),
   C2 and the tokenizer bets gain priority over B1.
+
+## 8. Changes after the external review and the code audit (2026-10-23, R023 / R024)
+- Bet 1 (B1a): screen is now >= 0.35 Gen-PPL on 16 x 256 samples against each arm's registered comparator (W1b);
+  "no arm passes" deprioritizes B1 / B7 for wave 2 instead of killing them. Conditional matched-damage (A1m) and
+  random-soft-label (A6s) controls are registered.
+- Bet 2 (B2-trained): J2 must also beat J0 and J1 decoded at a fixed cap with at least its mean passes (J1a). Prior
+  art (CLLMs 2024) makes this a transfer test, not a new method.
+- Bet 3 (repair): the gain counts as learned repair only if board feedback adds >= 2 points over the same model with
+  feedback zeroed (S1b). Its kill condition was already against the best control under verifier stopping (S1).
+- Bet 4 (C2) and the §7 triggers: the P1 trigger is void (P1b withdrawn, P1c to come) and the wave-0 trigger result
+  (48% vs 50%) is inside its noise; C2's priority is decided by P1c.
+- Bet 7: stays demoted, but only on "small fine-level cost under real coarse codes" (R020 is an oracle intervention,
+  not an upper bound on a retrained schedule).
+- The R018 reading that NCM's NLL is "mostly learnability cost" (STATE, log) is withdrawn (R023): the excess over
+  H(codes) includes within-level TC. §3's R014 evidence (near-equivalent codes at fine levels) is unaffected.

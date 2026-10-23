@@ -1,0 +1,5 @@
+_assets/
+_deps/
+_tmp/
+__pycache__/
+.pytest_cache/

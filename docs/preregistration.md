@@ -151,3 +151,72 @@
   spent on it.
 - **Sanity checks:** J0 re-evaluation reproduces 11.07 passes / 22.63 BLEU. If J1 loses > 1 BLEU vs J0, the
   recipe damages the model: lower the lr and re-run J1 before reading J2.
+
+## W1b — amendment to W1/W1a after the external review and the code audit (registered 2026-10-23, before any W1 run)
+Why: `docs/reviews/triage_2026-10-23.md` (G5-G7, codex F1-F8). Everything not listed here is unchanged from W1/W1a.
+- **Code fixes before launch (R024):** autocast no longer leaks after on-policy steps (F2; it would have scored the
+  on-policy arms in bf16 and the uniform arms in fp32); two-pass policy codes condition on the sampled level 0 (F3);
+  the corruption RNG is checkpointed (F1); resume and `--eval_only` refuse a mismatched run directory (F5); sample
+  evaluation no longer reseeds the training RNG (F6). The on-policy arms' random draw order changed.
+- **Evaluation protocol:** final eval on **16 x 256** samples (seeds 42, 0-14) instead of 4 x 256; sampling (generator
+  and tokenizer) and scoring in fp32 with TF32 off (F8). A0 is re-evaluated in `w1_L_ts_ctrl` with exactly this
+  protocol (`L_ts_released16`); w0's 4-group A0 stays as the sanity reference. All W1 runs on bf16 GPUs (A100 or L4).
+- **Screen (seed 0):** an arm advances to seeds 1-2 if its Gen-PPL is >= **0.35** below any of its registered
+  comparators, entropy within 0.05 nats and MAUVE not lower by > 0.01. Comparators: A2 vs A1; A3 vs A1; A4 vs A1 or
+  A3; A5 vs A1 or A3; A6 vs A1. From sampling noise alone (per-group SD 0.59, 16 groups per arm, unpaired) the SE of
+  a difference is 0.21: an arm with no true effect passes 5% of the time, a true 0.5 passes 76%, a true 0.7 passes
+  95%. Training-seed variance is not in these figures (unmeasured until seeds 1-2), so the seed-0 screen is a
+  selection step, not a test. A1 always gets seeds 1-2.
+- **No arm passes:** reported as "B1 / B7 not supported at tier L (a sampling-noise-only gain of >= 0.7 Gen-PPL would
+  have passed with ~95% probability)". B1 and B7 are deprioritized for wave 2; they are not declared false.
+- **Step-count confound (A3, A4: 1350 steps; A5: 1080):** A1's sample curve runs every 270 steps (256 samples, the same
+  seed at every point), giving A1 at 1080 and 1350. If A1 at the matched step is >= 0.5 Gen-PPL better than A1 at 1800,
+  fewer steps alone helps: the on-policy arm's win is then credited to H6/H8 only if it also beats A1 at its matched
+  step by >= 0.35 on the same 256-sample protocol (curve-point evaluation of the final checkpoint).
+- **Conditional controls (registered now, run only if triggered, at seeds 0-2 with the triggering arm's seeds 1-2):**
+  A1m = uniform corruption whose per-level rates are scaled so that its decoded-token survival equals A3's (measured on
+  CPU with `scripts/repair_capacity.py`-style decoding, per-level corruption rates now logged), 1800 steps; triggered if
+  A3 advances. H6 is attributed to policy matching only if A3 also beats A1m by >= 0.35 at seeds 0-2; otherwise the
+  gain is reported as "milder corruption". A6s = A6 with its soft-label mass spread over 16 random codes (same weights);
+  triggered if A6 advances. H9 is attributed to near-equivalent codes only if A6 beats A6s by >= 0.35.
+- **Definitions made precise:** H7 tests a consistent re-quantized hierarchy (labels and the unmasked finer-level
+  inputs are both re-quantized), not labels alone. H8 tests proposals conditioned on a full previous policy hierarchy,
+  then mixed with clean codes by the corruption mask. A6's soft-label gap is the per-level mean nearest /
+  second-nearest distance gap, frozen at the start of training from 512 val windows (was: per micro-batch, F7).
+- **Claim rule addition:** the entropy-matching temperature (when a claim needs one) is chosen on sample seeds
+  100-103 and the claim is evaluated on the 16 screen seeds. The FLOP-matching unit stays the generator-FLOP proxy
+  (F4: omits tokenizer and hierarchy work, the same attention pricing in every arm); measured wall-clock per arm is
+  reported with it.
+
+## P1b — withdrawn before launch (2026-10-23)
+- Its premise ("with zero-initialized previous-code embeddings the AR probe equals the factorized probe at step 0") is
+  false: the two probes' attention masks differ (AR code tokens attend to earlier code tokens of their level), so the
+  functions differ at step 0. The estimator has also never been checked on data with known TC. Not run; notebook
+  removed. Replacement (P1c, to be registered once built): (1) CPU validation of the TC estimator on synthetic codes
+  with known TC (independent, duplicated, Markov); (2) an AR probe that keeps the factorized mask and adds the previous
+  same-level codes through a zero-initialized side channel, so it equals the factorized probe exactly at step 0,
+  warm-started from `ts_fact_s` and trained next to an equally long continuation of `ts_fact_s`.
+
+## S1b — amendment to S1 (registered 2026-10-23, before any S1 run)
+- **Feedback ablation:** the repair arm A3 is also decoded with D2 when its board feedback is zeroed (`check_fb0`) and
+  when it comes from another puzzle's board (`check_fbshuf`), at every cap, on val and test.
+- **H10 credit:** A3's gain over the best control counts as learned repair only if A3's D2 solve rate exceeds its own
+  `check_fb0` rate by >= 2 points on val at c*. Otherwise the gain is reported as an effect of training on the pool
+  (extra exposure to the model's own hard states), not of feedback.
+- **Reported with every D2 result:** cap-hit count (no convergence guarantee with feedback), p90 and max NFE (mean NFE
+  already counts unsolved puzzles at the cap), and per-puzzle wrong -> right / right -> wrong transitions against A0
+  sequential (from the saved per-puzzle results).
+- **Criterion (d) claims** additionally need batch-size-1 wall-clock at the operating point on 256 puzzles and a cost
+  figure that includes attention (the w0 FLOP ratios are position counts).
+
+## J1a — amendment to J1 (registered 2026-10-23, before any J1 run)
+- **Capped decoding:** every evaluation (J0, J1, J2; val and test) also reports the output after at most c passes for
+  c in {6, 8, 9}: BLEU, mean passes, length ratio, and % identical to the exact-stop output. Test hypotheses and
+  per-sentence pass counts are saved.
+- **H12 comparator:** besides <= 8.25 mean exact passes and BLEU >= J0 - 1, J2's test BLEU must exceed the BLEU of J0
+  and of J1 decoded at the cap ceil(J2's mean exact passes) (equal or more compute) by more than the 95% paired
+  bootstrap interval (1000 resamples), and J2's length ratio must be within 0.02 of J0's. If J0 at cap 8 is already
+  within 1 BLEU of J0, that is reported: a fixed cap is not an adaptive rule and does not meet (d) by itself, but J2
+  must then beat it as above.
+- **Criterion (d) claims** additionally need batch-size-1 wall-clock at the operating point on 256 sentences and an
+  attention-inclusive cost (w0: each Jacobi pass costs 0.30 of a full sequential decode by position count).

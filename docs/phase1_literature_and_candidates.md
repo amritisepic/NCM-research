@@ -148,3 +148,22 @@ no exact likelihood to compare, highest cost at our scale. Prior 10%.
 
 **Chosen for Phase 2:** C1(a)→{C2 or C7} (within-level dependence track), C6 (semantics track), and
 C4 (high-risk/high-reward recurrence track; Sudoku first). Free/cheap side checks: C10, C3, C9.
+
+## Prior art added after the external review (2026-10-23, R023)
+Cited by the hostile review (`docs/reviews/gpt_hostile_review_2026-10-23.md`); all are known to us except Jacobi
+Forcing, whose existence we did not check ourselves.
+- **Corruption / exposure bias:** Bengio et al., scheduled sampling (2015): feeding model predictions during training
+  helped sequence models; Huszár (2015): that objective can be statistically inconsistent. Qian et al., GLAT (2021):
+  glancing (prediction-guided) training for parallel decoders. Han et al., Infinity (CVPR 2025): random bit flips in
+  a bitwise hierarchical visual tokenizer with re-quantized finer targets ("bitwise self-correction"). **Bearing:**
+  B1b / A2 is close to Infinity's mechanism (uniform, not on-policy, corruption with re-quantized targets); B1a's
+  on-policy source is the scheduled-sampling idea applied across NCM levels. None predicts which W1 arm wins.
+- **Jacobi / fixed-point decoding:** Santilli et al. (2023): training-free parallel (Jacobi) decoding for MT.
+  Kou et al., CLLMs (2024): train intermediate Jacobi states to predict the fixed point, keeping an AR loss. Hu et al.,
+  Jacobi Forcing (2025, unchecked): training on generated parallel trajectories. **Bearing:** J2 is CLLM-style
+  consistency applied across NCM levels; the contribution, if any, is the level-structured version. CLLMs report a
+  quality-speed trade-off, which is why J1a compares J2 with capped decoding of J0 / J1.
+- **Iterative refinement / Sudoku:** Lee et al. (2018), iterative refinement for non-AR translation; Palm et al.,
+  Recurrent Relational Networks (2018); Wang et al., HRM (2025); Jolicoeur-Martineau, TRM (2025). **Bearing:**
+  repeated refinement solves hard Sudoku in other architectures; it does not predict gains for NCM's repair arm over
+  the training-free verifier baseline (S1/S1b).

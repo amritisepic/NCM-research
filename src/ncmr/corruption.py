@@ -29,6 +29,8 @@ class CorruptionCfg:
     retarget: bool = False      # B1: re-quantize labels against the true residual
     soft_tau: float = 0.0       # B7: >0 enables soft labels (relative temperature)
     soft_topm: int = 16
+    soft_gap: tuple | None = None   # per-level distance gap that sets the soft-label temperature; None = batch mean
+                                    # (depends on the micro-batch; train_gen.py freezes a calibrated value, W1b)
     level_rates: tuple | None = None   # explicit per-level rates (overrides mean_rate/spread), for diagnostics
 
     def rates(self, n_levels: int) -> list[float]:
@@ -49,7 +51,7 @@ def build_hierarchy(vqvae, x: torch.Tensor, cfg: CorruptionCfg, policy_codes: to
     level 0 = what inference uses there, e.g. unigram samples).
     Returns dict(inputs=(B, S - l_0, D) NCM inputs for levels 1.., targets=(B, S) labels for every level,
     canonical=(B, S) clean codes, used=(B, S) codes fed forward, z_used=(B, L, D) their full reconstruction,
-    soft_idx/soft_w=(B, S, M) or None, corrupted_frac=float)."""
+    soft_idx/soft_w=(B, S, M) or None, corrupted_frac=float, corrupted_frac_per_level=list of K floats)."""
     vq = vqvae.vq
     with torch.autocast(device_type=x.device.type, enabled=False):
         z = vqvae._encode_pre_quant(x).float()
@@ -61,6 +63,8 @@ def build_hierarchy(vqvae, x: torch.Tensor, cfg: CorruptionCfg, policy_codes: to
         z_clean = torch.zeros_like(z)    # reconstruction from canonical codes
         inputs, targets, canon, s_idx, s_w, used_all = [], [], [], [], [], []
         n_corr, n_tot, acc = 0, 0, 0
+        frac_lvl = []                    # per level: share of fed-forward codes that differ from the labels
+        gap_lvl = []                     # per level: soft-label gap used
         for k, lk in enumerate(levels):
             if k >= 1:
                 inputs.append(F.interpolate(z_used.transpose(1, 2), size=(lk,), mode="area").transpose(1, 2))
@@ -79,7 +83,11 @@ def build_hierarchy(vqvae, x: torch.Tensor, cfg: CorruptionCfg, policy_codes: to
             targets.append(c_lab)
             if cfg.soft_tau > 0:
                 top_d, top_i = d_lab.topk(cfg.soft_topm, dim=-1, largest=False)
-                gap = (top_d[..., 1] - top_d[..., 0]).mean().clamp_min(1e-6)
+                if cfg.soft_gap is not None:
+                    gap = torch.tensor(float(cfg.soft_gap[k]), device=x.device)
+                else:
+                    gap = (top_d[..., 1] - top_d[..., 0]).mean().clamp_min(1e-6)
+                gap_lvl.append(float(gap))
                 s_w.append(torch.softmax(-(top_d - top_d[..., :1]) / (cfg.soft_tau * gap), -1))
                 s_idx.append(top_i)
             used = c_lab.clone()
@@ -91,6 +99,7 @@ def build_hierarchy(vqvae, x: torch.Tensor, cfg: CorruptionCfg, policy_codes: to
                     repl = torch.randint(0, E.shape[0], (B, lk), device=x.device, generator=generator)
                 used = torch.where(m, repl, used)
                 n_corr += int((used != c_lab).sum())
+            frac_lvl.append(float((used != c_lab).float().mean()))
             n_tot += B * lk
             used_all.append(used)
             for zz, cc in ((z_used, used), (z_clean, c_canon)):
@@ -101,7 +110,8 @@ def build_hierarchy(vqvae, x: torch.Tensor, cfg: CorruptionCfg, policy_codes: to
     return {"inputs": torch.cat(inputs, 1), "targets": torch.cat(targets, 1), "canonical": torch.cat(canon, 1),
             "used": torch.cat(used_all, 1), "z_used": z_used,
             "soft_idx": torch.cat(s_idx, 1) if s_idx else None, "soft_w": torch.cat(s_w, 1) if s_w else None,
-            "corrupted_frac": n_corr / max(n_tot, 1)}
+            "corrupted_frac": n_corr / max(n_tot, 1), "corrupted_frac_per_level": frac_lvl,
+            "soft_gap_per_level": gap_lvl}
 
 
 def soft_ce(logits: torch.Tensor, idx: torch.Tensor, w: torch.Tensor) -> torch.Tensor:

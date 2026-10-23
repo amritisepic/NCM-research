@@ -156,17 +156,19 @@ def detok(ids):
 
 
 @torch.no_grad()
-def evaluate(srcs, refs, bs_=128, sequential=True):
-    """fp32 eval: exact Jacobi passes + BLEU of its output (= sequential output); optionally verifies that."""
+def evaluate(srcs, refs, bs_=128, sequential=True, caps=(6, 8, 9)):
+    """fp32 eval: exact Jacobi passes + BLEU of its output (= sequential output); optionally verifies that.
+    caps: also the output after at most c passes (fixed-cap Jacobi, J1a), with BLEU, mean passes and length ratio."""
     import sacrebleu
     net.eval()
     hyp, nfe, same = [], [], []
+    hyp_cap = {c: [] for c in caps}
     with torch.autocast(device_type=dev, enabled=False):
         for s in range(0, len(srcs), bs_):
             ids = [(pt.encode(t)[:P] + [PAD] * P)[:P] for t in srcs[s:s + bs_]]
             x = torch.tensor(ids, device=dev)
             z, pm = prefix(x)
-            out = jacobi_decode(net, lambda c, h: z, len(x), S, dev, K + 1, pad_mask=pm)
+            out = jacobi_decode(net, lambda c, h: z, len(x), S, dev, K + 1, pad_mask=pm, keep_history=True)
             if sequential:
                 seq = net.generate(None, x, temperature=0.0, top_k=0, top_p=1.0, cfg_scale=0.0, cfg_null_eos=EOS)
                 same += (seq == out["codes"]).all(1).tolist()
@@ -174,10 +176,23 @@ def evaluate(srcs, refs, bs_=128, sequential=True):
                 toks = tok.decoder(vq.idx_to_z_q(out["codes"])).argmax(-1).tolist()
             hyp += [detok(r) for r in toks]
             nfe += out["nfe"].tolist()
+            for c in caps:      # done samples keep their codes in later history entries
+                hc = out["history"][min(c, len(out["history"])) - 1]
+                with torch.autocast(device_type=dev, enabled=False):
+                    hyp_cap[c] += [detok(r) for r in tok.decoder(vq.idx_to_z_q(hc)).argmax(-1).tolist()]
     net.train()
     res = {"n": len(srcs), "exact_passes_mean": float(np.mean(nfe)), "exact_passes_hist": np.bincount(nfe).tolist(),
            "sequential_nfe": K, "exact_nfe_saving_pct": 100 * (1 - float(np.mean(nfe)) / K),
            "bleu_lc": sacrebleu.corpus_bleu(hyp, [list(refs)], lowercase=True).score}
+    b = sacrebleu.corpus_bleu(hyp, [list(refs)], lowercase=True)
+    res["len_ratio"] = b.sys_len / max(b.ref_len, 1)
+    res["capped"] = {}
+    for c in caps:
+        bc = sacrebleu.corpus_bleu(hyp_cap[c], [list(refs)], lowercase=True)
+        res["capped"][str(c)] = {"passes_mean": float(np.mean(np.minimum(nfe, c))), "bleu_lc": bc.score,
+                                 "len_ratio": bc.sys_len / max(bc.ref_len, 1),
+                                 "identical_to_exact_pct": 100 * float(np.mean([u == v for u, v in zip(hyp_cap[c], hyp)]))}
+    res["nfe_per_sentence"] = nfe
     if sequential:
         res["fixed_point_equals_sequential_pct"] = 100 * float(np.mean(same))
     return res, hyp
@@ -227,6 +242,7 @@ while trainer.step < int(tc.steps):
         print(json.dumps(trainer.log({"loss": round(loss.item(), 4), "gnorm": round(gn, 3), **logs})), flush=True)
     if trainer.step % int(tc.eval_every) == 0 or trainer.step == int(tc.steps):
         ev, _ = evaluate(val_text["src"][:n_curve], val_text["ref"][:n_curve], sequential=False)
+        ev.pop("nfe_per_sentence")
         ev["val_nll"] = val_nll()
         print(json.dumps(trainer.log({"eval": ev})), flush=True)
     if trainer.step % int(tc.ckpt_every) == 0:
@@ -249,7 +265,8 @@ srcs = safe_pickle_load(os.path.join(ROOT, "data", "wmt14", "sources.pickle"))
 refs = safe_pickle_load(os.path.join(ROOT, "data", "wmt14", "reference_translations.pickle"))
 nt = a.n_test or len(srcs)
 final["test"], hyp = evaluate(srcs[:nt], refs[:nt])
-json.dump({"hyp_test": hyp}, open(os.path.join(a.run_dir, "hyp_test.json"), "w"))
+json.dump({"hyp_test": hyp, "nfe_test": final["test"].pop("nfe_per_sentence")}, open(os.path.join(a.run_dir, "hyp_test.json"), "w"))
+final["val"].pop("nfe_per_sentence", None)
 res = {"run": os.path.basename(a.run_dir.rstrip("/")), "arm": arm, "config": OmegaConf.to_container(cfg),
        "params_total": n_params(net), "steps": trainer.step, "flops_est_total_upper": fl_step * trainer.step,
        "wall_s": trainer.wall_prev + time.time() - trainer.t_start, "device": dev,

@@ -16,12 +16,15 @@ If your plan allows several sessions at once, notebooks within the same wave can
 
 ## Queue
 Costs below are measured A100-40GB rates from wave 0 (5.4 CU/h); L4 costs about the same per FLOP and takes ~3x longer.
+**Wave 1 (`w1_*`) needs a bf16 GPU: A100 or L4, not T4** (W1b). Launch only notebooks pulled after the R024 fixes;
+a `w1_*` run started before them must be restarted in a fresh run directory (tell me, and I will rename it).
+Final eval per W1 arm: 16 x 256 samples in fp32 (~5-10 min on an A100).
 | Run | Purpose | GPU | Est. CU | Status |
 |---|---|---|---|---|
 | `p1_tc_pilot` | P1: TC decomposition of the NCM–AR gap (small models) + throughput calibration | T4 | ~3.5 + setup | done (R018) |
 | `c4_sudoku_pilot` | C4 kill experiment: Recurrent NCM vs NCM on Sudoku-hard (1 seed each) | T4 | ~5.7 + setup | done (R019) |
 | `w0_calib_diag` | reference, calibration, where quality is lost, exact Jacobi | A100 | ~2.5 | done (R020) |
-| `w1_L_ts_ctrl` | tier L control (paper recipe, continued), 1800 steps (W1a) | A100 / L4 | ~6 | **launch now** |
+| `w1_L_ts_ctrl` | tier L control (paper recipe, continued), 1800 steps (W1a); also A0 with the 16-group protocol (W1b) | A100 / L4 | ~6 | **launch now** |
 | `w1_L_ts_onpol` | B1a: on-policy corruption, 1350 steps | A100 / L4 | ~6 | **launch now** |
 | `w1_L_ts_onpol2` | B1a-2: two-pass on-policy corruption, 1080 steps | A100 / L4 | ~6 | **launch now** |
 | `w1_L_ts_b1` | B1: on-policy + re-quantized labels, 1350 steps | A100 / L4 | ~6 | **launch now** |
@@ -33,11 +36,11 @@ Costs below are measured A100-40GB rates from wave 0 (5.4 CU/h); L4 costs about 
 | `w2b_L_sdk_repair` | Sudoku: board-feedback repair passes (B6/C5) | A100 / L4 | ~2.5 | **launch now** |
 | `w2c_L_wmt_ctrl` | WMT14 control (+ released reference J0), J1 | A100 / L4 | ~4 | **launch now** |
 | `w2c_L_wmt_consist` | WMT14 self-consistency fine-tune (criterion d, text) | A100 / L4 | ~4 | **launch now** |
-| `p1b_tc_rerun` | P1b: fair within-level-AR TC probe (reuses tok_s on Drive) | any (T4 ok) | ~1.2 | **launch now** |
+| `p1b_tc_rerun` | P1b: within-level-AR TC probe | — | — | **withdrawn** (R023: false premise; notebook removed; P1c to come) |
 | `w2_M_ncm` | tier M NCM from scratch (25M) | — | ~25 per seed at measured throughput | **on hold**: > 15 CU per run; re-plan after wave 1 |
 | `w2_M_ar` | tier M AR, FLOP-matched | — | ~14 per seed | **on hold** (re-plan with w2_M_ncm) |
 | `calib_t4` | old calibration (superseded by w0) | T4 | 0.6 | skip |
 
-Budget: ~200 CU (raised 2026-10-23). Spent: ~12.5 CU (p1, c4, w0). Queued above: ~56 CU. Allocation and decision points:
+Budget: ~200 CU (raised 2026-10-23). Spent: ~12.5 CU (p1, c4, w0). Queued above: ~54 CU. Allocation and decision points:
 `docs/phase1b_scaleup.md`. Progress check: the notebook prints `{"step": ..., "steps_per_s": ...,
 "tflops_eff": ...}`; remaining steps / steps_per_s = time left.

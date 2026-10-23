@@ -95,23 +95,19 @@ RUNS["w0_calib_diag"] = {
     ],
 }
 for arm, what in L_ARMS.items():
+    cmds = [f"python scripts/train_gen.py --config configs/scale/{arm}.yaml --run_dir {{R}}/{arm}_s{{S}} --seed {{S}}"]
+    if arm == "L_ts_ctrl":   # W1b: A0 re-evaluated with the 16-group protocol
+        cmds.insert(0, "python scripts/train_gen.py --config configs/scale/L_ts_ctrl.yaml --run_dir {R}/L_ts_released16 --eval_only")
     RUNS[f"w1_{arm}"] = {
         "desc": f"Wave 1, tier L (paper scale): fine-tune the released 88.6M TinyStories generator; arm = {what}. "
                 "All arms share data order, schedule and training FLOPs (on-policy arms run 3/4 of the steps because "
-                "each step has one extra forward pass). Final eval: 4 x 256 samples, Gen-PPL (GPT-2 large and "
+                "each step has one extra forward pass). Final eval: 16 x 256 samples (W1b), Gen-PPL (GPT-2 large and "
                 "TinyStories-33M), entropy, repetition, duplicates, MAUVE. Run seed 0 first; seeds 1-2 only for the "
                 "arms that survive (edit SEEDS).",
         "gpu": "A100 (measured 2.2 s/step, ~67 min + eval) or L4", "units": 6, "needs": ["ts", "ckpt"], "seeds": [0],
-        "cmds": [f"python scripts/train_gen.py --config configs/scale/{arm}.yaml --run_dir {{R}}/{arm}_s{{S}} --seed {{S}}"],
+        "cmds": cmds,
     }
-RUNS["p1b_tc_rerun"] = {
-    "desc": "P1b (pre-registered): re-train only the within-level-AR TC probe of P1 with zero-initialized previous-code "
-            "embeddings (P1's probe started with its own-position latent buried in noise and gave a negative TC). "
-            "Reuses tok_s from the p1_tc_pilot run on your Drive (runs/tok_s/final.pt); ~1 h on a T4, ~25 min on an A100.",
-    "gpu": "any (T4 is enough)", "units": 1.2, "needs": ["ts"], "seeds": [0],
-    "cmds": ["python scripts/train.py ts_ar --config configs/pilot/ncm_s.yaml --tokenizer {R}/tok_s/final.pt "
-             "--run_dir {R}/ts_ar0_s --ts_prev_init zero"],
-}
+# P1b withdrawn before launch (R023): its premise (AR probe = factorized probe at step 0) is false; see P1c in docs.
 SDK_ARMS = {
     "ctrl": "control: plain teacher forcing (also evaluates the released model once, A0)",
     "uniform": "control 2: NCM uniform conditioning corruption",

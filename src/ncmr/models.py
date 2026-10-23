@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import copy
 import math
+import os
 import sys
 
 import torch
@@ -55,7 +56,7 @@ class TiedOutputVQVAE(VQVAE):
     """Upstream VQVAE with the decoder's output projection tied to the encoder token embedding."""
 
     def __init__(self, **kw):
-        _stdout, sys.stdout = sys.stdout, open("/dev/null", "w")
+        _stdout, sys.stdout = sys.stdout, open(os.devnull, "w")
         try:
             super().__init__(**kw)
         finally:
@@ -124,7 +125,7 @@ def generator_config(vqvae: VQVAE, n_layer=6, n_head=8, n_embd=512, dropout=0.0,
 
 
 def build_ncm_generator(vqvae: VQVAE, **kw) -> NextConceptTransformer:
-    _stdout, sys.stdout = sys.stdout, open("/dev/null", "w")
+    _stdout, sys.stdout = sys.stdout, open(os.devnull, "w")
     try:
         net = NextConceptTransformer(vqvae_local=vqvae, config=generator_config(vqvae, **kw))
     finally:

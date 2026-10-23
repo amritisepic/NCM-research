@@ -57,10 +57,17 @@ class Trainer:
         groups = [{"params": decay, "weight_decay": weight_decay}, {"params": no_decay, "weight_decay": 0.0}]
         groups += [{"params": list(ps), "weight_decay": 0.0, "lr_mult": float(m)} for ps, m in extra_groups]
         self.opt = torch.optim.AdamW(groups, lr=max_lr, betas=betas)
-        self.ctx, self.scaler = autocast_ctx(device, amp)
+        c, self.scaler = autocast_ctx(device, amp)
+        self._ctx_kw = None if isinstance(c, nullcontext) else {"device_type": c.device, "dtype": c.fast_dtype}
         self.step = 0
         self.t_start = time.time()
         self.wall_prev = 0.0
+
+    @property
+    def ctx(self):
+        """A fresh autocast context per use: re-entering one torch.autocast object (nested `with trainer.ctx`)
+        restores the wrong state on exit and leaves autocast enabled afterwards (codex audit F2)."""
+        return nullcontext() if self._ctx_kw is None else torch.autocast(**self._ctx_kw)
 
     def state(self, modules: dict, data_rng: np.random.Generator, extra: dict | None = None) -> dict:
         return {"step": self.step, "opt": self.opt.state_dict(),
