@@ -378,3 +378,13 @@ Compute units: CPU-h = wall-clock hours on the 4-core cloud container (Xeon w/ A
   audit, now passing). Jacobi cap extraction checked with a stub network; the Sudoku repair arm's eval (new feedback
   modes) ran end to end on val on CPU. Not run locally: a W1 training step and the WMT14 eval (released TinyStories /
   WMT14 checkpoints not downloaded). CPU: ~0.5 h.
+
+## R025 — CPU smoke test of the amended S1 / J1 code; repo hygiene (2026-10-23)
+- Merged the R023/R024 commit; `pytest tests` 34 passed on this container. Checked the F2 fix in `train_gen.py`
+  (the policy forward no longer enters a second autocast) and that the Sudoku / WMT14 trainers never nest it.
+- `train_wmt14_L.py` (J1a eval: capped Jacobi at 6 / 8 / 9, length ratio, per-sentence passes) and
+  `train_sudoku_L.py` (S1b: feedback zeroed / shuffled decodes) run end to end on CPU with the smoke configs:
+  training steps, final val and test eval, fixed point = sequential output in 100% of smoke sentences. Neither
+  trainer has had an independent code audit (the R024 audit covered `train_gen.py` and `corruption.py`).
+- Hygiene: 4 commits in the public history carry a personal author name and email; flagged to the user (rewriting
+  needs their approval, since it force-pushes the shared branch).
