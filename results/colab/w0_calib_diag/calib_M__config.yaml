@@ -1,0 +1,36 @@
+init: scratch
+model:
+  n_layer: 8
+  n_head: 8
+  n_embd: 512
+  dropout: 0.1
+corruption:
+  mode: uniform
+  mean_rate: 0.5
+  spread: 0.5
+  retarget: false
+train:
+  steps: 60
+  batch_size: 256
+  grad_accum: 2
+  lr: 0.0003
+  warmup: 500
+  min_lr_frac: 0.1
+  weight_decay: 0.1
+  beta2: 0.95
+  ckpt_every: 1000000000
+  eval_every: 1000000000
+  eval_n: 1000
+  log_every: 50
+  compile: false
+  seed: 0
+sample_eval:
+  every: 5000
+  'n': 256
+  final_seeds:
+  - 42
+  - 0
+  - 1
+  - 2
+  final_n: 256
+  mauve: true

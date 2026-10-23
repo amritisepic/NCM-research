@@ -1,0 +1,32 @@
+{
+ "run": "b2_jacobi_wmt14_n6",
+ "n": 6,
+ "sequential_nfe": 10,
+ "exact_passes_mean": 11.333333333333334,
+ "exact_passes_hist": [
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  2,
+  0,
+  4
+ ],
+ "stable_passes_mean": 10.5,
+ "stable_output_equals_exact_pct": 83.33333333333334,
+ "first_final_output_pass_mean": 9.833333333333334,
+ "flops_per_pass_ratio_vs_sequential_total": 0.32075471698113206,
+ "wall_s": 70.15617442131042,
+ "exact_nfe_saving_pct": -13.33333333333333,
+ "exact_flops_ratio": 3.6352201257861636,
+ "fixed_point_equals_sequential_pct": 100.0,
+ "bleu_lc_exact": 13.254752840888365,
+ "bleu_lc_stable_rule": 13.254752840888365,
+ "stable_rule_identical_output_pct": 100.0
+}

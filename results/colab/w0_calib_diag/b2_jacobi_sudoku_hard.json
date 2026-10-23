@@ -1,0 +1,33 @@
+{
+ "run": "b2_jacobi_sudoku_hard",
+ "n": 2000,
+ "sequential_nfe": 12,
+ "exact_passes_mean": 6.406,
+ "exact_passes_hist": [
+  0,
+  0,
+  0,
+  0,
+  5,
+  287,
+  916,
+  566,
+  156,
+  53,
+  13,
+  4
+ ],
+ "stable_passes_mean": 2.917,
+ "stable_output_equals_exact_pct": 94.55,
+ "first_final_output_pass_mean": 2.0125,
+ "flops_per_pass_ratio_vs_sequential_total": 0.29207920792079206,
+ "wall_s": 56.11142373085022,
+ "device": "cuda",
+ "exact_nfe_saving_pct": 46.616666666666674,
+ "exact_flops_ratio": 1.8710594059405938,
+ "fixed_point_equals_sequential_pct": 100.0,
+ "solved_pct_exact": 86.15,
+ "solved_pct_stable_rule": 88.2,
+ "check_passes_mean": 2.3655,
+ "solved_pct_check_rule": 90.3
+}
