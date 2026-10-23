@@ -1,0 +1,11 @@
+{
+ "gpu": "NVIDIA A100-SXM4-40GB",
+ "steps_timed": 50,
+ "s_per_step": 1.1078278732299804,
+ "tflops_useful": 24.715418122746527,
+ "peak_mem_gb": 25.210595328,
+ "init": "scratch",
+ "corruption": "uniform",
+ "batch_size": 256,
+ "grad_accum": 2
+}
