@@ -11,6 +11,9 @@ regression, 5-fold CV accuracy, train on val windows only):
   order      : is the window's first half before its second half? (the window vs. its halves swapped;
                a bag-of-words summary of the whole window cannot tell, a positional one can)
 Chance levels are reported (majority class / 0.5 balanced).
+Resumable: per-level results go to <out>.partial.json as they finish; --levels runs a subset (the probes are
+deterministic: fixed features, unshuffled stratified 5-fold CV, lbfgs), and <out> is written once all
+levels are present.
 """
 from __future__ import annotations
 
@@ -35,6 +38,7 @@ ap.add_argument("--n", type=int, default=4000)
 ap.add_argument("--seed", type=int, default=0)
 ap.add_argument("--tokenizer", default="released", help="released, or path to our final.pt")
 ap.add_argument("--out", default=os.path.join(ROOT, "results", "phase0_level_probes.json"))
+ap.add_argument("--levels", type=int, nargs="*", default=None, help="subset of level indices (default: all)")
 a = ap.parse_args()
 
 from sklearn.linear_model import LogisticRegression  # noqa: E402
@@ -101,7 +105,14 @@ t64_y = np.array([top64.index(tok64[i]) for i in t64_idx])
 res["chance"] = {"main_char": float(np.bincount(mc_y).max() / len(mc_y)), "dialogue_balanced": 0.5,
                  "content_balanced": 0.5, "tok@64": float(np.bincount(t64_y).max() / len(t64_y)), "order_balanced": 0.5}
 order_y = np.concatenate([np.zeros(len(X)), np.ones(len(X))])
-for k in range(len(levels)):
+partial = a.out + ".partial.json"
+if os.path.exists(partial):
+    prev = json.load(open(partial))
+    assert prev["n"] == res["n"] and prev["levels"] == res["levels"], "partial file is from a different setup"
+    res["probes"].update(prev["probes"])
+for k in (a.levels if a.levels is not None else range(len(levels))):
+    if f"L{k}" in res["probes"]:
+        continue
     r = {}
     for name, F in [("code", codeF[k]), ("cum", cumF[k])]:
         r[f"main_char_{name}"] = cv(F[mc_idx], mc_y)
@@ -111,5 +122,9 @@ for k in range(len(levels)):
     r["order_cum"] = cv(np.concatenate([cumF[k], cumF_swap[k]]), order_y, balanced=True)
     res["probes"][f"L{k}"] = r
     print(f"L{k:2d} len {levels[k]:3d} | " + " ".join(f"{kk} {v:.3f}" for kk, v in r.items()), flush=True)
+    json.dump(res, open(partial, "w"), indent=1)
 print("chance:", res["chance"])
-json.dump(res, open(a.out, "w"), indent=1)
+if all(f"L{k}" in res["probes"] for k in range(len(levels))):
+    res["probes"] = {f"L{k}": res["probes"][f"L{k}"] for k in range(len(levels))}
+    json.dump(res, open(a.out, "w"), indent=1)
+    print("complete ->", a.out)

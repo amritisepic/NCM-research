@@ -1,0 +1,68 @@
+{
+ "run": "phase0_level_probes",
+ "n": 4000,
+ "levels": [
+  1,
+  8,
+  16,
+  24,
+  32,
+  40,
+  52,
+  64,
+  76,
+  92,
+  108,
+  128
+ ],
+ "probes": {
+  "L0": {
+   "main_char_code": 0.281,
+   "dialogue_code": 0.539,
+   "content_code": 0.519,
+   "tok64_code": 0.094,
+   "main_char_cum": 0.315,
+   "dialogue_cum": 0.537,
+   "content_cum": 0.527,
+   "tok64_cum": 0.124,
+   "order_cum": 0.658,
+   "source": "transcribed from the run log of the interrupted full run (3 decimals)"
+  },
+  "L1": {
+   "main_char_code": 0.557,
+   "dialogue_code": 0.935,
+   "content_code": 0.758,
+   "tok64_code": 0.099,
+   "main_char_cum": 0.564,
+   "dialogue_cum": 0.926,
+   "content_cum": 0.755,
+   "tok64_cum": 0.106,
+   "order_cum": 0.728,
+   "source": "transcribed from the run log of the interrupted full run (3 decimals)"
+  },
+  "L2": {
+   "main_char_code": 0.621,
+   "dialogue_code": 0.925,
+   "content_code": 0.77,
+   "tok64_code": 0.096,
+   "main_char_cum": 0.654,
+   "dialogue_cum": 0.943,
+   "content_cum": 0.805,
+   "tok64_cum": 0.101,
+   "order_cum": 0.738,
+   "source": "transcribed from the run log of the interrupted full run (3 decimals)"
+  },
+  "L3": {
+   "main_char_code": 0.751,
+   "dialogue_code": 0.9,
+   "content_code": 0.792,
+   "tok64_code": 0.094,
+   "main_char_cum": 0.768,
+   "dialogue_cum": 0.945,
+   "content_cum": 0.84,
+   "tok64_cum": 0.107,
+   "order_cum": 0.717,
+   "source": "transcribed from the run log of the interrupted full run (3 decimals)"
+  }
+ }
+}
