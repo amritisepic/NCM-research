@@ -35,7 +35,15 @@ from transformers import AutoTokenizer  # noqa: E402
 
 from omegaconf import OmegaConf  # noqa: E402
 
+selection = {"n": a.n, "shards": a.shards, "seed": 0, "max_target_ids": 63}
+selection_path = a.out.replace(".npz", "_selection.json")
 if os.path.exists(a.out) and os.path.exists(a.out.replace(".npz", "_val_text.json")):
+    # reuse only an archive built with the same selection (codex audit2 A2-8)
+    if not os.path.exists(selection_path) or json.load(open(selection_path)) != selection:
+        sys.exit(f"{a.out} exists with different or missing selection metadata; delete it or use another --out")
+    with np.load(a.out) as prev:
+        if len(prev["src"]) != a.n:
+            sys.exit(f"{a.out} holds {len(prev['src'])} pairs, not {a.n}")
     print("exists:", a.out)
     sys.exit(0)
 BASE = "https://huggingface.co/datasets/wmt/wmt14/resolve/main/de-en/"
@@ -81,7 +89,7 @@ train = []
 for s in a.shards:
     train += pairs(fetch(f"train-0000{s}-of-00003.parquet"))
 print(f"{len(train)} training pairs in shards {a.shards}", flush=True)
-sel = rng.permutation(len(train))[: int(a.n * 1.15) + 1000]
+sel = rng.permutation(len(train))   # walked until n eligible pairs are found (uniform over eligible pairs)
 Ss, Ts = [], []
 for i in range(0, len(sel), 20000):
     s_, t_, _ = encode([train[j] for j in sel[i:i + 20000]])
@@ -90,9 +98,12 @@ for i in range(0, len(sel), 20000):
     if sum(len(x) for x in Ss) >= a.n:
         break
 src, tgt = np.concatenate(Ss)[: a.n], np.concatenate(Ts)[: a.n]
+if len(src) != a.n:
+    sys.exit(f"only {len(src)} eligible pairs in shards {a.shards}, requested {a.n}")
 val = pairs(fetch("validation-00000-of-00001.parquet"))
 vs, vt, keep = encode(val)
 np.savez_compressed(a.out, src=src, tgt=tgt, val_src=vs, val_tgt=vt, pad=PAD, eos=EOS)
+json.dump(selection, open(selection_path, "w"), indent=1)
 json.dump({"src": [d for d, _ in val], "ref": [e for _, e in val]},   # all 3000, for BLEU
           open(a.out.replace(".npz", "_val_text.json"), "w"))
 print(json.dumps({"train_pairs": int(len(src)), "val_pairs": int(len(vs)), "val_total": len(val),

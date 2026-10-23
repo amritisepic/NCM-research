@@ -13,6 +13,7 @@ and tested. Wave 1 (6 arms, W1/W1a/**W1b**), Sudoku tier L (S1/S1a/**S1b**, 4 ar
 2 arms) are registered with notebooks ready: **waiting for the user to launch** (`docs/colab_runs.md`). P1b
 withdrawn before launch (false premise); P1c to be built. Tier M re-planned after an external design review (R027):
 design C, registered as **M1** (d512 x 6 NCM + FLOP-matched AR, seed-0 gate before seeds 1-2), notebooks ready.
+Second code audit (R028): Sudoku / WMT14 trainers fixed (S1c / J1b); P1c step 1 passed on synthetic codes.
 Wave 1: the user launched `w1_L_ts_{ctrl,onpol,b1}` (2026-10-23; commit to be confirmed as post-R024).
 
 ## Environment
@@ -70,8 +71,8 @@ Wave 1: the user launched `w1_L_ts_{ctrl,onpol,b1}` (2026-10-23; commit to be co
 ## Next 3 actions
 1. When wave 1 / Sudoku / WMT14 results arrive: analyse each strictly against W1(+W1a+W1b) / S1(+S1a+S1b) /
    J1(+J1a), log, apply the screens, then tell the user which seed-1-2 notebooks (and conditional controls) to run.
-2. Build P1c on CPU: validate the TC estimator on synthetic codes with known TC, then the zero-init side-channel AR
-   probe warm-started from `ts_fact_s`; register thresholds before any GPU run (~1 CU).
+2. Build P1c step 2 on CPU (step 1 passed, R028): the zero-init side-channel AR probe warm-started from `ts_fact_s`;
+   register thresholds before any GPU run (~1 CU).
 3. When the M1 seed-0 pair reports: apply the gate (G0 >= max(2.4, 4 x W1 control training SD)); if it passes, ask for
    seeds 1-2 and register the candidate from wave 1's result. If J2 or the Sudoku repair arm looks like it meets
    criterion (d) or the +3-point bar: stop and ask first.

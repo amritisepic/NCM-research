@@ -26,13 +26,14 @@ def parallel_logits(net, z_prefix: torch.Tensor, codes: torch.Tensor, pad_mask: 
 
 @torch.no_grad()
 def jacobi_decode(net, prefix_fn, n: int, S: int, device, max_passes: int, pad_mask=None, check_fn=None,
-                  keep_history: bool = False):
+                  keep_history: bool = False, full_budget: bool = False):
     """Greedy Jacobi decoding with per-sample stopping.
 
     prefix_fn(codes, has_prev) -> z_prefix: lets the prefix depend on the previous pass (board feedback);
     has_prev is False on pass 1. check_fn(codes) -> bool tensor (n,): optional task check (stop when True).
     Returns dict(codes=(n, S) final codes, nfe=(n,) passes used, stop=(n,) 0 = cap, 1 = fixed point, 2 = check,
-    history=list of (n, S) codes per pass if keep_history)."""
+    history=list of (n, S) codes per pass if keep_history). full_budget: always run max_passes passes (stopped
+    samples keep their codes), so the executed compute is fixed (training teacher, codex audit2 A2-7)."""
     codes = torch.zeros(n, S, dtype=torch.long, device=device)
     done = torch.zeros(n, dtype=torch.bool, device=device)
     nfe = torch.full((n,), max_passes, dtype=torch.long, device=device)
@@ -50,7 +51,7 @@ def jacobi_decode(net, prefix_fn, n: int, S: int, device, max_passes: int, pad_m
         codes = new
         if keep_history:
             hist.append(codes.clone())
-        if bool(done.all()):
+        if bool(done.all()) and not full_budget:
             break
     return {"codes": codes, "nfe": nfe, "stop": stop, "history": hist}
 

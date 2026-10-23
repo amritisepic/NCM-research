@@ -16,7 +16,7 @@ If your plan allows several sessions at once, notebooks within the same wave can
 
 ## Queue
 Costs below are measured A100-40GB rates from wave 0 (5.4 CU/h); L4 costs about the same per FLOP and takes ~3x longer.
-**Wave 1 (`w1_*`) needs a bf16 GPU: A100 or L4, not T4** (W1b). Launch only notebooks pulled after the R024 fixes;
+**Wave 1 (`w1_*`) needs a bf16 GPU: A100 or L4, not T4** (W1b). Launch only notebooks pulled after the R024 fixes (and Sudoku / WMT14 only after the R028 fixes);
 a `w1_*` run started before them must be restarted in a fresh run directory (tell me, and I will rename it).
 Final eval per W1 arm: 16 x 256 samples in fp32 (~5-10 min on an A100).
 | Run | Purpose | GPU | Est. CU | Status |
@@ -35,7 +35,7 @@ Final eval per W1 arm: 16 x 256 samples in fp32 (~5-10 min on an A100).
 | `w2b_L_sdk_onpolicy` | Sudoku: on-policy greedy corruption (B1a) | A100 / L4 | ~2.5 | **launch now** |
 | `w2b_L_sdk_repair` | Sudoku: board-feedback repair passes (B6/C5) | A100 / L4 | ~2.5 | **launch now** |
 | `w2c_L_wmt_ctrl` | WMT14 control (+ released reference J0), J1 | A100 / L4 | ~4 | **launch now** |
-| `w2c_L_wmt_consist` | WMT14 self-consistency fine-tune (criterion d, text) | A100 / L4 | ~4 | **launch now** |
+| `w2c_L_wmt_consist` | WMT14 self-consistency fine-tune (criterion d, text); fp32 teacher (J1b) | A100 / L4 | ~5 | **launch now** |
 | `p1b_tc_rerun` | P1b: within-level-AR TC probe | — | — | **withdrawn** (R023: false premise; notebook removed; P1c to come) |
 | `w2_Mc_ncm` | tier M design C (M1): NCM from scratch, d512 x 6, 6k steps, seed 0 | A100 / L4 | ~7.7 | **launch any time** (independent of wave 1) |
 | `w2_Mc_ar` | tier M design C (M1): AR, same body, FLOP-matched, seed 0 | A100 / L4 | ~4.3 | **launch any time** |

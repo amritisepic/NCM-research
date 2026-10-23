@@ -1,0 +1,522 @@
+{
+  "protocol": "P1c step 1; existing fact/ar masks; no step-2 side channel",
+  "device": "cpu",
+  "dtype": "float32 (loss expectation accumulated in float64)",
+  "torch": "2.6.0+cu124",
+  "git_head": "f9f90ffc6c4e16726d54c461714f0ae94624374b",
+  "models_sha256": "23a3f9567c3ff6a07fdd8f557f76b022c91bfedc4af5c99e62e060b77b80bafe",
+  "configuration": {
+    "levels": [
+      1,
+      4
+    ],
+    "modeled_levels": [
+      4
+    ],
+    "codebook": 2,
+    "vq_dim": 8,
+    "n_embd": 32,
+    "n_layer": 1,
+    "n_head": 2,
+    "dropout": 0,
+    "steps": 800,
+    "lr": 0.01,
+    "weight_decay": 0,
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "threads": 2,
+    "tolerance_nats": 0.05,
+    "initialization": "identical common weights; AR prev_emb normal; distinct masks"
+  },
+  "units": "nats per four-code modeled level, conditional on constant coarser input",
+  "evaluation": "exact population expectation over all 16 strings; same population objective in training",
+  "formulas": {
+    "independent": "TC=0",
+    "duplicated": "TC=(L-1)*ln(2)",
+    "markov": "stationary fair first bit, P(flip)=q; TC=(L-1)*(ln(2)-h(q))"
+  },
+  "cases": [
+    {
+      "case": "independent",
+      "true": {
+        "fact_nll": 2.772588722239781,
+        "ar_nll": 2.772588722239781,
+        "tc": 0.0
+      },
+      "runs": [
+        {
+          "seed": 0,
+          "fact": {
+            "initial_nll": 2.9495693519711494,
+            "final_nll": 2.772588774561882,
+            "curve": [
+              {
+                "step": 400,
+                "population_nll": 2.772588759660721
+              },
+              {
+                "step": 800,
+                "population_nll": 2.772588774561882
+              }
+            ],
+            "parameters": 13465
+          },
+          "ar": {
+            "initial_nll": 2.923484116792679,
+            "final_nll": 2.772588774561882,
+            "curve": [
+              {
+                "step": 400,
+                "population_nll": 2.7725887447595596
+              },
+              {
+                "step": 800,
+                "population_nll": 2.772588774561882
+              }
+            ],
+            "parameters": 13465
+          },
+          "estimated_tc": 0.0,
+          "error": 0.0
+        },
+        {
+          "seed": 1,
+          "fact": {
+            "initial_nll": 3.7976711243391037,
+            "final_nll": 2.7725888043642044,
+            "curve": [
+              {
+                "step": 400,
+                "population_nll": 2.7725886702537537
+              },
+              {
+                "step": 800,
+                "population_nll": 2.7725888043642044
+              }
+            ],
+            "parameters": 13465
+          },
+          "ar": {
+            "initial_nll": 3.7956204786896706,
+            "final_nll": 2.7725888192653656,
+            "curve": [
+              {
+                "step": 400,
+                "population_nll": 2.7725888043642044
+              },
+              {
+                "step": 800,
+                "population_nll": 2.7725888192653656
+              }
+            ],
+            "parameters": 13465
+          },
+          "estimated_tc": -1.4901161193847656e-08,
+          "error": -1.4901161193847656e-08
+        },
+        {
+          "seed": 2,
+          "fact": {
+            "initial_nll": 3.151244640350342,
+            "final_nll": 2.772588759660721,
+            "curve": [
+              {
+                "step": 400,
+                "population_nll": 2.772588700056076
+              },
+              {
+                "step": 800,
+                "population_nll": 2.772588759660721
+              }
+            ],
+            "parameters": 13465
+          },
+          "ar": {
+            "initial_nll": 3.1067282930016518,
+            "final_nll": 2.772588774561882,
+            "curve": [
+              {
+                "step": 400,
+                "population_nll": 2.772588774561882
+              },
+              {
+                "step": 800,
+                "population_nll": 2.772588774561882
+              }
+            ],
+            "parameters": 13465
+          },
+          "estimated_tc": -1.4901161193847656e-08,
+          "error": -1.4901161193847656e-08
+        }
+      ],
+      "estimated_tc_mean": -9.934107462565104e-09,
+      "estimated_tc_sd": 8.60318942650595e-09,
+      "max_absolute_error": 1.4901161193847656e-08,
+      "passed": true
+    },
+    {
+      "case": "duplicated",
+      "true": {
+        "fact_nll": 2.772588722239781,
+        "ar_nll": 0.6931471805599453,
+        "tc": 2.0794415416798357
+      },
+      "runs": [
+        {
+          "seed": 0,
+          "fact": {
+            "initial_nll": 2.949569284915924,
+            "final_nll": 2.7725887298583984,
+            "curve": [
+              {
+                "step": 400,
+                "population_nll": 2.7725887298583984
+              },
+              {
+                "step": 800,
+                "population_nll": 2.7725887298583984
+              }
+            ],
+            "parameters": 13465
+          },
+          "ar": {
+            "initial_nll": 3.0666990280151367,
+            "final_nll": 0.6931649446487427,
+            "curve": [
+              {
+                "step": 400,
+                "population_nll": 0.693177342414856
+              },
+              {
+                "step": 800,
+                "population_nll": 0.6931649446487427
+              }
+            ],
+            "parameters": 13465
+          },
+          "estimated_tc": 2.0794237852096558,
+          "error": -1.775647017998594e-05
+        },
+        {
+          "seed": 1,
+          "fact": {
+            "initial_nll": 3.7976711988449097,
+            "final_nll": 2.772588849067688,
+            "curve": [
+              {
+                "step": 400,
+                "population_nll": 2.772588610649109
+              },
+              {
+                "step": 800,
+                "population_nll": 2.772588849067688
+              }
+            ],
+            "parameters": 13465
+          },
+          "ar": {
+            "initial_nll": 3.7222126126289368,
+            "final_nll": 0.6931778788566589,
+            "curve": [
+              {
+                "step": 400,
+                "population_nll": 0.6932002305984497
+              },
+              {
+                "step": 800,
+                "population_nll": 0.6931778788566589
+              }
+            ],
+            "parameters": 13465
+          },
+          "estimated_tc": 2.079410970211029,
+          "error": -3.0571468806694924e-05
+        },
+        {
+          "seed": 2,
+          "fact": {
+            "initial_nll": 3.1512447595596313,
+            "final_nll": 2.772588849067688,
+            "curve": [
+              {
+                "step": 400,
+                "population_nll": 2.7725887298583984
+              },
+              {
+                "step": 800,
+                "population_nll": 2.772588849067688
+              }
+            ],
+            "parameters": 13465
+          },
+          "ar": {
+            "initial_nll": 3.379943549633026,
+            "final_nll": 0.6931679248809814,
+            "curve": [
+              {
+                "step": 400,
+                "population_nll": 0.6931822299957275
+              },
+              {
+                "step": 800,
+                "population_nll": 0.6931679248809814
+              }
+            ],
+            "parameters": 13465
+          },
+          "estimated_tc": 2.0794209241867065,
+          "error": -2.061749312920469e-05
+        }
+      ],
+      "estimated_tc_mean": 2.0794185598691306,
+      "estimated_tc_sd": 6.7267039217655565e-06,
+      "max_absolute_error": 3.0571468806694924e-05,
+      "passed": true
+    },
+    {
+      "case": "markov_0.10",
+      "true": {
+        "fact_nll": 2.772588722239781,
+        "ar_nll": 1.6683961007342898,
+        "tc": 1.1041926215054914
+      },
+      "runs": [
+        {
+          "seed": 0,
+          "fact": {
+            "initial_nll": 2.949569301187993,
+            "final_nll": 2.772588729858399,
+            "curve": [
+              {
+                "step": 400,
+                "population_nll": 2.772588622570038
+              },
+              {
+                "step": 800,
+                "population_nll": 2.772588729858399
+              }
+            ],
+            "parameters": 13465
+          },
+          "ar": {
+            "initial_nll": 3.03798768734932,
+            "final_nll": 1.668396264433861,
+            "curve": [
+              {
+                "step": 400,
+                "population_nll": 1.6683962135314945
+              },
+              {
+                "step": 800,
+                "population_nll": 1.668396264433861
+              }
+            ],
+            "parameters": 13465
+          },
+          "estimated_tc": 1.1041924654245379,
+          "error": -1.5608095349506357e-07
+        },
+        {
+          "seed": 1,
+          "fact": {
+            "initial_nll": 3.797671177268029,
+            "final_nll": 2.7725887298583984,
+            "curve": [
+              {
+                "step": 400,
+                "population_nll": 2.7725888478755953
+              },
+              {
+                "step": 800,
+                "population_nll": 2.7725887298583984
+              }
+            ],
+            "parameters": 13465
+          },
+          "ar": {
+            "initial_nll": 3.73695993500948,
+            "final_nll": 1.6683962473869327,
+            "curve": [
+              {
+                "step": 400,
+                "population_nll": 1.6683963243365292
+              },
+              {
+                "step": 800,
+                "population_nll": 1.6683962473869327
+              }
+            ],
+            "parameters": 13465
+          },
+          "estimated_tc": 1.1041924824714657,
+          "error": -1.3903402562576161e-07
+        },
+        {
+          "seed": 2,
+          "fact": {
+            "initial_nll": 3.1512447271347055,
+            "final_nll": 2.772588838338852,
+            "curve": [
+              {
+                "step": 400,
+                "population_nll": 2.772588610649109
+              },
+              {
+                "step": 800,
+                "population_nll": 2.772588838338852
+              }
+            ],
+            "parameters": 13465
+          },
+          "ar": {
+            "initial_nll": 3.3254557984471327,
+            "final_nll": 1.6683961507678036,
+            "curve": [
+              {
+                "step": 400,
+                "population_nll": 1.668396258533001
+              },
+              {
+                "step": 800,
+                "population_nll": 1.6683961507678036
+              }
+            ],
+            "parameters": 13465
+          },
+          "estimated_tc": 1.1041926875710484,
+          "error": 6.606555702504124e-08
+        }
+      ],
+      "estimated_tc_mean": 1.104192545155684,
+      "estimated_tc_sd": 1.2362949263125807e-07,
+      "max_absolute_error": 1.5608095349506357e-07,
+      "passed": true
+    },
+    {
+      "case": "markov_0.25",
+      "true": {
+        "fact_nll": 2.772588722239781,
+        "ar_nll": 2.38015261441637,
+        "tc": 0.3924361078234111
+      },
+      "runs": [
+        {
+          "seed": 0,
+          "fact": {
+            "initial_nll": 2.9495693212375045,
+            "final_nll": 2.7725886330008507,
+            "curve": [
+              {
+                "step": 400,
+                "population_nll": 2.7725887298583984
+              },
+              {
+                "step": 800,
+                "population_nll": 2.7725886330008507
+              }
+            ],
+            "parameters": 13465
+          },
+          "ar": {
+            "initial_nll": 2.9949850887060165,
+            "final_nll": 2.38015263248235,
+            "curve": [
+              {
+                "step": 400,
+                "population_nll": 2.3801525933668017
+              },
+              {
+                "step": 800,
+                "population_nll": 2.38015263248235
+              }
+            ],
+            "parameters": 13465
+          },
+          "estimated_tc": 0.3924360005185008,
+          "error": -1.0730491029065092e-07
+        },
+        {
+          "seed": 1,
+          "fact": {
+            "initial_nll": 3.797671152278781,
+            "final_nll": 2.7725887298583984,
+            "curve": [
+              {
+                "step": 400,
+                "population_nll": 2.7725887298583984
+              },
+              {
+                "step": 800,
+                "population_nll": 2.7725887298583984
+              }
+            ],
+            "parameters": 13465
+          },
+          "ar": {
+            "initial_nll": 3.7590114874765277,
+            "final_nll": 2.380152772180736,
+            "curve": [
+              {
+                "step": 400,
+                "population_nll": 2.3801527470350266
+              },
+              {
+                "step": 800,
+                "population_nll": 2.380152772180736
+              }
+            ],
+            "parameters": 13465
+          },
+          "estimated_tc": 0.3924359576776624,
+          "error": -1.5014574872296294e-07
+        },
+        {
+          "seed": 2,
+          "fact": {
+            "initial_nll": 3.1512446887791157,
+            "final_nll": 2.7725887447595596,
+            "curve": [
+              {
+                "step": 400,
+                "population_nll": 2.772588849067688
+              },
+              {
+                "step": 800,
+                "population_nll": 2.7725887447595596
+              }
+            ],
+            "parameters": 13465
+          },
+          "ar": {
+            "initial_nll": 3.2435667430981994,
+            "final_nll": 2.3801526222378016,
+            "curve": [
+              {
+                "step": 400,
+                "population_nll": 2.3801526315510273
+              },
+              {
+                "step": 800,
+                "population_nll": 2.3801526222378016
+              }
+            ],
+            "parameters": 13465
+          },
+          "estimated_tc": 0.3924361225217581,
+          "error": 1.4698346983976762e-08
+        }
+      ],
+      "estimated_tc_mean": 0.39243602690597373,
+      "estimated_tc_sd": 8.553138616188519e-08,
+      "max_absolute_error": 1.5014574872296294e-07,
+      "passed": true
+    }
+  ],
+  "passed": true,
+  "wall_s": 257.98252250000223,
+  "git_head_note": "Mapped to the tree-identical public-history replacement after the author rewrite (R026)."
+}

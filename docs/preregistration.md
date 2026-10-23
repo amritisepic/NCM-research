@@ -239,3 +239,32 @@ Why: `docs/reviews/triage_2026-10-23.md` (G5-G7, codex F1-F8). Everything not li
   the gain over NCM-c exceeds 2x the pooled training-seed SD, and the same holds with the gap of a conditional AR-c15
   (1.5x AR steps, seed 0, `configs/scale/M_ar_c15.yaml`) run before the claim. Stated as conditional on the released
   tokenizer, at this body and budget, with proxy FLOPs and measured wall-clock.
+
+## S1c — amendment to S1 after the second code audit (registered 2026-10-23, before any S1 run)
+Why: `docs/reviews/codex_audit2.md` (A2-1, A2-2, A2-3, A2-6, A2-9); triage `docs/reviews/triage_audit2_2026-10-23.md`.
+- **Data order:** every arm draws the same 256 rows per step from the training RNG; the repair arm trains its
+  teacher-forcing half on the first 128 of them. Repair-pool refills come from a separate, checkpointed RNG, so the
+  pool's puzzles are an exposure that the other arms do not have; this is recorded, not claimed equal.
+- **Exact resume:** model, optimizer, data RNG, corruption RNG, repair pool and pool RNG are saved in one atomic
+  checkpoint; a resume without them fails. A run manifest (config, training-data SHA-256, base config hash and
+  checkpoint sizes, device) must match to resume; `--eval_only` refuses a directory with a checkpoint.
+- **Reporting:** every cap also reports p90 / max NFE and the cap-hit count; per-puzzle stop / NFE / correctness are
+  saved for every decoding mode; the operating cap c* is computed on val and stored with the run.
+- **Precision:** evaluation in fp32 with TF32 off. On-policy proposals (A2) are computed under the training autocast
+  (bf16 on A100/L4), i.e. from the bf16 policy, while inference decodes in fp32; recorded as part of A2's definition.
+
+## J1b — amendment to J1/J1a after the second code audit (registered 2026-10-23, before any J1 run)
+Why: `docs/reviews/codex_audit2.md` (A2-3 to A2-8, A2-10).
+- **Teacher:** J2's trajectories are run with the fp32 greedy map (autocast off, TF32 off), the map that exact
+  decoding is evaluated with, and always for K + 1 = 12 passes (stopped sources hold their codes), so the executed
+  generator proxy equals the registered one (control 3000 x 384 = J2 2000 x 576 forward rows).
+- **Degenerate sources:** a source whose all-zero start is already its fixed point has no pre-fixed-point state; it is
+  dropped from that step's consistency loss and counted (`traj_degenerate`). If more than 1% of trajectory sources
+  over the run are degenerate, this is reported and H12 is not read until a policy for them is registered.
+- **Data order:** both arms draw one common batch of 128 per step; J2 uses rows 1-64 for teacher forcing and every
+  4th of rows 65-128 as trajectory sources.
+- **Comparators:** every evaluation keeps sentence-ordered exact hypotheses and capped hypotheses for every cap 1-12
+  (val and test), so the J1a paired bootstrap at ceil(J2's mean passes) is always possible. Exact-vs-sequential
+  disagreements are recorded per sentence; any disagreement is reported, and "exact" applies only where they agree.
+- **Data:** `prep_wmt14.py` samples uniformly from the length-eligible pairs until exactly 400k are found, and reuses an
+  archive only if its saved selection metadata matches. Run manifest and `--eval_only` guard as in S1c.

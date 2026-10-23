@@ -251,7 +251,7 @@ for seed in SEEDS:
             continue
         rd = c.split('--run_dir ')[1].split()[0].format(R=R, S=seed)
         name = os.path.basename(rd)
-        for f in ['result.json', 'metrics.jsonl', 'config.yaml', 'calib.json', 'hyp_test.json', 'eval_final.json', 'eval_6000.json', 'eval_20500.json', 'samples_final.json']:
+        for f in ['result.json', 'metrics.jsonl', 'config.yaml', 'calib.json', 'hyp_test.json', 'hyp_val.json', 'run_manifest.json', 'eval_final.json', 'eval_6000.json', 'eval_20500.json', 'samples_final.json']:
             if os.path.exists(f'{rd}/{f}'):
                 shutil.copy(f'{rd}/{f}', f'{out}/{name}__{f}')
 for f in os.listdir('results'):   # diagnostics write straight into the repo's results/

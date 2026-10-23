@@ -21,6 +21,7 @@ or at the cap (board feedback only for the repair arm); D2-nocheck = the same wi
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import sys
@@ -66,10 +67,35 @@ if a.calib_steps:
 if a.eval_only:
     tc.steps = 0
 dev = pick_device()
+if dev == "cuda":   # explicit precision policy: fp32 evaluation without TF32, as wave 0 decoded (codex audit2)
+    torch.backends.cuda.matmul.allow_tf32 = False
+    torch.backends.cudnn.allow_tf32 = False
 torch.manual_seed(seed)
 rng = np.random.default_rng(seed)
+pool_rng = np.random.default_rng(np.random.SeedSequence([seed, 2201]))   # repair-pool refills only (codex audit2 A2-6)
 data = SudokuTrain("hard", a.data)
 os.makedirs(a.run_dir, exist_ok=True)
+
+
+def digest(path):
+    with open(path, "rb") as f:
+        return hashlib.file_digest(f, "sha256").hexdigest()
+
+
+# run identity, validated before anything in run_dir is overwritten (codex audit2 A2-3)
+ckpt_path, manifest_path = os.path.join(a.run_dir, "ckpt.pt"), os.path.join(a.run_dir, "run_manifest.json")
+if a.eval_only and os.path.exists(ckpt_path):
+    sys.exit(f"--eval_only evaluates the released model, but {a.run_dir} holds a training checkpoint")
+_base = os.path.join(ROOT, "artifacts", "sudoku", "hard")
+manifest = {"config": OmegaConf.to_container(cfg, resolve=True), "data_sha256": digest(a.data),
+            "base_config_sha256": digest(os.path.join(_base, "config.yaml")),
+            "base_bytes": {n: os.path.getsize(os.path.join(_base, n)) for n in ("tokenizer.pt", "generator.pt")},
+            "device": pick_device()}
+if os.path.exists(ckpt_path) and not a.calib_steps:
+    if not os.path.exists(manifest_path) or json.load(open(manifest_path)) != manifest:
+        sys.exit(f"{a.run_dir} holds a checkpoint of a different (or unrecorded) run: use a fresh run directory")
+if not a.calib_steps:
+    json.dump(manifest, open(manifest_path, "w"), indent=1)
 OmegaConf.save(cfg, os.path.join(a.run_dir, "config.yaml"))
 
 B_ = load_ncm(os.path.join(ROOT, "artifacts", "sudoku", "hard"), device=dev)
@@ -98,8 +124,12 @@ trainer = Trainer(a.run_dir, params, max_lr=float(tc.lr), total_steps=int(tc.ste
                   ckpt_every=int(tc.ckpt_every), device=dev, amp=bool(tc.get("amp", True)),
                   min_lr_frac=float(tc.get("min_lr_frac", 0.1)), extra_groups=extra)
 modules = {"model": net, **({"feedback": fb} if fb is not None else {})}
-trainer.maybe_resume(modules, rng)
-gen = torch.Generator(device=dev).manual_seed(seed * 7919 + trainer.step)
+resume_extra = trainer.maybe_resume(modules, rng)
+gen = torch.Generator(device=dev).manual_seed(seed * 7919)
+if trainer.step and corr.mode != "none":   # codex audit2 A2-2: continue the corruption stream, do not reseed
+    if "corruption_rng" not in resume_extra:
+        raise RuntimeError("checkpoint lacks the corruption RNG state; exact resume unavailable")
+    gen.set_state(resume_extra["corruption_rng"].cpu())
 print(f"[sudoku-L] arm={arm} params {n_params(net) / 1e6:.2f}M (+{n_params(fb) if fb else 0} feedback) | "
       f"{fl_step / 1e12:.2f} TFLOP/step, {fl_step * int(tc.steps) / 1e15:.1f} PFLOP total | device {dev}", flush=True)
 
@@ -128,16 +158,19 @@ def canon(sol):
         return tok.encode(sol)
 
 
-def batch(n):
-    p, s = data.batch(rng, n)
+def batch(n, data_rng=None):
+    p, s = data.batch(rng if data_rng is None else data_rng, n)
     return torch.from_numpy(p).to(dev), torch.from_numpy(s).to(dev)
 
 
 class Pool:
     """In-progress Jacobi decodes of training puzzles (repair arm)."""
 
-    def __init__(self, n):
-        self.prompt, self.sol = batch(n)
+    def __init__(self, n, state=None):
+        if state is not None:   # restored from the checkpoint: draws no data (codex audit2 A2-1)
+            self.load_state_dict(state)
+            return
+        self.prompt, self.sol = batch(n, data_rng=pool_rng)
         self.codes = torch.zeros(n, S, dtype=torch.long, device=dev)
         self.guess = torch.zeros(n, 89, dtype=torch.long, device=dev)
         self.active = torch.zeros(n, dtype=torch.bool, device=dev)
@@ -147,7 +180,7 @@ class Pool:
         k = int(m.sum())
         if k == 0:
             return
-        p, s = batch(k)
+        p, s = batch(k, data_rng=pool_rng)
         self.prompt[m], self.sol[m] = p, s
         self.codes[m], self.guess[m], self.active[m], self.age[m] = 0, 0, False, 0
 
@@ -159,11 +192,23 @@ class Pool:
             setattr(self, k, v.to(dev))
 
 
-pool = Pool(int(tc.batch_size) // 2) if arm == "repair" else None
-if pool is not None:
-    pst = os.path.join(a.run_dir, "pool.pt")
-    if trainer.step > 0 and os.path.exists(pst):
-        pool.load_state_dict(torch.load(pst, map_location="cpu", weights_only=False))
+pool = None
+if arm == "repair":
+    if trainer.step:
+        if "pool" not in resume_extra or "pool_data_rng" not in resume_extra:
+            raise RuntimeError("checkpoint lacks the repair pool / pool RNG; exact resume unavailable")
+        pool_rng.bit_generator.state = resume_extra["pool_data_rng"]
+    pool = Pool(int(tc.batch_size) // 2, state=resume_extra.get("pool") if trainer.step else None)
+
+
+def save_checkpoint():
+    """Model, optimizer, data RNG, corruption RNG and repair pool in one atomic file (codex audit2 A2-1/A2-2)."""
+    extra = {"corruption_rng": gen.get_state()}
+    if pool is not None:
+        extra.update(pool=pool.state_dict(), pool_data_rng=pool_rng.bit_generator.state)
+    trainer.save(modules, rng, extra=extra)
+
+
 pool_stats = {"solved": 0, "aged": 0, "advanced": 0}
 
 
@@ -176,6 +221,7 @@ def tf_loss(prompt, sol):
         return F.cross_entropy(logits.float().reshape(-1, logits.shape[-1]), idx.reshape(-1))
     pol = None
     if corr.mode == "onpolicy":
+        # policy proposals inherit the training autocast (bf16 on A100/L4); inference decodes in fp32 (S1 records this)
         was = net.training
         net.eval()
         with torch.no_grad():
@@ -236,8 +282,12 @@ def evaluate(prompts, sols, caps=(4, 8, 12, 16, 24), bs=250, final=False):
                                  "stop": int(out["stop"][j])})
     res["seq_solved_pct"] = 100 * float(np.mean(seq_ok))
     for mode, rows in d2.items():
+        # S1b tails (codex audit2 A2-9): cap hit = not stopped by the verifier or a fixed point at or before c
         res[f"d2_{mode}"] = {f"cap{c}": {"solved_pct": 100 * float(np.mean([r["ok_at"][i] for r in rows])),
-                                        "mean_nfe": float(np.mean([min(r["nfe"], c) for r in rows]))}
+                                        "mean_nfe": float(np.mean([min(r["nfe"], c) for r in rows])),
+                                        "p90_nfe": float(np.percentile([min(r["nfe"], c) for r in rows], 90)),
+                                        "max_nfe": int(max(min(r["nfe"], c) for r in rows)),
+                                        "cap_hit_count": int(sum(r["nfe"] > c or (r["nfe"] == c and r["stop"] == 0) for r in rows))}
                              for i, c in enumerate(caps)}
         res[f"d2_{mode}"]["stop_counts"] = np.bincount([r["stop"] for r in rows], minlength=3).tolist()
     if final:
@@ -250,8 +300,10 @@ def evaluate(prompts, sols, caps=(4, 8, 12, 16, 24), bs=250, final=False):
             m = [i for i, (r, ok) in enumerate(rounds) if sel(r, ok)]
             res["by_depth"][name] = {"n": len(m), "seq_pct": 100 * float(np.mean([seq_ok[i] for i in m])) if m else None,
                                      "d2_check_capmax_pct": 100 * float(np.mean([d2["check"][i]["ok_at"][-1] for i in m])) if m else None}
-        res["per_puzzle"] = {"seq": [bool(v) for v in seq_ok], "d2_check_nfe": [r["nfe"] for r in d2["check"]],
-                             "d2_check_ok_cap": [[bool(v) for v in r["ok_at"]] for r in d2["check"]]}
+        res["per_puzzle"] = {"seq": [bool(v) for v in seq_ok], "caps": list(caps),
+                             **{f"d2_{m}": {"nfe": [r["nfe"] for r in rows], "stop": [r["stop"] for r in rows],
+                                            "ok_at_cap": [[bool(v) for v in r["ok_at"]] for r in rows]}
+                                for m, rows in d2.items()}}
     net.train()
     return res
 
@@ -265,8 +317,8 @@ bs = int(tc.batch_size)
 while trainer.step < int(tc.steps):
     with trainer.ctx:
         if arm == "repair":
-            prompt, sol = batch(bs - bs // 2)
-            loss_tf = tf_loss(prompt, sol)
+            prompt, sol = batch(bs)   # same rows per step as every other arm; the repair arm uses the first half (A2-6)
+            loss_tf = tf_loss(prompt[:bs - bs // 2], sol[:bs - bs // 2])
             loss_pool = pool_loss()
             loss = 0.5 * (loss_tf + loss_pool)
             logs = {"loss_tf": round(loss_tf.item(), 4), "loss_pool": round(loss_pool.item(), 4)}
@@ -289,13 +341,9 @@ while trainer.step < int(tc.steps):
         ev = evaluate(val_p, val_s, caps=(12, 24))
         print(json.dumps(trainer.log({"eval": ev})), flush=True)
     if trainer.step % int(tc.ckpt_every) == 0:
-        trainer.save(modules, rng)
-        if pool is not None:
-            torch.save(pool.state_dict(), os.path.join(a.run_dir, "pool.pt"))
+        save_checkpoint()
     if deadline and time.time() > deadline:
-        trainer.save(modules, rng)
-        if pool is not None:
-            torch.save(pool.state_dict(), os.path.join(a.run_dir, "pool.pt"))
+        save_checkpoint()
         print("[stop] time budget reached; resume by re-running the same command", flush=True)
         sys.exit(0)
 
@@ -303,16 +351,18 @@ if calib:
     calib.report(trainer.step, {"arm": arm, "batch_size": bs})
     sys.exit(0)
 if not a.eval_only:
-    trainer.save(modules, rng)
+    save_checkpoint()
     torch.save({k: m.state_dict() for k, m in modules.items()}, os.path.join(a.run_dir, "final.pt"))
 caps = tuple(int(c) for c in ec.get("caps", [4, 8, 12, 16, 24]))
 final = {"val": evaluate(val_p, val_s, caps=caps)}
+# S1 operating point, chosen on val only: the largest cap whose mean NFE (verifier stop) is <= 12 (A2-9)
+c_star = max((c for c in caps if final["val"]["d2_check"][f"cap{c}"]["mean_nfe"] <= 12), default=None)
 tp = np.array(safe_pickle_load(os.path.join(ROOT, "data", "sudoku", "hard", "puzzles.pickle"))[: a.n_test])
 ts = np.array(safe_pickle_load(os.path.join(ROOT, "data", "sudoku", "hard", "solutions.pickle"))[: a.n_test])
 final["test_released"] = evaluate(tp, ts, caps=caps, final=True)
 res = {"run": os.path.basename(a.run_dir.rstrip("/")), "arm": arm, "config": OmegaConf.to_container(cfg),
        "params_total": n_params(net) + (n_params(fb) if fb else 0), "steps": trainer.step,
-       "flops_est_total": fl_step * trainer.step, "wall_s": trainer.wall_prev + time.time() - trainer.t_start,
+       "operating_cap_from_val": c_star, "generator_flops_proxy_total": fl_step * trainer.step, "wall_s": trainer.wall_prev + time.time() - trainer.t_start,
        "device": dev, "gpu": torch.cuda.get_device_name() if dev == "cuda" else None, "torch": torch.__version__,
        "final_eval": final}
 json.dump(res, open(os.path.join(a.run_dir, "result.json"), "w"), indent=1)

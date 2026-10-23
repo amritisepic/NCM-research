@@ -18,6 +18,7 @@ selection) and once on newstest2014 (test, data/wmt14/sources.pickle).
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import sys
@@ -61,9 +62,33 @@ if a.calib_steps:
 if a.eval_only:
     tc.steps = 0
 dev = pick_device()
+if dev == "cuda":   # strict fp32 for the no-grad teacher and all evaluation, as wave 0 decoded (codex audit2 A2-4)
+    torch.backends.cuda.matmul.allow_tf32 = False
+    torch.backends.cudnn.allow_tf32 = False
 torch.manual_seed(seed)
 rng = np.random.default_rng(seed)
 os.makedirs(a.run_dir, exist_ok=True)
+
+
+def digest(path):
+    with open(path, "rb") as f:
+        return hashlib.file_digest(f, "sha256").hexdigest()
+
+
+# run identity, validated before anything in run_dir is overwritten (codex audit2 A2-3)
+ckpt_path, manifest_path = os.path.join(a.run_dir, "ckpt.pt"), os.path.join(a.run_dir, "run_manifest.json")
+if a.eval_only and os.path.exists(ckpt_path):
+    sys.exit(f"--eval_only evaluates the released model, but {a.run_dir} holds a training checkpoint")
+_base = os.path.join(ROOT, "artifacts", "wmt14")
+manifest = {"config": OmegaConf.to_container(cfg, resolve=True), "data_sha256": digest(a.data),
+            "base_config_sha256": digest(os.path.join(_base, "config.yaml")),
+            "base_bytes": {n: os.path.getsize(os.path.join(_base, n)) for n in ("tokenizer.pt", "generator.pt")},
+            "device": dev}
+if os.path.exists(ckpt_path) and not a.calib_steps:
+    if not os.path.exists(manifest_path) or json.load(open(manifest_path)) != manifest:
+        sys.exit(f"{a.run_dir} holds a checkpoint of a different (or unrecorded) run: use a fresh run directory")
+if not a.calib_steps:
+    json.dump(manifest, open(manifest_path, "w"), indent=1)
 OmegaConf.save(cfg, os.path.join(a.run_dir, "config.yaml"))
 
 B_ = load_ncm(os.path.join(ROOT, "artifacts", "wmt14"), device=dev)
@@ -83,7 +108,10 @@ fwd = FL.ncm_gen_fwd_per_seq(int(B_.cfg.model.n_embd), int(B_.cfg.model.n_layer)
                              codebook=vq.vqvae_vocab_sizes[0], vq_dim=tok.embed_dim, query_level0=True)
 bs = int(tc.batch_size)
 n_c = bs // 2 if arm == "consist" else 0
-# per step: (bs - n_c) TF + n_c consistency samples (3 units each) + trajectories for n_c / m sources (<= K + 1 passes)
+if m_states < 1 or (n_c and (bs % 2 or n_c % m_states)):
+    raise ValueError("consistency needs an even batch and a half-batch divisible by states_per_traj")
+# per step: (bs - n_c) TF + n_c consistency samples (3 units each) + trajectories for n_c / m sources, always run for
+# exactly K + 1 passes (full budget), so the executed generator proxy equals this number (codex audit2 A2-7)
 fl_step = fwd * (3 * bs + (K + 1) * (n_c // max(m_states, 1)))
 params = [p for p in net.parameters() if p.requires_grad]
 trainer = Trainer(a.run_dir, params, max_lr=float(tc.lr), total_steps=int(tc.steps), warmup=int(tc.warmup),
@@ -92,8 +120,8 @@ trainer = Trainer(a.run_dir, params, max_lr=float(tc.lr), total_steps=int(tc.ste
                   min_lr_frac=float(tc.get("min_lr_frac", 0.1)))
 modules = {"model": net}
 trainer.maybe_resume(modules, rng)
-print(f"[wmt14-L] arm={arm} params {n_params(net) / 1e6:.2f}M | <= {fl_step / 1e12:.2f} TFLOP/step, "
-      f"{fl_step * int(tc.steps) / 1e15:.1f} PFLOP total (trajectory passes at the cap) | device {dev}", flush=True)
+print(f"[wmt14-L] arm={arm} params {n_params(net) / 1e6:.2f}M | {fl_step / 1e12:.2f} TFLOP/step, "
+      f"{fl_step * int(tc.steps) / 1e15:.1f} PFLOP total (generator proxy) | device {dev}", flush=True)
 
 
 # ------------------------------------------------------------------------------------------------ helpers
@@ -121,31 +149,40 @@ def tf_loss(src, tgt):
     return ce(parallel_logits(net, z, idx, pm), idx)
 
 
-traj_stats = {"passes": 0.0, "n": 0, "states_before_fp": 0.0}
+traj_stats = {"passes": 0.0, "n": 0, "states_before_fp": 0.0, "degenerate": 0}
 
 
-def consist_loss(n):
-    """Self-consistency on the current model's own greedy Jacobi trajectories."""
-    g = max(1, n // m_states)
-    src, _ = batch(g)
-    z, pm = prefix(src)
+def consist_loss(n, sources):
+    """Self-consistency on the current model's own greedy Jacobi trajectories (n // m_states sources).
+    Returns (loss or None, number of training states used)."""
+    g = n // m_states
+    z, pm = prefix(sources[:g])
     was = net.training
     net.eval()
-    with torch.no_grad():
-        out = jacobi_decode(net, lambda c, h: z, g, S, dev, K + 1, pad_mask=pm, keep_history=True)
+    # the teacher is the fp32 greedy map that exact decoding evaluates, not the bf16 training map (codex audit2 A2-4)
+    with torch.no_grad(), torch.autocast(device_type=dev, enabled=False):
+        out = jacobi_decode(net, lambda c, h: z.float(), g, S, dev, K + 1, pad_mask=pm, keep_history=True, full_budget=True)
     net.train(was)
+    if not bool(out["stop"].eq(1).all()):
+        raise RuntimeError("consistency teacher did not reach a fixed point in K + 1 passes")
     y = out["codes"]
     states = [torch.zeros_like(y)] + out["history"]            # input of pass t+1 = output of pass t
-    hist = torch.stack(states, 1)                               # (g, T+1, S)
-    first_fp = (hist == y[:, None]).all(-1).float().argmax(1)   # first state equal to the fixed point (>= 1)
-    t = (torch.rand(g, m_states, device=dev) * first_fp[:, None]).long()   # uniform over states before it
-    inp = hist[torch.arange(g, device=dev)[:, None], t].reshape(-1, S)[:n]
-    tgt = y.repeat_interleave(m_states, 0)[:n]
-    zz, pmm = z.repeat_interleave(m_states, 0)[:n], pm.repeat_interleave(m_states, 0)[:n]
+    hist = torch.stack(states, 1)                               # (g, K + 2, S)
+    first_fp = (hist == y[:, None]).all(-1).float().argmax(1)   # first state equal to the fixed point
+    keep = first_fp > 0   # J1b: a source whose all-zero start is already its fixed point has no pre-fixed-point state
     traj_stats["passes"] += float(out["nfe"].float().sum())
     traj_stats["states_before_fp"] += float(first_fp.sum())
     traj_stats["n"] += g
-    return ce(parallel_logits(net, zz, inp, pmm), tgt)
+    traj_stats["degenerate"] += int((~keep).sum())
+    if not bool(keep.any()):
+        return None, 0
+    hist, y, z, pm, first_fp = hist[keep], y[keep], z[keep], pm[keep], first_fp[keep]
+    gk = len(y)
+    t = (torch.rand(gk, m_states, device=dev) * first_fp[:, None]).long()   # uniform over states strictly before it
+    inp = hist[torch.arange(gk, device=dev)[:, None], t].reshape(-1, S)
+    tgt = y.repeat_interleave(m_states, 0)
+    zz, pmm = z.repeat_interleave(m_states, 0), pm.repeat_interleave(m_states, 0)
+    return ce(parallel_logits(net, zz, inp, pmm), tgt), len(tgt)
 
 
 def detok(ids):
@@ -156,10 +193,13 @@ def detok(ids):
 
 
 @torch.no_grad()
-def evaluate(srcs, refs, bs_=128, sequential=True, caps=(6, 8, 9)):
+def evaluate(srcs, refs, bs_=128, sequential=True, caps=None):
     """fp32 eval: exact Jacobi passes + BLEU of its output (= sequential output); optionally verifies that.
-    caps: also the output after at most c passes (fixed-cap Jacobi, J1a), with BLEU, mean passes and length ratio."""
+    caps: also the output after at most c passes (fixed-cap Jacobi, J1a), with BLEU, mean passes and length ratio;
+    default every cap 1..K+1 so any comparator cap exists (codex audit2 A2-10).
+    Returns (metrics, exact hypotheses, {cap: capped hypotheses})."""
     import sacrebleu
+    caps = tuple(range(1, K + 2)) if caps is None else tuple(caps)
     net.eval()
     hyp, nfe, same = [], [], []
     hyp_cap = {c: [] for c in caps}
@@ -169,7 +209,7 @@ def evaluate(srcs, refs, bs_=128, sequential=True, caps=(6, 8, 9)):
             x = torch.tensor(ids, device=dev)
             z, pm = prefix(x)
             out = jacobi_decode(net, lambda c, h: z, len(x), S, dev, K + 1, pad_mask=pm, keep_history=True)
-            if sequential:
+            if sequential:   # disagreements are recorded per sentence (reported, not silently averaged)
                 seq = net.generate(None, x, temperature=0.0, top_k=0, top_p=1.0, cfg_scale=0.0, cfg_null_eos=EOS)
                 same += (seq == out["codes"]).all(1).tolist()
             with torch.autocast(device_type=dev, enabled=False):
@@ -195,7 +235,8 @@ def evaluate(srcs, refs, bs_=128, sequential=True, caps=(6, 8, 9)):
     res["nfe_per_sentence"] = nfe
     if sequential:
         res["fixed_point_equals_sequential_pct"] = 100 * float(np.mean(same))
-    return res, hyp
+        res["fixed_point_differs_from_sequential_idx"] = [i for i, v in enumerate(same) if not v]
+    return res, hyp, hyp_cap
 
 
 @torch.no_grad()
@@ -221,14 +262,16 @@ calib = Calib(a.run_dir, a.calib_steps, fl_step) if a.calib_steps else None
 n_curve = int(ec.get("n_curve", 500))
 while trainer.step < int(tc.steps):
     with trainer.ctx:
-        src, tgt = batch(bs - n_c)
-        loss_tf = tf_loss(src, tgt)
+        # one common draw of bs rows per step in every arm; consist uses the first bs - n_c for teacher forcing and
+        # every m-th of the rest as trajectory sources (codex audit2 A2-6)
+        src, tgt = batch(bs)
+        loss_tf = tf_loss(src[:bs - n_c], tgt[:bs - n_c])
+        loss, logs = loss_tf, {}
         if n_c:
-            loss_c = consist_loss(n_c)
-            loss = ((bs - n_c) * loss_tf + n_c * loss_c) / bs
-            logs = {"loss_tf": round(loss_tf.item(), 4), "loss_consist": round(loss_c.item(), 4)}
-        else:
-            loss, logs = loss_tf, {}
+            loss_c, n_used = consist_loss(n_c, src[bs - n_c:][::m_states])
+            if loss_c is not None:
+                loss = ((bs - n_c) * loss_tf + n_used * loss_c) / (bs - n_c + n_used)
+                logs = {"loss_tf": round(loss_tf.item(), 4), "loss_consist": round(loss_c.item(), 4)}
     trainer.backward(loss)
     gn = trainer.step_opt(params)
     if calib:
@@ -237,11 +280,12 @@ while trainer.step < int(tc.steps):
     if trainer.step % int(tc.get("log_every", 50)) == 0 or trainer.step == 1:
         if traj_stats["n"]:
             logs.update({"traj_passes": round(traj_stats["passes"] / traj_stats["n"], 3),
-                         "traj_states_before_fp": round(traj_stats["states_before_fp"] / traj_stats["n"], 3)})
-            traj_stats.update(passes=0.0, n=0, states_before_fp=0.0)
+                         "traj_states_before_fp": round(traj_stats["states_before_fp"] / traj_stats["n"], 3),
+                         "traj_degenerate": traj_stats["degenerate"]})
+            traj_stats.update(passes=0.0, n=0, states_before_fp=0.0, degenerate=0)
         print(json.dumps(trainer.log({"loss": round(loss.item(), 4), "gnorm": round(gn, 3), **logs})), flush=True)
     if trainer.step % int(tc.eval_every) == 0 or trainer.step == int(tc.steps):
-        ev, _ = evaluate(val_text["src"][:n_curve], val_text["ref"][:n_curve], sequential=False)
+        ev, _, _ = evaluate(val_text["src"][:n_curve], val_text["ref"][:n_curve], sequential=False)
         ev.pop("nfe_per_sentence")
         ev["val_nll"] = val_nll()
         print(json.dumps(trainer.log({"eval": ev})), flush=True)
@@ -260,15 +304,18 @@ if not a.eval_only:
     torch.save({"model": net.state_dict()}, os.path.join(a.run_dir, "final.pt"))
 nv = a.n_val or len(val_text["src"])
 final = {"val_nll": val_nll()}
-final["val"], _ = evaluate(val_text["src"][:nv], val_text["ref"][:nv])
+final["val"], hyp_val, hyp_val_cap = evaluate(val_text["src"][:nv], val_text["ref"][:nv])
 srcs = safe_pickle_load(os.path.join(ROOT, "data", "wmt14", "sources.pickle"))
 refs = safe_pickle_load(os.path.join(ROOT, "data", "wmt14", "reference_translations.pickle"))
 nt = a.n_test or len(srcs)
-final["test"], hyp = evaluate(srcs[:nt], refs[:nt])
-json.dump({"hyp_test": hyp, "nfe_test": final["test"].pop("nfe_per_sentence")}, open(os.path.join(a.run_dir, "hyp_test.json"), "w"))
-final["val"].pop("nfe_per_sentence", None)
+final["test"], hyp, hyp_cap = evaluate(srcs[:nt], refs[:nt])
+# sentence-ordered exact and capped hypotheses for the J1a paired bootstrap (codex audit2 A2-10)
+json.dump({"hyp_test": hyp, "hyp_test_capped": hyp_cap, "nfe_test": final["test"].pop("nfe_per_sentence")},
+          open(os.path.join(a.run_dir, "hyp_test.json"), "w"))
+json.dump({"hyp_val": hyp_val, "hyp_val_capped": hyp_val_cap, "nfe_val": final["val"].pop("nfe_per_sentence")},
+          open(os.path.join(a.run_dir, "hyp_val.json"), "w"))
 res = {"run": os.path.basename(a.run_dir.rstrip("/")), "arm": arm, "config": OmegaConf.to_container(cfg),
-       "params_total": n_params(net), "steps": trainer.step, "flops_est_total_upper": fl_step * trainer.step,
+       "params_total": n_params(net), "steps": trainer.step, "generator_flops_proxy_total": fl_step * trainer.step,
        "wall_s": trainer.wall_prev + time.time() - trainer.t_start, "device": dev,
        "gpu": torch.cuda.get_device_name() if dev == "cuda" else None, "torch": torch.__version__, "final_eval": final}
 json.dump(res, open(os.path.join(a.run_dir, "result.json"), "w"), indent=1)

@@ -410,3 +410,28 @@ Compute units: CPU-h = wall-clock hours on the 4-core cloud container (Xeon w/ A
   annealing alone; replaced by a conditional 1.5x-steps AR (seed 0) that any criterion-(b) claim must also beat.
 - Budget view (A100, estimates): spent ~12.5; queued wave 1 + Sudoku + WMT14 ~54; M1 seed-0 pair ~12, seeds 1-2 ~24,
   candidate ~23, AR-c15 ~6.4; wave-1b / S1 / J1 seeds ~20-40. Total ~150-175 of ~200 CU.
+
+## R028 — second code audit (Sudoku / WMT14 trainers) and P1c step 1; fixes before any S1 / J1 run (2026-10-23)
+- Audit by codex (`docs/reviews/codex_audit2.md`, branch `codex/audit2`, files merged here), triage in
+  `docs/reviews/triage_audit2_2026-10-23.md`. Its suite reproduced here before any change (12 passed, 13 strict xfails).
+- **Real defects, all fixed:** repair-pool checkpoint not atomic and not restorable without drawing data (A2-1);
+  Sudoku corruption RNG reseeded on resume (A2-2); no run-identity check, so `--eval_only` could have evaluated a
+  fine-tuned checkpoint as the released model (A2-3); **J2's teacher ran in bf16 under the training autocast, not
+  the fp32 map that exact decoding uses (A2-4)**; degenerate trajectories (A2-5); arms with the same seed did not see
+  the same data (A2-6); **J2's executed compute was up to 28% below the control's when teachers stopped early
+  (A2-7)**; WMT prep could return fewer pairs or reuse a stale archive (A2-8); S1b tails and c* not recorded (A2-9);
+  capped hypotheses discarded, so J1a's paired bootstrap was impossible (A2-10). Three of the audit's patches were
+  modified (base-checkpoint hashing, A2-5 and A2-10 fail-closed behaviour; reasons in the triage).
+- No result is affected: no S1 / J1 run had started. Registered as S1c / J1b (`preregistration.md`).
+- **Checks after the fixes (CPU):** test suite 59 passed (25 audit-2 tests ported to the working tree; 14 of them fail
+  on the pre-fix commit); Sudoku uniform / repair train, evaluate, stop on the time budget and resume exactly (pool
+  restored); the manifest refuses a changed config and `--eval_only` on a trained directory; WMT14 consist trains with
+  the fp32 full-budget teacher (degenerate count 0 in the smoke run), saves capped hypotheses for caps 1-12 on val and
+  test, sequential = exact on all smoke sentences; prep reproduces the previous 20k smoke selection exactly and
+  refuses a mismatched archive.
+- **P1c step 1 (codex, CPU, 258 s):** the two-stream TC estimator recovers known TC on synthetic codes (independent
+  0, four duplicated bits 2.079, Markov q = 0.10 / 0.25: 1.104 / 0.392 nats) within 3.1e-5 nats in all 12 seed-cases
+  (`docs/reviews/p1c_synthetic.json`, `scripts/p1c_synthetic.py`). This validates the estimator's arithmetic and
+  basic optimisation on one tiny level with constant context, not its behaviour on learned codes. P1c step 2 (the
+  zero-init side-channel probe on real codes) remains to be built and registered.
+- Cost note: J2's fp32 teacher adds wall-clock; the CU estimate for `w2c_L_wmt_consist` rises from ~4 to ~5.
