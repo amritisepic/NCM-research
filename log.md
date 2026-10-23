@@ -435,3 +435,27 @@ Compute units: CPU-h = wall-clock hours on the 4-core cloud container (Xeon w/ A
   basic optimisation on one tiny level with constant context, not its behaviour on learned codes. P1c step 2 (the
   zero-init side-channel probe on real codes) remains to be built and registered.
 - Cost note: J2's fp32 teacher adds wall-clock; the CU estimate for `w2c_L_wmt_consist` rises from ~4 to ~5.
+
+## R029 — automated Codex review (2026-10-23)
+- Code changes to `src/ scripts/ configs/ notebooks/ assets/` now reach `claude/ncm-research` (the branch Colab
+  clones) only through a PR that Codex has reviewed on its current head, with every P0/P1 triaged in
+  `docs/reviews/triage_pr<N>.md` (`scripts/review/codex_pr.py`; protocol in `CLAUDE.md`; review rules for Codex in
+  `AGENTS.md`, drawn from the R024 / R028 defect classes). A Claude Code hook (`.claude/hooks/review_gate.sh`) blocks
+  direct pushes of gated code to that branch and merges that bypass the gate; it fails closed if it cannot compare
+  with the remote.
+- Deep audits (failing strict-xfail tests, number recomputation) are required before any Colab run whose trainer,
+  sampler, corruption, eval or FLOP code changed since the last audit, and before any success-bar claim: via an
+  `@codex` brief on the PR (cloud) or `scripts/review/codex_local.sh audit` (laptop; gpt-6.1-sol, ultra effort).
+- Not covered: pushes made outside Claude Code; GitHub review needs Codex code review enabled for the repo.
+- R029 addendum (laptop session, 2026-10-23): the gate was tested and four holes fixed. (1) The hook read its
+  input with `jq`, which this Windows laptop lacks; it then saw an empty command and allowed every push and merge.
+  It now falls back to Python and fails closed if it cannot parse input that mentions a push or merge. It also
+  checks the repo the command actually runs in (hook `cwd`, a leading `cd`, `git -C`) and the source of
+  `SRC:claude/ncm-research` refspecs. (2) Any Codex issue comment after the head commit counted as a review, so
+  a usage-limit or setup notice would have passed the gate; now only a "didn't find any major issues" comment or a
+  PR review on the head counts, and limit / setup notices make `wait` exit 4. (3) Pagination split pages on "][",
+  which also occurs in comment bodies (`x[0][1]`); it now pages by hand. (4) Any 6+ digit number in the triage file
+  counted as a triaged id; the id must now share a line with accept / partial / reject. `merge` pins the head SHA
+  the gate passed. Tests: `tests/test_review_gate.py` (12; 10 fail against the R029 scripts on this laptop).
+- Codex has not reacted to the review request on PR #1 (posted 21:17 UTC, checked 22:18 UTC): code review is
+  probably not enabled for the repository in Codex settings. Until it is, no gated code can merge.

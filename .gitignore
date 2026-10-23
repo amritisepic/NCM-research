@@ -10,3 +10,6 @@ __pycache__/
 *.pyc
 .ipynb_checkpoints/
 .venv/
+
+# local Codex review scratch (may contain local paths)
+.codex-review/
