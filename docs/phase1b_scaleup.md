@@ -67,7 +67,7 @@ models from scratch. A claim needs both, or is stated as only one.
 | 4 | C2 red-black within-level sub-steps (attacks incoherent plans) | tier L, only if P1 finds TC >= 30% of the gap or wave 0 locates the loss at coarse levels | no gain over an NFE-matched baseline | 30% (40%, conditional) |
 | 5 | B1b re-quantized labels | in the same factorial | A2 not better than A1 | 20% (part of B1) |
 | 6 | B7 soft labels (tau 0.25, top 16) | one arm in the factorial | A6 not better than A1 | 20% (30%) |
-| 7 | Token-aligned level schedule (are the straddling levels the problem?) | tier S pair | no Gen-PPL gain at equal K | 25% |
+| 7 | Token-aligned level schedule (are the straddling levels the problem?) | tier S pair | no Gen-PPL gain at equal K | 35% (25%; raised by R016) |
 | 8 | B3/B4 tokenizers (high risk) | tier S | as in phase1b_reevaluation.md | 15% |
 | 9 | B5 exact AR sampling from NCM drafts (hybrid, reported separately) | tier M, once AR-m exists | mean accepted run < 4 tokens | 30% |
 

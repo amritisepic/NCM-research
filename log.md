@@ -171,3 +171,23 @@ Compute units: CPU-h = wall-clock hours on the 4-core cloud container (Xeon w/ A
 - Soft-label temperature: tau = 0.25 puts 77% (72-87% by level) of the weight on the canonical code.
 - Smoke-test warning: 2 Adam steps at lr 1e-4 without warmup on batch 2 raised val NLL on 4 windows from
   1075 to 1459 nats; tier-L fine-tunes therefore use lr 5e-5 with 200 warmup steps (all arms alike).
+
+## R016 — linear probes on the released tokenizer's levels (n = 4000 val windows; complete)
+- `scripts/probe_levels.py --n 4000`, run in 3 chunks after the CPU queue hit its 2-h limit (levels 0-3 from
+  the interrupted run's log, 3 decimals; the probes are deterministic). `results/phase0_level_probes.json`.
+  Logistic regression, 5-fold CV; "cum" = mean-pooled cumulative reconstruction up to level k, "code" = mean
+  of level k's own code vectors. Chance: main character 0.36 (majority of 8 names), dialogue / content /
+  order 0.50 (balanced), token@64 0.19.
+- Cumulative view: dialogue 0.54 (L0) -> 0.93 (L1) -> 0.95; main character 0.32 -> 0.56 (L1) -> 0.85 (L4) ->
+  0.89 (L5-L11, flat); content words 0.53 -> 0.76 (L1) -> 0.89 (L6+, flat); token@64 0.09-0.12 at every
+  level (below the majority rate: pooled features carry no position; the probe overfits); order 0.66-0.74
+  at every level, highest at L1-L2.
+- **Own-code view collapses at the token-straddling levels:** main character / dialogue / content from
+  level k's own codes: L7 (64 codes, 2 tokens each) 0.85 / 0.84 / 0.84; **L8 0.40 / 0.68 / 0.69, L9
+  0.32 / 0.60 / 0.58, L10 0.34 / 0.57 / 0.56 (near chance)**; L11 (128 codes, 1 token each) 0.80 / 0.89 / 0.84.
+- **Reading:** global story attributes are in place by level 1-5 and add nothing after level 6. The three
+  straddling levels hold codes with almost no linearly readable content of their own, are the hardest for
+  the generator to predict (R014: 45-55% one-step disagreement) and carry 43% of its NLL (R008). Being a
+  residual level does not explain it (L11 is residual and content-bearing); the non-integer
+  tokens-per-code ratio (1.68, 1.39, 1.19) is the distinguishing property. Raises the prior of the
+  token-aligned schedule test (bet 7 in phase1b_scaleup.md) from 25% to 35%.

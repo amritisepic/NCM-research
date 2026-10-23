@@ -19,6 +19,8 @@ Colab; wave 0 and wave 1 notebooks ready; wave 1 pre-registered (`docs/preregist
 - Sudoku reproduced (99.4 / 96.4 / 86.3); success falls with propagation depth on all three sets (R012).
 - Released TinyStories NCM: Gen-PPL 16.10 ± 0.59, H 3.971, MAUVE 0.878 (R010; paper 15.41).
 - Coarse codes are window bags of words (R011, n = 1000).
+- Level probes (R016): global attributes (dialogue, main character, content) saturate by L5-L6; the token-
+  straddling levels L8-L10 carry near-chance content in their own codes (L7 and L11 do not).
 - Released generator code NLL 870 nats/window, 43% in token-straddling levels (R008).
 - Exact Jacobi across levels: Sudoku-hard -47% NFE at zero quality change (1.87x FLOPs); no saving on
   text training-free (R013).
@@ -42,7 +44,7 @@ Colab; wave 0 and wave 1 notebooks ready; wave 1 pre-registered (`docs/preregist
 
 ## Compute
 - Colab: p1_tc_pilot + c4_sudoku_pilot launched (est. 4.5-9 CU; actuals pending). Budget ~200 CU.
-- CPU: ~5 CPU-h so far. `scripts/probe_levels.py --n 4000` still running (queue1).
+- CPU: ~8 CPU-h so far. No CPU job running.
 
 ## Next 3 actions
 1. User: confirm scale-limit change; launch `w0_calib_diag` (L4), then the six `w1_*` arms (seed 0);
