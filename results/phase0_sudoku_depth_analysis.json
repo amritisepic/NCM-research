@@ -1,4 +1,136 @@
 {
+ "easy": {
+  "n": 2000,
+  "solved_pct": 99.4,
+  "by_propagation_depth": [
+   {
+    "rounds": "0-4",
+    "n": 1684,
+    "solved_pct": 99.9,
+    "ci95": [
+     99.7,
+     100.0
+    ]
+   },
+   {
+    "rounds": "5-6",
+    "n": 299,
+    "solved_pct": 98.0,
+    "ci95": [
+     95.7,
+     99.1
+    ]
+   },
+   {
+    "rounds": "7-8",
+    "n": 14,
+    "solved_pct": 71.4,
+    "ci95": [
+     45.4,
+     88.3
+    ]
+   },
+   {
+    "rounds": "9-10",
+    "n": 1,
+    "solved_pct": 100.0,
+    "ci95": [
+     20.7,
+     100.0
+    ]
+   },
+   {
+    "rounds": "11-99",
+    "n": 0,
+    "solved_pct": null,
+    "ci95": [
+     NaN,
+     NaN
+    ]
+   },
+   {
+    "rounds": "needs search",
+    "n": 2,
+    "solved_pct": 50.0,
+    "ci95": [
+     9.5,
+     90.5
+    ]
+   }
+  ],
+  "spearman_rounds_vs_failure_prop_solvable": [
+   0.11009641288039944,
+   8.092565946634923e-07
+  ],
+  "auc_failure_from_final_level_max_code_entropy": 0.7627850435949028,
+  "auc_failure_from_decoder_min_cell_confidence": 0.8475435949027499
+ },
+ "medium": {
+  "n": 2000,
+  "solved_pct": 96.4,
+  "by_propagation_depth": [
+   {
+    "rounds": "0-4",
+    "n": 730,
+    "solved_pct": 98.8,
+    "ci95": [
+     97.7,
+     99.4
+    ]
+   },
+   {
+    "rounds": "5-6",
+    "n": 972,
+    "solved_pct": 97.8,
+    "ci95": [
+     96.7,
+     98.6
+    ]
+   },
+   {
+    "rounds": "7-8",
+    "n": 235,
+    "solved_pct": 89.8,
+    "ci95": [
+     85.3,
+     93.0
+    ]
+   },
+   {
+    "rounds": "9-10",
+    "n": 35,
+    "solved_pct": 82.9,
+    "ci95": [
+     67.3,
+     91.9
+    ]
+   },
+   {
+    "rounds": "11-99",
+    "n": 4,
+    "solved_pct": 50.0,
+    "ci95": [
+     15.0,
+     85.0
+    ]
+   },
+   {
+    "rounds": "needs search",
+    "n": 24,
+    "solved_pct": 58.3,
+    "ci95": [
+     38.8,
+     75.5
+    ]
+   }
+  ],
+  "spearman_rounds_vs_failure_prop_solvable": [
+   0.1410449249025719,
+   3.028806131054634e-10
+  ],
+  "auc_failure_from_final_level_max_code_entropy": 0.6771697786998617,
+  "auc_failure_from_decoder_min_cell_confidence": 0.8431340767634855
+ },
  "hard": {
   "n": 2000,
   "solved_pct": 86.3,

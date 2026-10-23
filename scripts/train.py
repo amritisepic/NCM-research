@@ -159,13 +159,18 @@ t0 = time.time()
 model.train()
 deadline = time.time() + 60 * a.max_minutes if a.max_minutes else None
 last = {}
+accum = int(tc.get("grad_accum", 1))  # micro-batching for small GPUs; same data per optimizer step
 while trainer.step < int(tc.steps):
-    xb = torch.from_numpy(stream.batch(data_rng, int(tc.batch_size))).to(device)
-    with trainer.ctx:
-        loss, logs = compute_loss(xb, True)
-    gn = trainer.backward_step(loss, params)
+    xb_full = torch.from_numpy(stream.batch(data_rng, int(tc.batch_size))).to(device)
+    loss_sum = 0.0
+    for xb in torch.chunk(xb_full, accum):
+        with trainer.ctx:
+            loss, logs = compute_loss(xb, True)
+        trainer.backward(loss / accum)
+        loss_sum += loss.item() / accum
+    gn = trainer.step_opt(params)
     if trainer.step % int(tc.get("log_every", 50)) == 0 or trainer.step == 1:
-        rec = trainer.log({"loss": round(loss.item(), 4), "gnorm": round(gn, 3), **logs})
+        rec = trainer.log({"loss": round(loss_sum, 4), "gnorm": round(gn, 3), **logs})
         print(json.dumps(rec), flush=True)
     if trainer.step % int(tc.eval_every) == 0 or trainer.step == int(tc.steps):
         last = evaluate()

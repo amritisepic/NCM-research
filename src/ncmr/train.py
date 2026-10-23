@@ -90,6 +90,28 @@ class Trainer:
         print(f"[resume] step {self.step} from {path}", flush=True)
         return st.get("extra", {})
 
+    def backward(self, loss: torch.Tensor):
+        """Accumulate gradients of one micro-batch (call step_opt after the last one)."""
+        if self.scaler:
+            self.scaler.scale(loss).backward()
+        else:
+            loss.backward()
+
+    def step_opt(self, params) -> float:
+        for g in self.opt.param_groups:
+            g["lr"] = lr_at(self.step, self.max_lr, self.warmup, self.total)
+        if self.scaler:
+            self.scaler.unscale_(self.opt)
+        gn = torch.nn.utils.clip_grad_norm_(params, self.clip)
+        if self.scaler:
+            self.scaler.step(self.opt)
+            self.scaler.update()
+        else:
+            self.opt.step()
+        self.opt.zero_grad(set_to_none=True)
+        self.step += 1
+        return float(gn)
+
     def backward_step(self, loss: torch.Tensor, params) -> float:
         for g in self.opt.param_groups:
             g["lr"] = lr_at(self.step, self.max_lr, self.warmup, self.total)

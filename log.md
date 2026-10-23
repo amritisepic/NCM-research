@@ -81,3 +81,23 @@ Compute units: CPU-h = wall-clock hours on the 4-core cloud container (Xeon w/ A
 - `RecurrentNCM(carry=False)` on the released Sudoku-hard checkpoint reproduces upstream `generate`
   exactly (identical greedy codes on 8 puzzles) and the parallel teacher-forced logits to 9e-5.
 - Smoke tests of tokenizer / ncm / rncm training and --final evaluation pass (tiny configs).
+
+## R007 — Sudoku easy/medium reproduction (released checkpoints)
+- easy **99.4%** (paper 99.5), medium **96.4%** (paper 96.5), hard 86.3% (paper 86.1, R004). All within
+  noise of the paper and the independent reproduction. NFE 12. Files: `results/phase0_sudoku_repro_*.json`.
+- One earlier launch hit the 30-min background limit (easy at 1664/2000); relaunched with a 2-h limit.
+
+## R008 — released TinyStories generator: teacher-forced per-level code NLL
+- `scripts/released_generator_eval.py nll --n 1000` (val windows, packed). `results/phase0_released_generator_nll.json`.
+- NLL nats per window, levels 1..11 (lengths 8..128): 55.8, 80.8, 84.9, 78.0, 66.2, 64.1, 29.7, 84.4,
+  131.8, 161.4, 33.5; **total 870.5 nats/window = 6.8 nats/token** (+ level 0 from a unigram).
+  Per code: 6.98, 5.05, 3.54, 2.44, 1.65, 1.23, **0.46 (64 codes)**, 1.11, 1.43, 1.49, **0.26 (128)**.
+- **Reading:** codes are a deterministic function of the text, so H(codes) = H(text) (~1-1.5 nats/token
+  for TinyStories AR models, to be measured by our AR baseline). The generator is therefore far from the
+  code distribution, and the bound log p(x) >= log p(x|r*) + log p(r*) is loose (many code hierarchies
+  decode to the same text). The token-straddling levels (76/92/108) carry 43% of the NLL while adding
+  ~5 points of truncated-decode accuracy. Motivates B7 (equivalence-class targets) and a token-aligned
+  schedule test; P1 will split the rest into within-level TC vs representation cost.
+- **Paper read (docs/2610.14162v1.pdf):** AR baseline on TinyStories (same architecture and updates)
+  Gen-PPL 8.89 vs NCM 15.41; conditioning corruption is NCM's largest ablation effect (~48 -> ~19);
+  more levels keep helping. Plan revised in `docs/phase1b_reevaluation.md`.
