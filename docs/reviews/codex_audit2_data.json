@@ -1,0 +1,9 @@
+{
+  "generated_total": 100000,
+  "generated_train": 98000,
+  "generated_val": 2000,
+  "raw_train_val_duplicate_puzzles": 0,
+  "raw_generated_released_puzzle_overlap": 0,
+  "generated_sha256": "ca975491994394c9a695c4017b621831cc1ab451f2fb6f950fd9364441565b31",
+  "limits": "Exact raw puzzles only; augmentation-orbit collisions and released solution hashes not checked."
+}

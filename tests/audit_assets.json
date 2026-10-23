@@ -1,0 +1,18 @@
+{
+  "config.yaml": {
+    "url": "https://huggingface.co/hazyresearch/ncm-checkpoints/resolve/main/sudoku/hard/config.yaml",
+    "sha256": "8d58c49e6fe52e60191e06df4061937d5bb84f97c5ffbcd93ed9830c32f8df2f"
+  },
+  "generator.pt": {
+    "url": "https://huggingface.co/hazyresearch/ncm-checkpoints/resolve/main/sudoku/hard/generator.pt",
+    "sha256": "9e0bfe44abc1ca3930b7a63cd56cd0b9564b95e29edfe12dd0903207b89df8b8"
+  },
+  "puzzles.pickle": {
+    "url": "https://huggingface.co/datasets/hazyresearch/ncm-datasets/resolve/main/sudoku/hard/puzzles.pickle",
+    "sha256": "dd7b6763e5594094a1366ac8423f87fc9431056721c61df52ce3490023f17d5e"
+  },
+  "tokenizer.pt": {
+    "url": "https://huggingface.co/hazyresearch/ncm-checkpoints/resolve/main/sudoku/hard/tokenizer.pt",
+    "sha256": "3bc6aecad8e15820f9d9bb09750e3c59bdf91ca953f1f11dbd109aaed1d80c0b"
+  }
+}
