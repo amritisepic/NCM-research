@@ -7,7 +7,7 @@ All quantities in nats per 128-token window (sequence):
   NLL_NCM       : -log p_unigram(level-0 code) + sum_k NLL_fact,k  (single-stream NCM generator)
   TC_k          : NLL_ts_fact,k - NLL_ts_ar,k (two-stream pair; identical except within-level code access)
   representation term = (NLL_L0 + sum_k NLL_ts_ar,k) - NLL_AR
-Usage: python scripts/analyze_p1.py --runs <dir containing the run folders> [--l0_nats X]
+Usage: python scripts/analyze_p1.py --runs <dir containing the run folders> [--l0_nats X] [--ar_run ts_ar0_s --ar_dir results/colab/p1b_tc_rerun]
 """
 from __future__ import annotations
 
@@ -21,21 +21,24 @@ ap = argparse.ArgumentParser()
 ap.add_argument("--runs", required=True)
 ap.add_argument("--l0_nats", type=float, default=None, help="entropy of the level-0 unigram (nats); "
                 "default: estimated from tok_s level-0 code usage if available")
+ap.add_argument("--ar_run", default="ts_ar_s", help="within-level AR probe run (P1b: ts_ar0_s)")
+ap.add_argument("--ar_dir", default="", help="folder holding --ar_run if not --runs (P1b: results/colab/p1b_tc_rerun)")
 ap.add_argument("--out", default="results/p1_tc_decomposition.json")
 a = ap.parse_args()
 
 
-def evals(run):
-    f = os.path.join(a.runs, run, "metrics.jsonl")
+def evals(run, root=None):
+    root = root or a.runs
+    f = os.path.join(root, run, "metrics.jsonl")
     if not os.path.exists(f):
-        f = os.path.join(a.runs, f"{run}__metrics.jsonl")  # flattened Colab results folder
+        f = os.path.join(root, f"{run}__metrics.jsonl")  # flattened Colab results folder
     rows = [json.loads(l) for l in open(f)]
     return [(r["step"], r["eval"]) for r in rows if "eval" in r]
 
 
 ncm = evals("ncm_s")
 fact = evals("ts_fact_s")
-ar_codes = evals("ts_ar_s")
+ar_codes = evals(a.ar_run, a.ar_dir)
 ar = evals("ar_s")
 out = {"by_step": []}
 def result(run):

@@ -202,11 +202,11 @@ for seed in SEEDS:
             continue
         rd = c.split('--run_dir ')[1].split()[0].format(R=R, S=seed)
         name = os.path.basename(rd)
-        for f in ['result.json', 'metrics.jsonl', 'config.yaml', 'eval_final.json', 'eval_15k.json', 'samples_final.json']:
+        for f in ['result.json', 'metrics.jsonl', 'config.yaml', 'calib.json', 'eval_final.json', 'eval_15k.json', 'samples_final.json']:
             if os.path.exists(f'{rd}/{f}'):
                 shutil.copy(f'{rd}/{f}', f'{out}/{name}__{f}')
 for f in os.listdir('results'):   # diagnostics write straight into the repo's results/
-    if f.startswith(('diag_', 'b2_jacobi_')) and os.path.getmtime(f'results/{f}') > T_START:
+    if f.startswith(('diag_', 'b2_jacobi_', 'sudoku_', 'wmt14_')) and os.path.getmtime(f'results/{f}') > T_START:
         shutil.copy(f'results/{f}', f'{out}/{f}')
 gpu = torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'cpu'
 json.dump({'run': '__NAME__', 'gpu': gpu, 'finished': time.ctime()}, open(f'{out}/_meta.json', 'w'))

@@ -1,0 +1,32 @@
+{
+ "run": "sudoku_repair_ceiling_val",
+ "n": 250,
+ "set": "val",
+ "released_solved_pct": 88.0,
+ "oracle_solved_pct_after_t_repairs": [
+  88.0,
+  88.8,
+  88.8,
+  90.4,
+  93.2,
+  95.2,
+  95.6,
+  95.6,
+  95.6
+ ],
+ "oracle_fixed_pct_of_failures_after_t": [
+  0.0,
+  6.67,
+  6.67,
+  20.0,
+  43.33,
+  60.0,
+  63.33,
+  63.33,
+  63.33
+ ],
+ "n_failures": 30,
+ "residual_norm_canonical": 4.598056793212891,
+ "residual_norm_generated": 4.875232219696045,
+ "wall_s": 98.78437161445618
+}

@@ -214,9 +214,12 @@ class TwoStreamLevelModel(nn.Module):
     Everything else (weights, depth, context) is identical, so
       TC_k (nats/sample) ~= NLL_fact,k - NLL_ar,k   (both summed over the l_k positions).
     A plain causal NCM would also hide the coarse context of later positions and understate TC.
+    prev_init="zero" starts the previous-code embeddings at 0, so at step 0 the "ar" code stream gets exactly the
+    "fact" inputs (only the mask differs) and has to learn to use the previous codes (P1b); the default
+    N(0, 1) init buries the code stream's own latent under noise (R018).
     """
 
-    def __init__(self, ncm_net: NextConceptTransformer, mode: str):
+    def __init__(self, ncm_net: NextConceptTransformer, mode: str, prev_init: str = "normal"):
         super().__init__()
         assert mode in ("fact", "ar")
         self.net, self.mode = ncm_net, mode
@@ -225,6 +228,9 @@ class TwoStreamLevelModel(nn.Module):
         first = ncm_net._lvl_first
         self.lv = [int(l) for l in vq.levels[first:]]
         self.prev_emb = nn.ModuleList([nn.Embedding(vq.vqvae_vocab_sizes[k], D) for k in range(first, len(vq.levels))])
+        if prev_init == "zero":
+            for e in self.prev_emb:
+                nn.init.zeros_(e.weight)
         self.bos = nn.Parameter(torch.zeros(len(self.lv), D))
         self.stream_emb = nn.Parameter(torch.zeros(2, ncm_net.config.n_embd))
         P = ncm_net.prefix_len

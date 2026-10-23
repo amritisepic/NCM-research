@@ -39,6 +39,8 @@ ap.add_argument("--data_dir", default="")
 ap.add_argument("--threads", type=int, default=0)
 ap.add_argument("--max_minutes", type=float, default=0, help="stop (after checkpointing) after this long")
 ap.add_argument("--seed", type=int, default=None, help="overrides train.seed")
+ap.add_argument("--ts_prev_init", default="normal", choices=["normal", "zero"],
+                help="ts_ar only: init of the previous-code embeddings (zero = P1b)")
 ap.add_argument("--calib_steps", type=int, default=0, help="throughput calibration only: run this many steps, no eval/ckpt")
 a = ap.parse_args()
 if a.threads:
@@ -84,7 +86,7 @@ else:
         for p in tok.parameters():
             p.requires_grad_(False)
         gen = build_ncm_generator(tok, **OmegaConf.to_container(cfg.model, resolve=True)).to(device)
-        model = TwoStreamLevelModel(gen, a.kind[3:]).to(device) if a.kind.startswith("ts_") else gen
+        model = TwoStreamLevelModel(gen, a.kind[3:], prev_init=a.ts_prev_init).to(device) if a.kind.startswith("ts_") else gen
         extra_save["tokenizer_path"] = os.path.abspath(a.tokenizer)
         extra_save["gen_kwargs"] = OmegaConf.to_container(cfg.model, resolve=True)
         levels = [int(l) for l in tok.vq.levels]

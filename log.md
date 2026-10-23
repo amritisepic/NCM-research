@@ -245,3 +245,47 @@ Compute units: CPU-h = wall-clock hours on the 4-core cloud container (Xeon w/ A
 - **Decision (§7):** carry is killed for Sudoku and does not join the tier-L Sudoku arms.
 - Untested reading: lower teacher-forced loss with worse greedy decoding fits carry amplifying exposure bias
   (the carried state is built from clean levels in training, from the model's own levels at inference).
+
+## R020 — wave 0 (`w0_calib_diag`, Colab A100-40GB; user-run)
+- **Released reference with the wave-1 protocol** (`L_ts_released`, eval only): clean val NLL **861.8**
+  nats/window (R008: 870.5 on CPU fp32 with a different window packing; -1.0%), Gen-PPL GPT-2 large **16.35 ± 0.51**
+  over 4 x 256 (R010: 16.10 ± 0.59), TinyStories-33M 12.01, entropy 3.976, MAUVE 0.888 ± 0.021, rep-2 0.100,
+  11 NFE. **W1 sanity check passed** (~870 / ~16.1).
+- **Throughput calibration: not recoverable from the upload.** The three calibration runs wrote `calib.json`,
+  which the notebook's collect cell did not copy (only their configs arrived). Fixed in `make_notebooks.py`
+  (collects `calib.json`); the files are still on Drive under `ncm-research/runs/calib_{L,M,M_ar}/`.
+- **Where quality is lost** (`diag_tf_levels_released_ts.json`, n = 512, seed 0, one group: SE ~0.4 Gen-PPL):
+  real codes at levels 0..j, generator samples the rest. Gen-PPL GPT-2 large / TinyStories-33M by j:
+  -1 (unconditional) 16.00 / 11.71; 0: 15.88; 1: 15.39; 2: 14.47; 3: 12.36; 4: 10.60; 5: 9.51; 6: 9.15; 7: 8.96;
+  8: 8.81; 9: 8.75; 10: 8.67; 11 (tokenizer reconstruction of real text) 8.62 / 3.49. Entropy flat (3.94-3.97).
+  Share of the 7.38-point gap lost when sampling each band (given the real coarser levels): level 0 2%,
+  **levels 1-3 (8-24 codes) 48%, levels 4-5 (32-40 codes) 39%**, level 6 5%, levels 7-11 5% (token-straddling
+  L8-L10: ~0.2 points, 3%). MAUVE: 0.82 (j = -1) -> 0.87 (real level 0) -> 0.91-0.97 from j = 1 on.
+- **Reading:** quality is lost in the coarse and middle levels (the plan), not in the fine levels. The
+  token-straddling levels hold 43% of the NLL (R008) and the least content (R016) but cost ~3% of the sample
+  quality: NLL share and quality share dissociate. §7 rule ("most of the loss when levels 1-3 are sampled"
+  -> C2 and tokenizer bets gain priority over B1): 48% < 50%, so it **does not fire as written** (borderline);
+  levels 1-5 together hold 87%. Decision: **bet 7 (token-aligned schedule) demoted** — its quality upside on
+  this model is bounded by ~0.2-0.3 Gen-PPL; B1 stays first (its corruption acts on exactly these levels);
+  C2 gets no promotion from either trigger (P1 inconclusive, w0 below threshold).
+- **Exact Jacobi across levels (training-free), full sets:** Sudoku-hard (2000): exact stop 6.41 passes
+  (-46.6% NFE, 1.87x FLOPs), output = sequential in 100%, 86.15% solved; verifier stop ("check": first board
+  satisfying the rules and clues) **2.37 passes, 90.3% solved** (+4.15: for ~4% of puzzles an intermediate pass
+  holds the solution and the fixed point is wrong); stable-output stop 2.92 passes, 88.2%. TinyStories (512,
+  sampled): 11.94 passes vs 11 (no saving). WMT14 full test (3003, greedy): **11.07 passes vs 11**, fixed point
+  = sequential in 100%, BLEU (lowercased sacreBLEU) **22.63**; stable-output stop 10.59 passes, 22.64. Target for
+  criterion (d) text: <= 8.25 passes at >= 21.63 BLEU. (`b2_jacobi_levels_hard.json` and
+  `b2_jacobi_wmt14_n6.json` in the upload are stale copies of the repo's older files, not w0 output.)
+- Criterion (d), Sudoku half: met training-free by exact Jacobi (-46.6% NFE at zero quality change), but it
+  needs a text task too and the FLOPs rise 1.87x; stated, not claimed.
+- Compute: A100 at ~5.4 CU/h; wall time per command not recorded in the upload. Charged as ~2.5 CU (estimate).
+
+## R021 — Sudoku repair-level ceiling (CPU pre-check for the tier-L repair arm)
+- `scripts/sudoku_repair_ceiling.py --n 250` (our generated val puzzles), `results/sudoku_repair_ceiling_val.json`,
+  1.6 CPU-min. Released hard model solves **88.0%** of our generated hard puzzles (released test: 86.3%), so our
+  generator's distribution is close enough for fine-tuning.
+- Oracle with extra full-resolution residual levels on the finest codebook (codes = nearest to the true residual):
+  solved after 0..8 levels 88.0, 88.8, 88.8, 90.4, 93.2, 95.2, 95.6, 95.6, 95.6 -> fixes 7% of failures with one
+  level, 20% with three, saturates at 63% after six. A repair level built from the finest codebook is a weak
+  correction channel (16 codes meant for tiny residuals). Decision: the repair arm uses a representationally
+  complete pass instead (re-predict the whole hierarchy conditioned on the current board; `preregistration.md` S1).
