@@ -191,3 +191,11 @@ Compute units: CPU-h = wall-clock hours on the 4-core cloud container (Xeon w/ A
   residual level does not explain it (L11 is residual and content-bearing); the non-integer
   tokens-per-code ratio (1.68, 1.39, 1.19) is the distinguishing property. Raises the prior of the
   token-aligned schedule test (bet 7 in phase1b_scaleup.md) from 25% to 35%.
+
+## R017 — decisions and arrivals (2026-10-23)
+- User approved the scale-limit change (tiers L/M use the released 88.6M generator / 36.4M tokenizer) and
+  launched `w0_calib_diag` on an L4. Project brief condensed into `docs/brief.md` (goals, success bar, rules).
+- P1 and C4 Colab results committed by the user under `results/colab/` (T4; all runs present). Training wall
+  time: P1 2.9 h (ncm_s 28 min, ts_fact_s / ts_ar_s 56-57 min each, ar_s 15 min, tok_s 14 min, m-scale
+  calibration 6 min), C4 4.8 h (tokenizer 28 min, NCM 124 min, RNCM 136 min): ~10 CU incl. setup, at the top of
+  the 4.5-9 CU estimate. Analysis against the pre-registrations: next session.
