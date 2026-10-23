@@ -1,0 +1,33 @@
+{
+ "run": "b2_jacobi_wmt14_n3003",
+ "n": 3003,
+ "sequential_nfe": 11,
+ "exact_passes_mean": 11.066600066600067,
+ "exact_passes_hist": [
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1,
+  2,
+  38,
+  155,
+  517,
+  1136,
+  1154
+ ],
+ "stable_passes_mean": 10.588411588411589,
+ "stable_output_equals_exact_pct": 97.13619713619714,
+ "first_final_output_pass_mean": 9.58075258075258,
+ "flops_per_pass_ratio_vs_sequential_total": 0.2982456140350877,
+ "wall_s": 270.45677042007446,
+ "device": "cuda",
+ "exact_nfe_saving_pct": -0.6054551509097061,
+ "exact_flops_ratio": 3.3005649321438795,
+ "fixed_point_equals_sequential_pct": 100.0,
+ "bleu_lc_exact": 22.625980088896835,
+ "bleu_lc_stable_rule": 22.639255560616412,
+ "stable_rule_identical_output_pct": 98.76789876789877
+}

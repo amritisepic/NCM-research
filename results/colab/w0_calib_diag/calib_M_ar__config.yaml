@@ -1,0 +1,19 @@
+model:
+  vocab: 8192
+  n_layer: 8
+  n_head: 8
+  n_embd: 512
+  dropout: 0.1
+train:
+  steps: 300
+  batch_size: 256
+  lr: 0.0003
+  warmup: 500
+  weight_decay: 0.1
+  ckpt_every: 1000000000
+  eval_every: 1000000000
+  eval_n: 1000
+  log_every: 200
+  seed: 0
+  snapshot_steps:
+  - 15000
