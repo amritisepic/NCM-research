@@ -69,3 +69,15 @@ Compute units: CPU-h = wall-clock hours on the 4-core cloud container (Xeon w/ A
 - **Decision:** adopt "serial depth" as the organizing hypothesis for the Sudoku track (C10, C4). Any
   adaptive-compute rule for Sudoku must change the tokenizer/level schedule (C5) or *add* compute where
   confidence is low; the released hierarchy cannot exit early.
+
+## R005 — Sudoku training data (ours)
+- `scripts/gen_sudoku.py --level hard --n 100000 --seed 0`: random complete grid (randomized backtracking)
+  + uniqueness-preserving hole digging to 51 blanks; 0 collisions with test grids; 362 s on 2 workers.
+  Stored at `assets/sudoku_train/hard.npz` (last 2000 = our val split).
+- Difficulty matches the released hard test set: 86.5% singles-solvable (test 85.5%), mean propagation
+  rounds 7.47 (test 7.49) on a 2000-puzzle sample.
+
+## R006 — C4 implementation check (Recurrent NCM)
+- `RecurrentNCM(carry=False)` on the released Sudoku-hard checkpoint reproduces upstream `generate`
+  exactly (identical greedy codes on 8 puzzles) and the parallel teacher-forced logits to 9e-5.
+- Smoke tests of tokenizer / ncm / rncm training and --final evaluation pass (tiny configs).

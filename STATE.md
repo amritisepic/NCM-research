@@ -35,11 +35,12 @@ _Last updated: 2026-10-23, session 1. Branch: `claude/ncm-research`._
 - Level-skipping early exit with the released Sudoku hierarchy: never fires (0% solved before last level).
 
 ## Compute
-- Colab: 0 / 100 CU spent. Requested: p1_tc_pilot (~1 CU) — awaiting launch.
+- Colab: 0 / 100 CU spent. Requested: `p1_tc_pilot` (~1.5 CU) and `c4_sudoku_pilot` (~3 CU) — awaiting launch (docs/colab_runs.md).
 - CPU (container): ~1.5 CPU-h so far.
 
 ## Next 3 actions
-1. Finish easy/medium Sudoku repro; run released TinyStories generator NLL + samples + eval suite
-   (reproduce genPPL 15.41 / entropy 3.98).
-2. Launch P1 (Colab notebook `notebooks/p1_tc_pilot.ipynb`); meanwhile train tok_s on CPU.
-3. Implement Recurrent NCM (C4) + Sudoku training pipeline; generate training puzzles.
+1. Finish easy/medium Sudoku repro (running); then released TinyStories generator: per-level NLL, 5x256
+   samples, full eval suite (reproduce genPPL 15.41 / entropy 3.98).
+2. Level probes (`scripts/probe_levels.py`) on the released tokenizer; then train tok_s on CPU and run the
+   same probes (lookup vs contextual encoder = C6) while Colab pilots run.
+3. When P1/C4 results arrive: `scripts/analyze_p1.py`, compare C4 arms against docs/preregistration.md.
