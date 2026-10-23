@@ -26,7 +26,9 @@ def autocast_ctx(device: str, enabled: bool = True):
     if not enabled:
         return nullcontext(), None
     if device == "cuda":
-        if torch.cuda.is_bf16_supported():
+        # native bf16 needs compute capability >= 8.0 (A100/L4); is_bf16_supported() can report emulated
+        # support on a T4, which is slow, so use fp16 + loss scaling there.
+        if torch.cuda.get_device_capability()[0] >= 8:
             return torch.autocast("cuda", dtype=torch.bfloat16), None
         return torch.autocast("cuda", dtype=torch.float16), torch.amp.GradScaler("cuda")
     return torch.autocast("cpu", dtype=torch.bfloat16), None
