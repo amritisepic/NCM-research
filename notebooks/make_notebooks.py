@@ -104,6 +104,31 @@ for arm, what in L_ARMS.items():
         "gpu": "A100 (measured 2.2 s/step, ~67 min + eval) or L4", "units": 6, "needs": ["ts", "ckpt"], "seeds": [0],
         "cmds": [f"python scripts/train_gen.py --config configs/scale/{arm}.yaml --run_dir {{R}}/{arm}_s{{S}} --seed {{S}}"],
     }
+RUNS["p1b_tc_rerun"] = {
+    "desc": "P1b (pre-registered): re-train only the within-level-AR TC probe of P1 with zero-initialized previous-code "
+            "embeddings (P1's probe started with its own-position latent buried in noise and gave a negative TC). "
+            "Reuses tok_s from the p1_tc_pilot run on your Drive (runs/tok_s/final.pt); ~1 h on a T4, ~25 min on an A100.",
+    "gpu": "any (T4 is enough)", "units": 1.2, "needs": ["ts"], "seeds": [0],
+    "cmds": ["python scripts/train.py ts_ar --config configs/pilot/ncm_s.yaml --tokenizer {R}/tok_s/final.pt "
+             "--run_dir {R}/ts_ar0_s --ts_prev_init zero"],
+}
+SDK_ARMS = {
+    "ctrl": "control: plain teacher forcing (also evaluates the released model once, A0)",
+    "uniform": "control 2: NCM uniform conditioning corruption",
+    "onpolicy": "B1a on Sudoku: the model's own one-step greedy codes as corruption",
+    "repair": "B6/C5: board-feedback repair passes trained on the model's own Jacobi decodes",
+}
+for arm, what in SDK_ARMS.items():
+    cmds = [f"python scripts/train_sudoku_L.py --config configs/scale/L_sdk_{arm}.yaml --run_dir {{R}}/L_sdk_{arm}_s{{S}} --seed {{S}}"]
+    if arm == "ctrl":
+        cmds.insert(0, "python scripts/train_sudoku_L.py --config configs/scale/L_sdk_ctrl.yaml --run_dir {R}/L_sdk_released --eval_only")
+    RUNS[f"w2b_L_sdk_{arm}"] = {
+        "desc": f"Wave 2b, tier L Sudoku (pre-registered S1/S1a): fine-tune the released 25.5M Sudoku-hard generator; "
+                f"arm = {what}. Same data order, schedule and training FLOPs across arms. Final eval on our val puzzles and "
+                "once on the 2000 released hard puzzles: sequential (12 NFE) and Jacobi with verifier / fixed-point stopping "
+                "at caps 4-24. Run seed 0 first; seeds 1-2 only for the control and arms that pass the screen.",
+        "gpu": "A100 or L4", "units": 2.5, "needs": ["ckpt"], "seeds": [0], "cmds": cmds,
+    }
 RUNS["w2_M_ncm"] = {
     "desc": "Wave 2, tier M: NCM generator from scratch (d512 x 8, 25M body) on the released tokenizer, paper recipe "
             "with conditioning corruption; ~411 PFLOP. Matched baseline for Phase 3 (3 seeds).",
@@ -179,16 +204,17 @@ import torch; print('GPU:', torch.cuda.get_device_name(0) if torch.cuda.is_avail
 '''
 
 RUN = r'''
+CMDS_RAW = list(CMDS)
 for seed in SEEDS:
-    for c in CMDS:
+    for i, c in enumerate(CMDS):
         c = c.format(R=R, D=D, S=seed)
         if 'scripts/train.py ' in c or 'scripts/train_gen.py ' in c:
             c += ' --data_dir /content/ts'
         if 'configs/scale/L_ts_' in c and '--micro_batch' not in c and torch.cuda.is_available() \
                 and torch.cuda.get_device_properties(0).total_memory > 39e9:
             c += ' --micro_batch 64'   # 40-80 GB GPUs: same optimizer step, fewer accumulation chunks (13.7 GB at 32)
-        if '{S}' not in str(CMDS) and seed != SEEDS[0]:
-            continue   # seed-independent notebook: run once
+        if '{S}' not in CMDS_RAW[i] and seed != SEEDS[0]:
+            continue   # seed-independent command: run once
         print('>>>', c, flush=True)
         t = time.time()
         p = subprocess.run(c, shell=True)
