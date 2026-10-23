@@ -43,3 +43,30 @@
 - **Why it matters:** if context breaks the bag-of-words structure, "semantic coarse levels" (idea 2) are
   reachable by architecture alone; P1-style TC measurements on both tokenizers then show whether that costs
   parallelizability (the trade-off C1b would optimize).
+
+## W1 — Tier-L TinyStories objective factorial (registered 2026-10-23, before any run)
+- **Setup:** the released 88.6M TinyStories generator and tokenizer (tokenizer frozen). Each arm fine-tunes
+  for the same training FLOPs (~349 PFLOP = 4000 steps x 256 windows of plain teacher forcing): lr 5e-5
+  (200 warmup, cosine to 5e-6), AdamW (0.9, 0.95), weight decay 0.1, dropout 0.1, same data order per
+  seed (`configs/scale/L_ts_*.yaml`). Arms differ only in the training hierarchy:
+  A0 released model, no training (reference); A1 control = uniform corruption (mean 0.5, linear 0.75 -> 0.25,
+  clean labels); A2 uniform + re-quantized labels; A3 one-step on-policy codes + clean labels (3000 steps);
+  A4 one-step on-policy + re-quantized labels (3000 steps); A5 two-pass on-policy + clean labels (2400
+  steps); A6 A1 + soft labels (tau 0.25, 16 nearest codes).
+- **Metrics:** primary Gen-PPL (GPT-2 large, upstream function) on 4 x 256 unconditional samples (seeds 42,
+  0, 1, 2; paper protocol, 11 NFE), always with unigram entropy; co-primary MAUVE (1024 samples vs 1024
+  human val windows, 5 quantization seeds). Secondary: TinyStories-33M Gen-PPL, rep-n, distinct-n,
+  repeated words at distance 1 and 2, clean teacher-forced val NLL. Curves every 1000 steps (256 samples).
+- **Hypotheses:** H6 (B1a) A3 < A1 on Gen-PPL with MAUVE not lower; H7 (B1b) A2 < A1 and A4 < A3;
+  H8 (compounding) A5 < A3; H9 (B7) A6 < A1.
+- **Screen (seed 0):** an arm advances to seeds 1-2 if Gen-PPL is >= 0.5 below A1 (the 4-group mean has
+  SE ~0.3 from R010's per-group SD 0.59), entropy within 0.05 nats of A1, MAUVE not lower by > 0.01.
+  A1 always gets seeds 1-2.
+- **Claim (Phase 3 rule):** with 3 seeds, Gen-PPL gain > 2x the pooled seed SD, entropy within 0.05 nats
+  (otherwise re-sampled at a temperature that matches entropy before comparing), MAUVE not worse beyond
+  its SD. A tier-L claim is stated as "improves the released model at equal fine-tuning compute" until
+  tier M confirms it from scratch.
+- **Falsified:** no arm passes the screen -> B1 and B7 killed at tier L.
+- **Sanity checks:** A0 clean val NLL ~870 nats/window (R008) and Gen-PPL ~16.1 (R010). If A1 ends > 1.0
+  Gen-PPL worse than A0, the fine-tuning recipe itself damages the model: lower the lr and re-run A1 before
+  reading any other arm.

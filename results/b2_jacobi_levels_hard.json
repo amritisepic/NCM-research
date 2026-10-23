@@ -1,0 +1,25 @@
+{
+ "run": "b2_jacobi_levels_hard",
+ "n": 500,
+ "K": 12,
+ "fixed_point_equals_sequential_pct": 100.0,
+ "solved_pct": 85.2,
+ "passes_exact_stop_mean": 6.394,
+ "passes_exact_stop_hist": [
+  0,
+  0,
+  0,
+  0,
+  3,
+  76,
+  225,
+  141,
+  32,
+  18,
+  5
+ ],
+ "passes_oracle_board_mean": 2.04,
+ "nfe_saving_vs_sequential_pct": 46.71666666666666,
+ "flops_ratio_vs_sequential": 1.8675544554455448,
+ "wall_s": 652.9970898628235
+}

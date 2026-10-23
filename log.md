@@ -107,3 +107,67 @@ Compute units: CPU-h = wall-clock hours on the 4-core cloud container (Xeon w/ A
   session link; trees unchanged. Later commits omit session links.
 - Colab time estimates revised upward: p1_tc_pilot ~1.5-3.5 h on a T4, c4_sudoku_pilot ~2-4 h
   (sequential level passes are kernel-launch bound; quantization runs in fp32). Actuals to follow.
+
+## R010 — released TinyStories NCM: full evaluation suite (CPU)
+- 5 seed groups x 256 samples (1280), paper protocol (level 0 from the stored unigram, T = 1, 11 NFE).
+  `results/phase0_released_ncm_tinystories_eval.json`.
+- Gen-PPL GPT-2 large **16.10 ± 0.59** (paper 15.41), TinyStories-33M 11.95 ± 0.59, entropy 3.971 (paper
+  3.98), MAUVE 0.878 ± 0.007 (vs 1280 human val windows), rep-2/3/4 0.101/0.022/0.006, distinct-2/3
+  0.194/0.459. Generation 623 s on 4 CPU cores (0.49 s/sample).
+
+## R011 — invariance probe, full run (n = 1000; released tokenizer)
+- Unconditional (all levels re-encoded): within-16-token shuffles leave 73% of L1 codes unchanged, within-8
+  shuffles leave 74% of L1 and 89% of L2 unchanged; a one-token synonym swap leaves 94-98% of codes at
+  L0-L7 and 89-92% at L8-L10 unchanged. With coarser levels forced (conditional analysis, R003 method):
+  L1 99.94% unchanged under w16 shuffles; L1 99.95% / L2 99.94% under w8 shuffles; synonym swap leaves the
+  affected window unchanged at L1 84.5%, L2 74.8%, L3 53.4%, L4 26.2%. `results/phase0_invariance_probe.json`.
+- Reading: coarse codes are window bags of words (order-free), confirmed at n = 1000.
+
+## R012 — serial-depth law on all three Sudoku sets (released checkpoints)
+- Solve rate by constraint-propagation rounds (0-4 / 5-6 / 7-8 / 9-10 / >= 11 / needs search):
+  hard 97.8 / 99.0 / 95.6 / 84.8 / 63.9 / 50.2; medium 98.8 / 97.8 / 89.8 / 82.9 / 50.0 (n = 4) / 58.3;
+  easy 99.9 / 98.0 / 71.4 (n = 14). Decoder min-cell confidence flags failures (AUC 0.85-0.87).
+  `results/phase0_sudoku_depth_analysis.json`.
+
+## R013 — B2: exact Jacobi (fixed-point) decoding across levels, training-free
+- Sudoku-hard (500 puzzles, greedy): fixed point = sequential output in 100%; **6.39 passes vs 12
+  (-46.7% NFE)** at zero quality change (85.2% solved, as sequential on this subset); 1.87x the FLOPs
+  of sequential decoding; the correct board first appears at pass 2.04 on average. `results/b2_jacobi_levels_hard.json`.
+- TinyStories (n = 4, sampling with fixed Gumbel noise): 12 passes vs 11, no saving. WMT14 (n = 6, greedy):
+  11.33 passes; first pass with the final output at 9.8. Text gets no training-free saving.
+- Accounting fix (after these runs): WMT14's sequential NFE is 11 (level 0 comes from the prefix pass), not
+  10 as the smoke file says; `scripts/jacobi_levels.py` now counts it.
+
+## R014 — B1 pre-check: what errors does the released generator make, and can re-quantized labels repair them?
+- `scripts/repair_capacity.py --n 256` (CPU, 11 min), `results/b1_repair_capacity.json`. The decoded text of
+  a corrupted hierarchy is the ceiling a perfect generator reaches under each label type.
+- **Decoder barely needs any single coarse level:** replacing all codes of one level (0-10) by random codes,
+  the rest canonical, leaves 99.2-99.97% of tokens correct. Replacing all levels but the finest by random
+  codes leaves **42.6%**; by the generator's own one-step samples (given the clean coarser levels; 58% of
+  codes change) leaves **98.0%**.
+- **One-step disagreement with the encoder's codes** (sampled, T = 1) per level 0..11: 100 (unigram),
+  98, 91, 81, 67, 55, 48, **21 (L7, 64 codes)**, **45, 53, 55 (L8-L10, token-straddling)**, 14 (L11). Greedy:
+  -, 96, 82, 68, 53, 41, 35, 14, 32, 40, 41, 9.
+- **Rank of the generator's sampled code** in the encoder's distance ordering: median 1055/1118/454 at
+  L1-L3 (different content), 0-1 from L5 on; top-16 share 44% (L3) -> 97% (L7) -> 81-88% (L8-L10) -> 99% (L11).
+- **Re-quantized labels repair only partly:** NCM's uniform recipe (mean rate 0.5; 31% of codes changed)
+  -> ceiling 92.9% with clean labels vs 96.9% re-quantized; on-policy recipe (21% changed) -> 99.40% vs
+  99.84%. Re-quantization changes 46-58% of labels.
+- **Reading:** (1) the paper's uniform corruption is far harsher than the generator's real errors (uniform
+  codes destroy 57% of tokens; the model's own one-step choices destroy 2%), so on-policy corruption
+  (B1a) is a much closer match to inference; (2) at fine levels the model's "errors" are mostly
+  near-equivalent codes (nuisance), at coarse levels they are content choices; (3) re-quantized labels
+  (B1b) have a modest ceiling effect. Priors updated in `docs/phase1b_scaleup.md`.
+
+## R015 — budget raised to ~200 CU (user); scale-up plan and trainer
+- Plan: `docs/phase1b_scaleup.md` (tiers S/L/M, waves 0-3). Scale-limit change (released 88.6M / 36.4M
+  models for tiers L/M) flagged for the user's confirmation.
+- New code: `src/ncmr/corruption.py` (hierarchies: clean = upstream exactly, unit-tested; uniform /
+  on-policy corruption; re-quantized and soft labels), `scripts/train_gen.py` (fine-tune or from scratch on
+  the released tokenizer; multi-pass on-policy errors; sample-based eval during training; calibration and
+  eval-only modes), `scripts/tf_levels_diag.py`, GPU support in `scripts/jacobi_levels.py`, `--seed` /
+  `--calib_steps` / snapshots in `scripts/train.py`, duplicate-word metric in `src/ncmr/eval_text.py`.
+  CPU smoke tests pass (fine-tune with on-policy + re-quantized + soft labels; scratch; calibration; AR).
+- Soft-label temperature: tau = 0.25 puts 77% (72-87% by level) of the weight on the canonical code.
+- Smoke-test warning: 2 Adam steps at lr 1e-4 without warmup on batch 2 raised val NLL on 4 windows from
+  1075 to 1459 nats; tier-L fine-tunes therefore use lr 5e-5 with 200 warmup steps (all arms alike).

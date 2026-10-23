@@ -1,0 +1,28 @@
+{
+ "run": "b2_jacobi_tinystories_seed0",
+ "n": 4,
+ "sequential_nfe": 11,
+ "exact_passes_mean": 12.0,
+ "exact_passes_hist": [
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  4
+ ],
+ "stable_passes_mean": 11.75,
+ "stable_output_equals_exact_pct": 100.0,
+ "first_final_output_pass_mean": 10.75,
+ "flops_per_pass_ratio_vs_sequential_total": 0.9846390168970814,
+ "wall_s": 61.47274136543274,
+ "exact_nfe_saving_pct": -9.090909090909083,
+ "exact_flops_ratio": 11.815668202764977
+}

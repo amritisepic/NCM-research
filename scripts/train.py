@@ -28,7 +28,7 @@ from ncmr import flops as FL  # noqa: E402
 from ncmr.data import EOS, TrainStream, examples  # noqa: E402
 from ncmr.models import (ARTransformer, TwoStreamLevelModel, build_ncm_generator, build_tokenizer,  # noqa: E402
                          n_params, ncm_batch, tokenizer_loss)
-from ncmr.train import Trainer, pick_device  # noqa: E402
+from ncmr.train import Calib, Trainer, pick_device  # noqa: E402
 
 ap = argparse.ArgumentParser()
 ap.add_argument("kind", choices=["tokenizer", "ncm", "ts_fact", "ts_ar", "ar"])
@@ -38,11 +38,17 @@ ap.add_argument("--tokenizer", default="")
 ap.add_argument("--data_dir", default="")
 ap.add_argument("--threads", type=int, default=0)
 ap.add_argument("--max_minutes", type=float, default=0, help="stop (after checkpointing) after this long")
+ap.add_argument("--seed", type=int, default=None, help="overrides train.seed")
+ap.add_argument("--calib_steps", type=int, default=0, help="throughput calibration only: run this many steps, no eval/ckpt")
 a = ap.parse_args()
 if a.threads:
     torch.set_num_threads(a.threads)
 cfg = OmegaConf.load(a.config)
 tc = cfg.train
+if a.seed is not None:
+    tc.seed = a.seed
+if a.calib_steps:
+    tc.steps, tc.eval_every, tc.ckpt_every = a.calib_steps, 10 ** 9, 10 ** 9
 device = pick_device()
 torch.manual_seed(int(tc.seed))
 data_rng = np.random.default_rng(int(tc.seed))
@@ -160,6 +166,7 @@ model.train()
 deadline = time.time() + 60 * a.max_minutes if a.max_minutes else None
 last = {}
 accum = int(tc.get("grad_accum", 1))  # micro-batching for small GPUs; same data per optimizer step
+calib = Calib(a.run_dir, a.calib_steps, fl_step) if a.calib_steps else None
 while trainer.step < int(tc.steps):
     xb_full = torch.from_numpy(stream.batch(data_rng, int(tc.batch_size))).to(device)
     loss_sum = 0.0
@@ -169,6 +176,9 @@ while trainer.step < int(tc.steps):
         trainer.backward(loss / accum)
         loss_sum += loss.item() / accum
     gn = trainer.step_opt(params)
+    if calib:
+        calib.tick(trainer.step)
+        continue
     if trainer.step % int(tc.get("log_every", 50)) == 0 or trainer.step == 1:
         rec = trainer.log({"loss": round(loss_sum, 4), "gnorm": round(gn, 3), **logs})
         print(json.dumps(rec), flush=True)
@@ -177,11 +187,16 @@ while trainer.step < int(tc.steps):
         print(json.dumps(trainer.log({"eval": last})), flush=True)
     if trainer.step % int(tc.ckpt_every) == 0:
         trainer.save(modules, data_rng, extra_save)
+    if trainer.step in [int(s) for s in tc.get("snapshot_steps", [])]:   # e.g. the data-matched point of a FLOP-matched AR run
+        torch.save({"model": model.state_dict(), **extra_save}, os.path.join(a.run_dir, f"snap_{trainer.step}.pt"))
     if deadline and time.time() > deadline:
         trainer.save(modules, data_rng, extra_save)
         print("[stop] time budget reached; resume by re-running the same command", flush=True)
         sys.exit(0)
 
+if calib:
+    calib.report(trainer.step, {"kind": a.kind, "batch_size": int(tc.batch_size), "grad_accum": accum})
+    sys.exit(0)
 if not last:  # re-run of an already finished run: evaluate once so result.json is complete
     last = evaluate()
 trainer.save(modules, data_rng, extra_save)

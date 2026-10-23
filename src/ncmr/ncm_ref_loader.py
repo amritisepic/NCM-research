@@ -54,6 +54,9 @@ def load_ncm(ckpt_dir: str, device: str = "cpu", quiet: bool = True) -> NCMBundl
         pre = BPETokenizer(vocab, merges, tcfg.pre_tokenizer.special_tokens)
     elif tcfg.pre_tokenizer.name == "sudoku":
         pre = SudokuTokenizer()
+    elif tcfg.pre_tokenizer.name == "hf":
+        from tokenization.hf_tokenizer import HFTokenizer  # upstream; downloads the HF tokenizer files
+        pre = HFTokenizer.from_config(tcfg.pre_tokenizer)
     else:
         raise NotImplementedError(tcfg.pre_tokenizer.name)
 

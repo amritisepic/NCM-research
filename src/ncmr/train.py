@@ -44,9 +44,10 @@ def lr_at(step: int, max_lr: float, warmup: int, total: int, min_frac: float = 0
 class Trainer:
     def __init__(self, run_dir: str, params, max_lr: float, total_steps: int, warmup: int = 200,
                  weight_decay: float = 0.1, betas=(0.9, 0.95), clip: float = 1.0, ckpt_every: int = 500,
-                 device: str = "cpu", amp: bool = True):
+                 device: str = "cpu", amp: bool = True, min_lr_frac: float = 0.1):
         os.makedirs(run_dir, exist_ok=True)
         self.run_dir, self.max_lr, self.total, self.warmup = run_dir, max_lr, total_steps, warmup
+        self.min_lr_frac = min_lr_frac
         self.clip, self.ckpt_every, self.device = clip, ckpt_every, device
         params = [p for p in params if p.requires_grad]
         decay = [p for p in params if p.dim() >= 2]
@@ -99,7 +100,7 @@ class Trainer:
 
     def step_opt(self, params) -> float:
         for g in self.opt.param_groups:
-            g["lr"] = lr_at(self.step, self.max_lr, self.warmup, self.total)
+            g["lr"] = lr_at(self.step, self.max_lr, self.warmup, self.total, self.min_lr_frac)
         if self.scaler:
             self.scaler.unscale_(self.opt)
         gn = torch.nn.utils.clip_grad_norm_(params, self.clip)
@@ -114,7 +115,7 @@ class Trainer:
 
     def backward_step(self, loss: torch.Tensor, params) -> float:
         for g in self.opt.param_groups:
-            g["lr"] = lr_at(self.step, self.max_lr, self.warmup, self.total)
+            g["lr"] = lr_at(self.step, self.max_lr, self.warmup, self.total, self.min_lr_frac)
         if self.scaler:
             self.scaler.scale(loss).backward()
             self.scaler.unscale_(self.opt)
@@ -134,4 +135,32 @@ class Trainer:
         rec = {"step": self.step, "wall_s": round(self.wall_prev + time.time() - self.t_start, 1), **rec}
         with open(os.path.join(self.run_dir, "metrics.jsonl"), "a") as f:
             f.write(json.dumps(rec) + "\n")
+        return rec
+
+
+class Calib:
+    """Throughput calibration: time steps after a warm-up (allocator, cuDNN autotune) and report useful TFLOPS."""
+
+    def __init__(self, run_dir: str, steps: int, fl_step: float, warm: int = 10):
+        self.run_dir, self.steps, self.fl_step, self.warm = run_dir, steps, fl_step, warm
+        self.t_warm = None
+
+    def tick(self, step: int):
+        if step == self.warm:
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+            self.t_warm = time.time()
+
+    def report(self, step: int, extra: dict | None = None) -> dict:
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+        dt = time.time() - self.t_warm
+        sps = (step - self.warm) / dt
+        gpu = torch.cuda.get_device_name() if torch.cuda.is_available() else "cpu"
+        mem = torch.cuda.max_memory_allocated() / 1e9 if torch.cuda.is_available() else None
+        rec = {"gpu": gpu, "steps_timed": step - self.warm, "s_per_step": 1 / sps, "tflops_useful": sps * self.fl_step / 1e12,
+               "peak_mem_gb": mem, **(extra or {})}
+        with open(os.path.join(self.run_dir, "calib.json"), "w") as f:
+            json.dump(rec, f, indent=1)
+        print("[calib]", json.dumps(rec), flush=True)
         return rec

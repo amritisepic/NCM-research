@@ -1,5 +1,6 @@
 {
  "run": "phase0_invariance_probe",
+ "tokenizer": "released",
  "n": 1000,
  "seed": 0,
  "levels": [
@@ -124,6 +125,100 @@
     0.8415462962962963,
     0.950578125
    ]
+  }
+ },
+ "conditional": {
+  "shuffle_w16": {
+   "L1": {
+    "frac_unchanged": 0.999375
+   },
+   "L2": {
+    "frac_unchanged": 0.1115
+   },
+   "L3": {
+    "frac_unchanged": 0.059583333333333335
+   },
+   "L4": {
+    "frac_unchanged": 0.05009375
+   }
+  },
+  "shuffle_w8": {
+   "L1": {
+    "frac_unchanged": 0.9995
+   },
+   "L2": {
+    "frac_unchanged": 0.9994375
+   },
+   "L3": {
+    "frac_unchanged": 0.21916666666666668
+   },
+   "L4": {
+    "frac_unchanged": 0.1586875
+   }
+  },
+  "swap_across": {
+   "L1": {
+    "frac_unchanged": 0.926375
+   },
+   "L2": {
+    "frac_unchanged": 0.946125
+   },
+   "L3": {
+    "frac_unchanged": 0.947125
+   },
+   "L4": {
+    "frac_unchanged": 0.95784375
+   }
+  },
+  "synonym": {
+   "L1": {
+    "frac_unchanged": 0.9788286004056795,
+    "affected_window_unchanged": 0.8448275862068966
+   },
+   "L2": {
+    "frac_unchanged": 0.9829487829614605,
+    "affected_window_unchanged": 0.7484787018255578
+   },
+   "L3": {
+    "frac_unchanged": 0.9773918187964841,
+    "affected_window_unchanged": 0.5344827586206896
+   },
+   "L4": {
+    "frac_unchanged": 0.9758176977687627,
+    "affected_window_unchanged": 0.2616632860040568
+   }
+  },
+  "name_swap": {
+   "L1": {
+    "frac_unchanged": 0.9224613686534217
+   },
+   "L2": {
+    "frac_unchanged": 0.9478476821192053
+   },
+   "L3": {
+    "frac_unchanged": 0.9375459896983076
+   },
+   "L4": {
+    "frac_unchanged": 0.9310154525386314
+   }
+  },
+  "random_tok": {
+   "L1": {
+    "frac_unchanged": 0.9605,
+    "affected_window_unchanged": 0.707
+   },
+   "L2": {
+    "frac_unchanged": 0.973,
+    "affected_window_unchanged": 0.59
+   },
+   "L3": {
+    "frac_unchanged": 0.971375,
+    "affected_window_unchanged": 0.418
+   },
+   "L4": {
+    "frac_unchanged": 0.97590625,
+    "affected_window_unchanged": 0.275
+   }
   }
  }
 }

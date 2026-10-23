@@ -7,8 +7,10 @@ step = 3 x forward). Dense-mask attention executes more FLOPs than counted; wall
 | Device | fp32 matmul | bf16 matmul | Notes |
 |---|---|---|---|
 | Cloud container (this agent), 4-core Xeon w/ AMX | 0.47-0.54 TFLOPS | 1.9-3.2 TFLOPS | n=512..2048 square matmuls; real models reach far less (see "effective") |
-| Colab T4 | (to calibrate) | fp16 only | ~1.2 CU/h |
-| Colab L4 | (to calibrate) | bf16 | ~1.7 CU/h |
+| Colab T4 | (to calibrate) | fp16 only | 1.19 CU/h |
+| Colab L4 | (to calibrate) | bf16 | 1.71 CU/h |
+| Colab A100 40 / 80 GB | (to calibrate) | bf16 | 5.40 / 7.52 CU/h |
+CU rates: third-party measurements (March 2026); the Colab resource panel shows the live rate.
 
 Effective training throughput on the container: _to be filled from tok_s / ncm_s step times_.
 
@@ -35,7 +37,17 @@ FLOP-matched (primary) and read the data-matched point off the AR learning curve
 T4 assumed 10 TFLOPS effective and L4 25 TFLOPS until calibrated (p1_tc_pilot notebook includes
 300-step calibration runs at the m scale). If estimates are off by >2x, investigate before the next run.
 
+## Scale-up tiers (2026-10-23, `docs/phase1b_scaleup.md`)
+| Run | Params | FLOPs/run | Est. CU (L4 @ 25-40 TFLOPS useful) |
+|---|---|---|---|
+| Tier L TinyStories fine-tune, 4000 x 256 (released generator) | 88.6M | 349 PFLOP (on-policy arms: fewer steps, same FLOPs) | 4.5-7 incl. eval |
+| Tier M NCM from scratch, 15k x 256 on the released tokenizer | 25.2M body | 411 PFLOP | 6-10 |
+| Tier M AR, FLOP-matched (70k x 256; NCM/AR = 4.66x per window) | 25.2M + 4.2M emb | 411 PFLOP | 6-10 |
+| Sudoku fine-tune, 5000 x 256 (released generator) | 25.5M | 84 PFLOP | ~1.3 |
+| Paper TinyStories generator from scratch (for scale) | 88.6M | ~34 EFLOP | 400+ (not planned) |
+
 ## Budget
+Raised to ~200 CU by the user on 2026-10-23 (see phase1b_scaleup.md for the allocation). Original note:
 Colab: 100 CU total. Planned Phase-0/1 use: ~1 CU (pilot + calibration). Matched baselines with 3 seeds
 at the m scale cost ~25 CU on L4 (NCM + AR), so Phase-3 confirmation must be planned against the
 remaining ~70 CU; anything >15 CU in one run needs approval.

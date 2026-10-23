@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Download the data and released checkpoints this repo uses (into data/ and artifacts/, both git-ignored).
-# Usage: bash scripts/fetch_assets.sh [all|tinystories|sudoku|checkpoints]
+# Usage: bash scripts/fetch_assets.sh [all|tinystories|sudoku|checkpoints|wmt14]
 set -euo pipefail
 cd "$(dirname "$0")/.."
 D=https://huggingface.co/datasets/hazyresearch/ncm-datasets/resolve/main
@@ -17,5 +17,9 @@ fi
 if [[ $what == all || $what == checkpoints ]]; then
   for l in easy medium hard; do for f in config.yaml tokenizer.pt generator.pt; do get "$M/sudoku/$l/$f" "artifacts/sudoku/$l/$f"; done; done
   for f in config.yaml tokenizer.pt generator.pt bpe_vocab_8192.pickle bpe_merges_8192.pickle; do get "$M/tinystories/$f" "artifacts/tinystories/$f"; done
+fi
+if [[ $what == wmt14 ]]; then   # 1.1 GB; not part of "all"
+  for f in config.yaml tokenizer.pt generator.pt; do get "$M/wmt14/$f" "artifacts/wmt14/$f"; done
+  for f in sources.pickle reference_translations.pickle; do get "$D/wmt14/$f" "data/wmt14/$f"; done
 fi
 echo done

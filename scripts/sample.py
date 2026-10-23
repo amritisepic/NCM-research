@@ -31,11 +31,12 @@ ap.add_argument("--n", type=int, default=256)
 ap.add_argument("--bs", type=int, default=128)
 ap.add_argument("--temperature", type=float, default=1.0)
 ap.add_argument("--threads", type=int, default=0)
+ap.add_argument("--ckpt", default="final.pt", help="file in run_dir (e.g. snap_15000.pt for an AR run)")
 a = ap.parse_args()
 if a.threads:
     torch.set_num_threads(a.threads)
 dev = "cuda" if torch.cuda.is_available() else "cpu"
-st = torch.load(os.path.join(a.run_dir, "final.pt"), map_location="cpu", weights_only=False)  # our own file
+st = torch.load(os.path.join(a.run_dir, a.ckpt), map_location="cpu", weights_only=False)  # our own file
 
 rows, groups, t_gen, nfe_calls, n_calls = [], [], 0.0, 0, 0
 if "gen_kwargs" in st:

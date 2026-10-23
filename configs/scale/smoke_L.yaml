@@ -1,0 +1,6 @@
+# CPU smoke test of scripts/train_gen.py (tiny batch, few steps)
+init: released
+corruption: {mode: onpolicy, mean_rate: 0.5, spread: 0.5, retarget: true, soft_tau: 1.0, soft_topm: 16, policy_temp: 1.0}
+train: {steps: 2, batch_size: 2, grad_accum: 1, lr: 1.0e-4, warmup: 1, min_lr_frac: 0.1, weight_decay: 0.1, beta2: 0.95,
+        ckpt_every: 2, eval_every: 2, eval_n: 4, log_every: 1, compile: false, seed: 0}
+sample_eval: {every: 2, n: 4, final_seeds: [10000], final_n: 4, mauve: false}

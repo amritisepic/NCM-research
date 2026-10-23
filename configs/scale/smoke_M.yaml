@@ -1,0 +1,7 @@
+# CPU smoke test: generator from scratch on the released tokenizer
+init: scratch
+model: {n_layer: 2, n_head: 4, n_embd: 128, dropout: 0.1}
+corruption: {mode: uniform, mean_rate: 0.5, spread: 0.5, retarget: false}
+train: {steps: 2, batch_size: 4, grad_accum: 2, lr: 3.0e-4, warmup: 1, weight_decay: 0.1, ckpt_every: 2, eval_every: 2,
+        eval_n: 4, log_every: 1, seed: 0}
+sample_eval: {every: 0, final_seeds: [42], final_n: 4, mauve: false}
