@@ -199,3 +199,49 @@ Compute units: CPU-h = wall-clock hours on the 4-core cloud container (Xeon w/ A
   time: P1 2.9 h (ncm_s 28 min, ts_fact_s / ts_ar_s 56-57 min each, ar_s 15 min, tok_s 14 min, m-scale
   calibration 6 min), C4 4.8 h (tokenizer 28 min, NCM 124 min, RNCM 136 min): ~10 CU incl. setup, at the top of
   the 4.5-9 CU estimate. Analysis against the pre-registrations: next session.
+
+## R018 — P1 analysis: within-level TC share of the NCM–AR gap (tok_s, Colab T4, seed 0)
+- `scripts/analyze_p1.py --runs results/colab/p1_tc_pilot` -> `results/p1_tc_decomposition.json`. **Scope: our
+  8.4M tok_s tokenizer and 5.5M-body generators, not the released tokenizer/generator.** Nats per 128-token
+  val window (1000 windows), final checkpoint (6000 steps).
+- NLL (incl. level 0 under the unigram, 4.51): NCM 1232.7; two-stream factorized 1232.8; two-stream within-level
+  AR 1290.1; AR tokens 173.6 FLOP-matched (6000 x 128 windows, 4.1 vs 4.0 PFLOP) / 212.4 data-matched (step
+  1500). Gap NCM - AR = **1059.1** (FLOP-matched), 1020.3 (data-matched).
+- **TC = NLL_fact - NLL_ar = -57.3 nats (-5.4% of the gap).** Per level 1..11: +1.1, +1.9, +1.0, +0.3, -2.0, -2.7,
+  -2.6, **-21.0, -14.7, -17.3** (token-straddling L8-L10), -1.2. Trend over the 12 evals: -142 -> -57, rising
+  monotonically, still negative at the end; all four NLL curves still falling (NCM -11 nats in the last 500 steps).
+- Registered sanity checks: NLL_ts_fact within 5% of NLL_ncm (0.01%: pass); tokenizer full-depth acc 99.17%
+  (pass); truncated-decode curve monotone (7.6% -> 99.2%: pass).
+- **Verdict H3: inconclusive (instrument failure).** The literal rule (TC < 10% of the gap -> falsified) is met,
+  but I do not apply it: true TC is >= 0 (more conditioning cannot raise entropy), so a negative value is not
+  an estimate of TC but evidence that the within-level-AR probe is the weaker learner. Likely cause, found in
+  the code: its previous-code embeddings use PyTorch's default N(0, 1) init (norm ~16 at d = 256) and are added
+  to the code stream's latent input (norm 7-15 on the released tokenizer, measured), so the AR probe starts with
+  its own-position conditioning buried in noise, while the factorized probe's code stream starts identical to
+  NCM's input. The probe is therefore not a superset of the factorized one at equal optimisation.
+- **Decision (phase1b_scaleup.md §7):** neither branch fires; C2/C7 are not killed by P1 and C2 stays conditional
+  on the wave-0 diagnostic. Re-test registered as P1b (`preregistration.md`): the same AR probe with zero-initialized
+  previous-code embeddings (at step 0 it equals the factorized probe), reusing tok_s and ts_fact_s; ~1 CU.
+- **Reading (an inequality, not a test of H3):** codes are a deterministic function of the text, so
+  H(codes) <= H(text) <= 173.6 nats (the AR model's val cross-entropy). Every code model here is therefore at
+  least 1059 (NCM) / 1116 (within-level AR) nats above the entropy of its own targets: >= 86% of NCM's NLL is
+  model excess, not information. The P1 "representation term" (1116.5) is mostly this learnability cost, not
+  an information cost of the representation. Whatever TC turns out to be, it can at most be a share of a gap that
+  is dominated by how hard canonical codes are to predict (consistent with R008/R014 on the released model:
+  near-equivalent codes at fine levels). Small scale, one seed, curves not converged.
+
+## R019 — C4 analysis: Recurrent NCM (carried state) on Sudoku-hard (Colab T4, seed 0)
+- `results/colab/c4_sudoku_pilot/`. Tokenizer: val token acc 100%, board exact 100%. Generators 5.66M, 20k steps
+  x 64, 12 NFE, greedy.
+- Solve rate, val (1000 generated hard) / released hard test (2000): NCM **2.1 / 3.00%**, RNCM **0.4 / 1.05%**.
+  By propagation rounds (test; <=6 n=563, 7-8 n=705, 9-10 n=322, >=11 n=119, needs search n=291):
+  NCM 6.7 / 2.4 / 0.6 / 0.8 / 0.7; RNCM 3.4 / 0.3 / 0.0 / 0.0 / 0.0. Rounds >= 9 (n = 441): NCM 3/441, RNCM 0/441.
+- (b) - (a): **-1.7 points val, -1.95 test, -0.68 on >= 9 rounds.** Final teacher-forced train CE per code: NCM
+  0.159, RNCM 0.127 (carry fits the training data better and decodes worse).
+- **Verdict H4: falsified** as registered ((b) - (a) < +1 point overall). Validity limit: both arms are at the
+  floor (the released 25.5M model solves 86.3%; ours saw 1.28M puzzle exposures vs the paper's 51.2M and a 5x
+  smaller body), so the test had almost no power at the depths H4 is about. The registered rule does not
+  condition on baseline competence; I apply it as written.
+- **Decision (§7):** carry is killed for Sudoku and does not join the tier-L Sudoku arms.
+- Untested reading: lower teacher-forced loss with worse greedy decoding fits carry amplifying exposure bias
+  (the carried state is built from clean levels in training, from the model's own levels at inference).
