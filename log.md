@@ -388,3 +388,11 @@ Compute units: CPU-h = wall-clock hours on the 4-core cloud container (Xeon w/ A
   trainer has had an independent code audit (the R024 audit covered `train_gen.py` and `corruption.py`).
 - Hygiene: 4 commits in the public history carry a personal author name and email; flagged to the user (rewriting
   needs their approval, since it force-pushes the shared branch).
+
+## R026 — public-history author rewrite (2026-10-23, user-approved)
+- The 4 commits authored with a personal name and email were rewritten to the GitHub noreply identity
+  (`git filter-branch --env-filter`, author and committer fields only; final tree identical) and both branches
+  force-pushed with lease. All commit hashes changed. Old -> new for hashes cited in this log and in `docs/reviews/`:
+  `1c7185c` -> `0f37c24`, `f2222ca` -> `f9f90ff`, `5cde67a` -> `5a43383`, `d86eb78` -> `d0e26a4`, `cac8598` -> `e1384a9`, `b073e9a` -> `b397656`, `8054cb5` -> `7427b96`.
+- Any local clone (e.g. the codex folder) must run `git fetch origin && git reset --hard origin/claude/ncm-research`
+  after setting its identity to the noreply address.
