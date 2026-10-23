@@ -147,6 +147,8 @@ while tr.step < int(tc.steps):
     if tr.step % int(tc.ckpt_every) == 0:
         tr.save({"model": model}, rng, extra)
 
+if not last and a.kind != "tokenizer":  # re-run of a finished run: evaluate once so result.json is complete
+    last = {"val_solved": solve_rate(val_p, val_s)[0]}
 tr.save({"model": model}, rng, extra)
 torch.save({"model": model.state_dict(), **extra}, os.path.join(a.run_dir, "final.pt"))
 res = {"run": os.path.basename(a.run_dir.rstrip("/")), "kind": a.kind, "level": a.level,

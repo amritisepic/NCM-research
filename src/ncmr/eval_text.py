@@ -63,16 +63,24 @@ def gen_ppl(texts: list[str], scorer: str, device: str = "cpu", batch_size: int 
 
 @torch.no_grad()
 def mauve_features(texts: list[str], device: str = "cpu", max_len: int = 256, batch_size: int = 16) -> np.ndarray:
-    """gpt2-large hidden state of the last real token (MAUVE's default featurization)."""
+    """gpt2-large final-layer hidden state at the last real token (MAUVE's default featurization).
+    Right-padded batches (GPT-2 positions are absolute and attention is causal, so the last real token's
+    state is unaffected by padding); bf16 autocast. Every method and the human references go through this
+    same function, so the featurization is identical across comparisons."""
     tok, lm = _load_lm("gpt2-large", device)
     feats = []
     for s in range(0, len(texts), batch_size):
         batch = [t if t.strip() else tok.eos_token for t in texts[s:s + batch_size]]
         enc = [tok(t, truncation=True, max_length=max_len)["input_ids"] for t in batch]
-        for ids in enc:  # unpadded, one at a time: exact last-token state, no padding effects
-            out = lm(torch.tensor([ids], device=device), output_hidden_states=True)
-            feats.append(out.hidden_states[-1][0, -1].float().cpu().numpy())
-    return np.stack(feats)
+        T = max(len(e) for e in enc)
+        ids = torch.full((len(enc), T), tok.eos_token_id, dtype=torch.long)
+        for i, e in enumerate(enc):
+            ids[i, :len(e)] = torch.tensor(e)
+        with torch.autocast(device_type=device, dtype=torch.bfloat16):
+            hs = lm(ids.to(device), output_hidden_states=True).hidden_states[-1]
+        last = torch.tensor([len(e) - 1 for e in enc], device=hs.device)
+        feats.append(hs[torch.arange(len(enc), device=hs.device), last].float().cpu().numpy())
+    return np.concatenate(feats)
 
 
 def mauve_score(p_feats: np.ndarray, q_feats: np.ndarray, seed: int = 0) -> float:

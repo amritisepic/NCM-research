@@ -177,6 +177,8 @@ while trainer.step < int(tc.steps):
         print("[stop] time budget reached; resume by re-running the same command", flush=True)
         sys.exit(0)
 
+if not last:  # re-run of an already finished run: evaluate once so result.json is complete
+    last = evaluate()
 trainer.save(modules, data_rng, extra_save)
 final = {"model": model.state_dict(), **extra_save}
 if a.kind in ("ncm", "ts_fact", "ts_ar"):

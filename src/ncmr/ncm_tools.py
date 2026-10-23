@@ -27,6 +27,29 @@ def zhat_snapshots(vq, idx: torch.Tensor) -> list[torch.Tensor]:
     return out
 
 
+@torch.no_grad()
+def z_to_idx_forced(vq, z: torch.Tensor, forced: torch.Tensor, n_forced: int) -> torch.Tensor:
+    """Upstream z_to_idx (deterministic encode), except that levels < n_forced use the codes in `forced`
+    instead of their argmin. Isolates how level k reacts to an input change *given identical coarser codes*."""
+    z = z.float()
+    B, L, C = z.shape
+    z_rest = z.clone()
+    n = len(vq.levels)
+    idx, acc = [], 0
+    for i, level in enumerate(vq.levels):
+        flat = (vq._down_for_quant(z_rest, i, level) if i != n - 1 else z_rest).reshape(-1, C)
+        if i < n_forced:
+            indices = forced[:, acc:acc + level]
+        else:
+            indices = torch.argmin(vq._distances(flat, vq.embeddings[i].weight), dim=1).view(B, level)
+        q = vq.embeddings[i](indices)
+        q = vq._up_to_full(q, i, L) if i != n - 1 else q
+        z_rest = z_rest - vq._apply_quant_resi(q, i)
+        idx.append(indices)
+        acc += level
+    return torch.cat(idx, 1)
+
+
 def level_slices(levels: list[int]) -> list[slice]:
     out, acc = [], 0
     for lk in levels:

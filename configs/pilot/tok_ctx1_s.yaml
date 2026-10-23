@@ -1,0 +1,4 @@
+# C6: identical to tok_s except a 1-layer bidirectional transformer encoder (contextual latents) instead of
+# a pure lookup. 9.22M params incl. EMA codebooks (2 layers would be 10.01M, over the 10M cap).
+model: {embed_dim: 256, codebook: 1024, enc_layers: 1, n_heads: 4, dropout: 0.1, learned_l1: false, fine_drop: 0.5, decay: 0.95}
+train: {steps: 6000, batch_size: 64, lr: 1.0e-3, warmup: 200, weight_decay: 0.0, ckpt_every: 500, eval_every: 500, eval_n: 1000, seed: 0, log_every: 100}

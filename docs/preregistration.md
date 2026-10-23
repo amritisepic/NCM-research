@@ -29,3 +29,17 @@
   propagation rounds (n = 441).
 - **Falsified if:** (b) − (a) < +1 point overall (then C4 is killed for Sudoku), or (b) fails to train.
 - **Caveat:** one seed per arm; a positive result triggers a 3-seed confirmation before any claim.
+
+## C6 — Does a contextual encoder remove the bag-of-words property of coarse codes? (registered 2026-10-23)
+- **Setup:** `configs/pilot/tok_s.yaml` (lookup encoder, as NCM) vs `configs/pilot/tok_ctx1_s.yaml`
+  (identical + 1 bidirectional transformer layer in the encoder; 9.22M vs 8.43M params). Seed 0, same
+  data order, CPU. Probes: `scripts/probe_invariance.py` and `scripts/probe_levels.py` (--tokenizer).
+- **Hypothesis H5:** with context, coarse codes become order-sensitive.
+- **Metric:** % of level-1 codes unchanged under within-16-token-window shuffles, and of level-2 codes under
+  within-8-token shuffles; per-affected-window change rate under single synonym swaps; full-depth recon.
+- **Counts as support:** shuffle invariance drops by >= 20 points at L1 and at L2 relative to the lookup
+  tokenizer, with full-depth reconstruction >= 99% for both.
+- **Falsified if:** invariance within 5 points of the lookup tokenizer at both L1 and L2.
+- **Why it matters:** if context breaks the bag-of-words structure, "semantic coarse levels" (idea 2) are
+  reachable by architecture alone; P1-style TC measurements on both tokenizers then show whether that costs
+  parallelizability (the trade-off C1b would optimize).

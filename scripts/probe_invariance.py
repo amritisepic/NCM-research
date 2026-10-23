@@ -27,7 +27,7 @@ sys.path.insert(0, os.path.join(ROOT, "src"))
 
 from ncmr.data import EOS, PAD, examples  # noqa: E402
 from ncmr.ncm_ref_loader import load_ncm  # noqa: E402
-from ncmr.ncm_tools import level_slices  # noqa: E402
+from ncmr.ncm_tools import level_slices, z_to_idx_forced  # noqa: E402
 
 SYNONYMS = [(" big", " large"), (" little", " small"), (" happy", " glad"), (" scared", " afraid"),
             (" mom", " mother"), (" dad", " father"), (" quickly", " fast"), (" said", " replied"),
@@ -51,11 +51,15 @@ sl = level_slices(levels)
 X = examples("val", a.n)
 
 
-def enc(xs: np.ndarray) -> np.ndarray:
+def enc(xs: np.ndarray, forced: np.ndarray | None = None, n_forced: int = 0) -> np.ndarray:
     out = []
     with torch.no_grad():
         for s in range(0, len(xs), 250):
-            out.append(vq.z_to_idx(vqvae._encode_pre_quant(torch.from_numpy(xs[s:s + 250]))).numpy())
+            z = vqvae._encode_pre_quant(torch.from_numpy(xs[s:s + 250]))
+            if n_forced:
+                out.append(z_to_idx_forced(vq, z, torch.from_numpy(forced[s:s + 250]), n_forced).numpy())
+            else:
+                out.append(vq.z_to_idx(z).numpy())
     return np.concatenate(out)
 
 
@@ -102,6 +106,7 @@ def perturb(kind: str, row: np.ndarray):
             return None, 0
         p = rng.choice(cand)
         r[p] = syn_map[r[p]]
+        EDIT_POS.append(int(p))
         return r, 1
     if kind == "name_swap":
         cand = [p for p in pos if r[p] in name_ids]
@@ -114,13 +119,16 @@ def perturb(kind: str, row: np.ndarray):
     if kind == "random_tok":
         p = rng.choice(pos)
         r[p] = rng.choice([t for t in freq_ids[:200] if t != r[p]])
+        EDIT_POS.append(int(p))
         return r, 1
     raise ValueError(kind)
 
 
 base_codes = enc(X)
-res = {"run": "phase0_invariance_probe", "n": int(a.n), "seed": a.seed, "levels": levels, "kinds": {}}
+res = {"run": "phase0_invariance_probe", "tokenizer": a.tokenizer, "n": int(a.n), "seed": a.seed, "levels": levels,
+       "kinds": {}, "conditional": {}}
 for kind in ["shuffle_w16", "shuffle_w8", "swap_across", "synonym", "name_swap", "random_tok"]:
+    EDIT_POS = []
     rows, keep, nchg = [], [], []
     for i, row in enumerate(X):
         r, c = perturb(kind, row)
@@ -138,6 +146,23 @@ for kind in ["shuffle_w16", "shuffle_w8", "swap_across", "synonym", "name_swap",
                           "frac_codes_unchanged_per_level": per_level}
     print(f"{kind:12s} n={len(rows):4d} tok_changed={np.mean(nchg):5.1f} | " +
           " ".join(f"L{k}:{100 * v:5.1f}" for k, v in enumerate(per_level)), flush=True)
+    # Conditional view: re-encode with all coarser levels forced to the original codes, so level k's
+    # change is caused by the input edit alone. For single-token edits also report the affected window only.
+    cond = {}
+    base_k = base_codes[keep]
+    for k in (1, 2, 3, 4):
+        ck = enc(np.stack(rows), base_k, n_forced=k)[:, sl[k]]
+        same_k = ck == base_k[:, sl[k]]
+        entry = {"frac_unchanged": float(same_k.mean())}
+        if EDIT_POS and len(EDIT_POS) == len(rows):
+            w = [min(levels[k] - 1, p * levels[k] // 128) for p in EDIT_POS]
+            entry["affected_window_unchanged"] = float(np.mean([same_k[i, w[i]] for i in range(len(rows))]))
+        cond[f"L{k}"] = entry
+    res["conditional"][kind] = cond
+    print("    conditional (coarser levels forced): " + " ".join(
+        f"L{k}: {100 * v['frac_unchanged']:5.1f}" + (f" (affected window {100 * v['affected_window_unchanged']:5.1f})"
+                                                     if "affected_window_unchanged" in v else "")
+        for k, v in ((int(kk[1:]), vv) for kk, vv in cond.items())), flush=True)
 
 with open(a.out, "w") as f:
     json.dump(res, f, indent=1)
