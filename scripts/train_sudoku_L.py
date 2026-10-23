@@ -246,7 +246,7 @@ def evaluate(prompts, sols, caps=(4, 8, 12, 16, 24), bs=250, final=False):
         for name, sel in bins:
             m = [i for i, (r, ok) in enumerate(rounds) if sel(r, ok)]
             res["by_depth"][name] = {"n": len(m), "seq_pct": 100 * float(np.mean([seq_ok[i] for i in m])) if m else None,
-                                     "d2_check_cap24_pct": 100 * float(np.mean([d2["check"][i]["ok_at"][-1] for i in m])) if m else None}
+                                     "d2_check_capmax_pct": 100 * float(np.mean([d2["check"][i]["ok_at"][-1] for i in m])) if m else None}
         res["per_puzzle"] = {"seq": [bool(v) for v in seq_ok], "d2_check_nfe": [r["nfe"] for r in d2["check"]],
                              "d2_check_ok_cap": [[bool(v) for v in r["ok_at"]] for r in d2["check"]]}
     net.train()

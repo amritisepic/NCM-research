@@ -1,9 +1,9 @@
-# Tier L Sudoku (S1): fine-tune the released 25.5M Sudoku-hard generator. Arm = B1a: conditioning codes replaced by the model's own one-step greedy predictions (rates as uniform), clean labels; 3750 steps = ctrl FLOPs.
+# Tier L Sudoku (S1): fine-tune the released 25.5M Sudoku-hard generator. Arm = B1a: conditioning codes replaced by the model's own one-step greedy predictions (rates as uniform), clean labels; 1875 steps = ctrl FLOPs.
 # Same data order (seed), schedule and training FLOPs across arms; only the training signal differs.
 arm: onpolicy
 model: {dropout: 0.1}
 corruption: {mean_rate: 0.5, spread: 0.5}
 repair: {max_age: 16, new_lr_mult: 20.0}
-train: {steps: 3750, batch_size: 256, lr: 5.0e-05, warmup: 200, min_lr_frac: 0.1, weight_decay: 0.01, beta2: 0.99,
-  ckpt_every: 250, eval_every: 1000, log_every: 50, seed: 0}
+train: {steps: 1875, batch_size: 256, lr: 5.0e-05, warmup: 200, min_lr_frac: 0.1, weight_decay: 0.01, beta2: 0.99,
+  ckpt_every: 250, eval_every: 500, log_every: 50, seed: 0}
 eval: {n_val: 1000, caps: [4, 8, 12, 16, 24]}

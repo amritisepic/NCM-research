@@ -121,3 +121,8 @@
 - **Sanity checks:** A0 D1 test 86.15% and D2 ~90.3% at ~2.4 passes (R020). If A1 ends > 2 points below A0 on
   val D1, the fine-tuning recipe damages the model: lower the lr and re-run A1 before reading any arm.
 - **Caveat:** verifier stopping uses task knowledge that text tasks lack; D2-nocheck is reported for every arm.
+
+## S1a — amendment to S1: step counts (registered 2026-10-23, before any S1 run)
+- 5000 x 256 is ~83 PFLOP per arm. At the ~25 TFLOPS that wave 0 measured for a 25M generator on an A100
+  (`calib_M__calib.json`), that is ~5 CU per arm, not the planned 1.3. Every S1 arm therefore runs half its
+  steps: A1 / A1u / A3 2500, A2 1875 (val curves every 500). Nothing else in S1 changes.
