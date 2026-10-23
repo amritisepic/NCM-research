@@ -103,6 +103,19 @@ else:
 L0 = BUNDLE.ckpt_extra["inference"]["level0_unigram"].float().to(device)
 levels = [int(l) for l in tok.vq.levels]
 K, S, l0 = len(levels), sum(levels), levels[0]
+if str(cfg.get("level0", "released")) == "train":
+    # M1: from-scratch runs estimate the level-0 prior from training windows (own RNG, so the data order is unchanged)
+    # instead of borrowing the released generator's stored unigram (tier-M review, 2026-10-23)
+    _rng0 = np.random.default_rng(seed + 12345)
+    _cnt = torch.zeros(tok.vq.vqvae_vocab_sizes[0], device=device)
+    with torch.no_grad(), torch.autocast(device_type=device, enabled=False):
+        for _ in range(int(cfg.get("level0_windows", 65536)) // 512):
+            _x = torch.from_numpy(stream.batch(_rng0, 512)).to(device)
+            _cnt += torch.bincount(tok.vq.z_to_idx(tok._encode_pre_quant(_x))[:, :l0].reshape(-1), minlength=_cnt.numel()).float()
+    _rel = L0
+    L0 = _cnt / _cnt.sum()
+    print(f"[gen] level-0 prior from {int(_cnt.sum())} training codes: {int((L0 > 0).sum())} codes used, "
+          f"total-variation distance to the released prior {0.5 * float((L0 - _rel).abs().sum()):.4f}", flush=True)
 n_embd = int(cfg.model.n_embd) if cfg.init != "released" else int(BUNDLE.cfg.model.n_embd)
 n_layer = int(cfg.model.n_layer) if cfg.init != "released" else int(BUNDLE.cfg.model.n_layer)
 cc = cfg.get("corruption", {})

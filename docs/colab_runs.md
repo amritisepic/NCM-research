@@ -37,8 +37,9 @@ Final eval per W1 arm: 16 x 256 samples in fp32 (~5-10 min on an A100).
 | `w2c_L_wmt_ctrl` | WMT14 control (+ released reference J0), J1 | A100 / L4 | ~4 | **launch now** |
 | `w2c_L_wmt_consist` | WMT14 self-consistency fine-tune (criterion d, text) | A100 / L4 | ~4 | **launch now** |
 | `p1b_tc_rerun` | P1b: within-level-AR TC probe | — | — | **withdrawn** (R023: false premise; notebook removed; P1c to come) |
-| `w2_M_ncm` | tier M NCM from scratch (25M) | — | ~25 per seed at measured throughput | **on hold**: > 15 CU per run; re-plan after wave 1 |
-| `w2_M_ar` | tier M AR, FLOP-matched | — | ~14 per seed | **on hold** (re-plan with w2_M_ncm) |
+| `w2_Mc_ncm` | tier M design C (M1): NCM from scratch, d512 x 6, 6k steps, seed 0 | A100 / L4 | ~7.7 | **launch any time** (independent of wave 1) |
+| `w2_Mc_ar` | tier M design C (M1): AR, same body, FLOP-matched, seed 0 | A100 / L4 | ~4.3 | **launch any time** |
+| `w2_Mc_ar15` | M1 conditional: AR at 1.5x steps, seed 0 | A100 / L4 | ~6.4 | only when asked (before a criterion-(b) claim) |
 | `calib_t4` | old calibration (superseded by w0) | T4 | 0.6 | skip |
 
 Budget: ~200 CU (raised 2026-10-23). Spent: ~12.5 CU (p1, c4, w0). Queued above: ~54 CU. Allocation and decision points:

@@ -142,22 +142,29 @@ for arm, what in {"ctrl": "control: teacher forcing on reference translations (a
                 "Run seed 0 first.",
         "gpu": "A100 or L4", "units": 4, "needs": ["ckpt", "wmt14"], "seeds": [0], "cmds": cmds,
     }
-RUNS["w2_M_ncm"] = {
-    "desc": "Wave 2, tier M: NCM generator from scratch (d512 x 8, 25M body) on the released tokenizer, paper recipe "
-            "with conditioning corruption; ~411 PFLOP. Matched baseline for Phase 3 (3 seeds).",
-    "gpu": "L4", "units": 7, "needs": ["ts", "ckpt"], "seeds": [0],
-    "cmds": ["python scripts/train_gen.py --config configs/scale/M_ncm.yaml --run_dir {R}/M_ncm_s{S} --seed {S}"],
+RUNS["w2_Mc_ncm"] = {
+    "desc": "Wave 2, tier M design C (pre-registered M1): NCM generator from scratch, d512 x 6 (~18.9M body), on the "
+            "released tokenizer, paper recipe with conditioning corruption, 6k x 256 windows; level-0 prior estimated "
+            "from training windows. Re-calibrates throughput first (30 steps). Final eval 16 x 256 samples. Run seed 0 first: "
+            "seeds 1-2 only if the M1 gate passes.",
+    "gpu": "A100 (or L4)", "units": 7.7, "needs": ["ts", "ckpt"], "seeds": [0],
+    "cmds": ["python scripts/train_gen.py --config configs/scale/M_ncm_c.yaml --run_dir {R}/calib_Mc --calib_steps 30",
+             "python scripts/train_gen.py --config configs/scale/M_ncm_c.yaml --run_dir {R}/Mc_ncm_s{S} --seed {S}"],
 }
-RUNS["w2_M_ar"] = {
-    "desc": "Wave 2, tier M: AR transformer with the same body (d512 x 8), FLOP-matched to w2_M_ncm (~411 PFLOP), "
-            "then 4 x 256 samples at the FLOP-matched end and at the data-matched snapshot (15k steps), full eval suite.",
-    "gpu": "L4", "units": 7, "needs": ["ts", "ckpt"], "seeds": [0],
-    "cmds": ["python scripts/train.py ar --config configs/scale/M_ar.yaml --run_dir {R}/M_ar_s{S} --seed {S}",
-             "python scripts/sample.py --run_dir {R}/M_ar_s{S} --out {R}/M_ar_s{S}/samples_final.json --seeds 42 0 1 2 --n 256",
-             "python scripts/eval_samples.py --samples {R}/M_ar_s{S}/samples_final.json --ref val --out {R}/M_ar_s{S}/eval_final.json",
-             "python scripts/sample.py --run_dir {R}/M_ar_s{S} --ckpt snap_15000.pt --out {R}/M_ar_s{S}/samples_15k.json --seeds 42 0 1 2 --n 256",
-             "python scripts/eval_samples.py --samples {R}/M_ar_s{S}/samples_15k.json --ref val --out {R}/M_ar_s{S}/eval_15k.json"],
-}
+for name, cfg, extra in [("w2_Mc_ar", "M_ar_c", "FLOP-matched to w2_Mc_ncm (27,335 x 256); snapshots at 6000 (data-matched) and 20500 (75%)"),
+                         ("w2_Mc_ar15", "M_ar_c15", "CONDITIONAL (M1): 1.5x the FLOP-matched steps, seed 0 only; run only when I ask")]:
+    cmds = [f"python scripts/train.py ar --config configs/scale/{cfg}.yaml --run_dir {{R}}/{cfg}_s{{S}} --seed {{S}}",
+            f"python scripts/sample.py --run_dir {{R}}/{cfg}_s{{S}} --out {{R}}/{cfg}_s{{S}}/samples_final.json --seeds 42 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 --n 256",
+            f"python scripts/eval_samples.py --samples {{R}}/{cfg}_s{{S}}/samples_final.json --ref val --out {{R}}/{cfg}_s{{S}}/eval_final.json"]
+    if cfg == "M_ar_c":
+        for snap in (6000, 20500):
+            cmds += [f"python scripts/sample.py --run_dir {{R}}/{cfg}_s{{S}} --ckpt snap_{snap}.pt --out {{R}}/{cfg}_s{{S}}/samples_{snap}.json --seeds 42 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 --n 256",
+                     f"python scripts/eval_samples.py --samples {{R}}/{cfg}_s{{S}}/samples_{snap}.json --ref val --out {{R}}/{cfg}_s{{S}}/eval_{snap}.json"]
+    RUNS[name] = {
+        "desc": f"Wave 2, tier M design C (M1): AR transformer, same body as w2_Mc_ncm (d512 x 6); {extra}. "
+                "Full eval suite on 16 x 256 samples.",
+        "gpu": "A100 (or L4)", "units": 4.3 if cfg == "M_ar_c" else 6.4, "needs": ["ts", "ckpt"], "seeds": [0], "cmds": cmds,
+    }
 
 SETUP = r'''
 import os, subprocess, sys, json, shutil, time
@@ -244,7 +251,7 @@ for seed in SEEDS:
             continue
         rd = c.split('--run_dir ')[1].split()[0].format(R=R, S=seed)
         name = os.path.basename(rd)
-        for f in ['result.json', 'metrics.jsonl', 'config.yaml', 'calib.json', 'hyp_test.json', 'eval_final.json', 'eval_15k.json', 'samples_final.json']:
+        for f in ['result.json', 'metrics.jsonl', 'config.yaml', 'calib.json', 'hyp_test.json', 'eval_final.json', 'eval_6000.json', 'eval_20500.json', 'samples_final.json']:
             if os.path.exists(f'{rd}/{f}'):
                 shutil.copy(f'{rd}/{f}', f'{out}/{name}__{f}')
 for f in os.listdir('results'):   # diagnostics write straight into the repo's results/

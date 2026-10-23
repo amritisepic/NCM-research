@@ -11,7 +11,9 @@ and wave 0 (R020) analysed, then corrected after an external hostile review (R02
 bugs that would have invalidated wave 1 (autocast leak in the on-policy arms, two-pass level 0); both are fixed
 and tested. Wave 1 (6 arms, W1/W1a/**W1b**), Sudoku tier L (S1/S1a/**S1b**, 4 arms) and WMT14 tier L (J1/**J1a**,
 2 arms) are registered with notebooks ready: **waiting for the user to launch** (`docs/colab_runs.md`). P1b
-withdrawn before launch (false premise); P1c to be built. Tier M on hold (> 15 CU per run).
+withdrawn before launch (false premise); P1c to be built. Tier M re-planned after an external design review (R027):
+design C, registered as **M1** (d512 x 6 NCM + FLOP-matched AR, seed-0 gate before seeds 1-2), notebooks ready.
+Wave 1: the user launched `w1_L_ts_{ctrl,onpol,b1}` (2026-10-23; commit to be confirmed as post-R024).
 
 ## Environment
 - Cloud agent: no GPU (4-core Xeon). Fresh containers need `pip install torch omegaconf hydra-core regex
@@ -59,7 +61,8 @@ withdrawn before launch (false premise); P1c to be built. Tier M on hold (> 15 C
 - P1b withdrawn (R023): the AR probe was not equal to the factorized probe at step 0.
 
 ## Compute
-- Colab: ~12.5 CU spent (p1, c4, w0). Queued (all pre-registered): w1 6 x ~6, Sudoku 4 x ~2.5, WMT14 2 x ~4 => ~54 CU
+- Colab: ~12.5 CU spent (p1, c4, w0). Queued (all pre-registered): w1 6 x ~6, Sudoku 4 x ~2.5, WMT14 2 x ~4 => ~54 CU;
+  M1 seed-0 pair ~12 CU (then ~24 for seeds 1-2 if the gate passes, ~23 for a candidate, ~6.4 for AR-c15)
   (W1b's extra eval adds < 0.2 CU per arm). Seeds 1-2 for survivors and the controls, plus the conditional controls
   A1m / A6s (~6 CU each x 3 seeds, only if triggered), follow the screens. Budget ~200 CU.
 - CPU: ~10 CPU-h so far.
@@ -69,5 +72,6 @@ withdrawn before launch (false premise); P1c to be built. Tier M on hold (> 15 C
    J1(+J1a), log, apply the screens, then tell the user which seed-1-2 notebooks (and conditional controls) to run.
 2. Build P1c on CPU: validate the TC estimator on synthetic codes with known TC, then the zero-init side-channel AR
    probe warm-started from `ts_fact_s`; register thresholds before any GPU run (~1 CU).
-3. Re-plan tier M (wave 2) to fit <= 15 CU per run at the measured 24.7 / 44.2 TFLOPS, and ask the user before any run
-   > 15 CU. If J2 or the Sudoku repair arm looks like it meets criterion (d) or the +3-point bar: stop and ask first.
+3. When the M1 seed-0 pair reports: apply the gate (G0 >= max(2.4, 4 x W1 control training SD)); if it passes, ask for
+   seeds 1-2 and register the candidate from wave 1's result. If J2 or the Sudoku repair arm looks like it meets
+   criterion (d) or the +3-point bar: stop and ask first.

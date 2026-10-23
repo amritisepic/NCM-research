@@ -396,3 +396,17 @@ Compute units: CPU-h = wall-clock hours on the 4-core cloud container (Xeon w/ A
   `1c7185c` -> `0f37c24`, `f2222ca` -> `f9f90ff`, `5cde67a` -> `5a43383`, `d86eb78` -> `d0e26a4`, `cac8598` -> `e1384a9`, `b073e9a` -> `b397656`, `8054cb5` -> `7427b96`.
 - Any local clone (e.g. the codex folder) must run `git fetch origin && git reset --hard origin/claude/ncm-research`
   after setting its identity to the noreply address.
+
+## R027 — tier-M re-plan after an external design review (2026-10-23)
+- Review saved in `docs/reviews/gpt_tierM_review_2026-10-23.md` (local file links replaced by repo paths), triage in
+  `docs/reviews/triage_tierM_2026-10-23.md`. All its costs recomputed here and agree (24.93 / 13.95 CU per seed for
+  the old plan, 116.6 CU for 3 baseline pairs; design C 7.65 / 4.28 CU, 27,335 FLOP-matched AR steps).
+- **Adopted: design C (registered as M1)**: d512 x 6 NCM from scratch (6000 x 256, ~7.7 CU) and FLOP-matched AR
+  (27,335 x 256, ~4.3 CU), 16 x 256-sample eval, level-0 prior from training windows (new `level0: train` path in
+  `train_gen.py`, CPU smoke-tested). Old `w2_M_ncm` / `w2_M_ar` notebooks removed (configs kept for the record).
+- **Gate added beyond the review:** the seed-0 pair (~12 CU) decides whether seeds 1-2 (~24 CU) run:
+  G0 >= max(2.4, 4 x W1's measured control training SD).
+- **Changed from the review:** its kill rule "AR improves >= 0.35 in its final quarter" would fire from cosine
+  annealing alone; replaced by a conditional 1.5x-steps AR (seed 0) that any criterion-(b) claim must also beat.
+- Budget view (A100, estimates): spent ~12.5; queued wave 1 + Sudoku + WMT14 ~54; M1 seed-0 pair ~12, seeds 1-2 ~24,
+  candidate ~23, AR-c15 ~6.4; wave-1b / S1 / J1 seeds ~20-40. Total ~150-175 of ~200 CU.

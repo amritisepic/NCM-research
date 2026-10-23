@@ -1,0 +1,6 @@
+# Tier M, design C (M1): AR transformer, same body as M_ncm_c (d512 x 6), 41,000 x 256 windows = 1.5x the FLOP-matched
+# steps of M_ar_c (~6.4 CU on an A100).
+# Conditional (M1): 1.5x the FLOP-matched steps, seed 0 only, run before any criterion-(b) claim.
+model: {vocab: 8192, n_layer: 6, n_head: 8, n_embd: 512, dropout: 0.1}
+train: {steps: 41000, batch_size: 256, lr: 0.0003, warmup: 500, weight_decay: 0.1, ckpt_every: 1000, eval_every: 2500, eval_n: 1000,
+  log_every: 200, seed: 0, snapshot_steps: []}

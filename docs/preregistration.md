@@ -220,3 +220,22 @@ Why: `docs/reviews/triage_2026-10-23.md` (G5-G7, codex F1-F8). Everything not li
   must then beat it as above.
 - **Criterion (d) claims** additionally need batch-size-1 wall-clock at the operating point on 256 sentences and an
   attention-inclusive cost (w0: each Jacobi pass costs 0.30 of a full sequential decode by position count).
+
+## M1 — Tier M, design C: matched from-scratch NCM and AR baselines for criterion (b) (registered 2026-10-23, before any run)
+- **Why:** the 15k / 70k tier-M plan costs 116.6 CU for its baselines (R022, R027). Design and changes follow the
+  external review (`docs/reviews/triage_tierM_2026-10-23.md`).
+- **Setup:** released TinyStories tokenizer (36.4M, frozen; not counted). NCM-c: generator from scratch, d512 x 6
+  (~18.9M body), paper recipe with uniform conditioning corruption, 6000 x 256 windows, level-0 prior estimated from
+  262k training windows (`configs/scale/M_ncm_c.yaml`). AR-c: same body (~23.1M with embeddings), FLOP-matched by the
+  generator proxy (27,335 x 256 windows; `configs/scale/M_ar_c.yaml`), snapshots at 6000 (data-matched, secondary) and
+  20500 (75%, curve point). Both evaluated with the W1b protocol (16 x 256 samples, fp32 sampling and scoring; GPT-2
+  large primary, TinyStories-33M, entropy, repetition, length, MAUVE always reported).
+- **Gate (seed 0, before any other tier-M spend):** G0 = Gen-PPL(NCM-c) - Gen-PPL(AR-c). Seeds 1-2 of both baselines
+  run only if G0 >= max(2.4, 4 x the pooled training-seed SD of W1's control A1 at seeds 0-2). Otherwise criterion (b)
+  is reported as "not measurable at this scale and budget" and tier M stops.
+- **Candidate (registered later, after wave 1):** one method, 3 seeds, FLOP-matched to NCM-c by the proxy (fewer
+  updates for costlier objectives), <= 42 NFE for 128 tokens with decoder work disclosed.
+- **Criterion (b) claim:** the 95% interval of (P_NCM + P_AR)/2 - P_candidate (seed means, 3 seeds each) lies above 0,
+  the gain over NCM-c exceeds 2x the pooled training-seed SD, and the same holds with the gap of a conditional AR-c15
+  (1.5x AR steps, seed 0, `configs/scale/M_ar_c15.yaml`) run before the claim. Stated as conditional on the released
+  tokenizer, at this body and budget, with proxy FLOPs and measured wall-clock.

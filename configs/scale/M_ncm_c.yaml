@@ -1,0 +1,17 @@
+# Tier M, design C (M1): NCM generator from scratch on the released (frozen) TinyStories tokenizer, d512 x 6
+# (~18.9M body), paper recipe incl. uniform conditioning corruption. 6k x 256 windows; ~7.7 CU on an A100
+# (projected from the w0 d512 x 8 timing by analytic FLOPs; the notebook re-calibrates first).
+# Level-0 prior estimated from training windows, not borrowed from the released generator.
+init: scratch
+level0: train
+level0_windows: 262144
+model: {n_layer: 6, n_head: 8, n_embd: 512, dropout: 0.1}
+corruption: {mode: uniform, mean_rate: 0.5, spread: 0.5, retarget: false}
+train: {steps: 6000, batch_size: 256, grad_accum: 2, lr: 0.0003, warmup: 500, min_lr_frac: 0.1, weight_decay: 0.1, beta2: 0.95,
+  ckpt_every: 500, eval_every: 500, eval_n: 1000, log_every: 50, compile: false, seed: 0}
+sample_eval:
+  every: 1500
+  n: 256
+  final_seeds: [42, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+  final_n: 256
+  mauve: true
