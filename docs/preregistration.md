@@ -70,3 +70,54 @@
 - **Sanity checks:** A0 clean val NLL ~870 nats/window (R008) and Gen-PPL ~16.1 (R010). If A1 ends > 1.0
   Gen-PPL worse than A0, the fine-tuning recipe itself damages the model: lower the lr and re-run A1 before
   reading any other arm.
+
+## W1a — amendment to W1: step counts from measured throughput (registered 2026-10-23, before any W1 run)
+- Wave 0 measured 39.2 useful TFLOPS for the tier-L trainer on an A100-40GB (2.23 s/step at 256 windows;
+  `results/colab/w0_calib_diag/calib_L__calib.json`), 33-52% of the planned rate. Per the plan's rule (< 60%: cut
+  steps, not seeds), every arm runs 45% of its steps: control / requant / soft 1800, onpol / b1 1350, onpol2 1080
+  (~157 PFLOP per arm, ~6 CU on an A100). Val NLL every 300 steps, sample curves every 600. Everything else in W1
+  (arms, recipe, schedule shape incl. 200 warmup steps, metrics, screen, claim rule, sanity checks) is unchanged.
+  On GPUs with >= 40 GB the notebook uses micro-batches of 64 instead of 32 (same 256-window optimizer step).
+
+## P1b — re-test of H3 with a fair within-level-AR probe (registered 2026-10-23)
+- **Why:** P1's TC estimate was negative (R018), which a true TC cannot be; the AR probe's previous-code
+  embeddings started at N(0, 1) and buried its own-position latent.
+- **Setup:** identical to P1's `ts_ar_s` (tok_s, `configs/pilot/ncm_s.yaml`, seed 0, 6000 x 32) except
+  `--ts_prev_init zero`; run `ts_ar0_s`. TC = NLL(existing ts_fact_s) - NLL(ts_ar0_s), per level and total.
+- **Thresholds:** as P1 (support: TC >= 30% of the 1059-nat gap and stable or rising over the last 3 evals;
+  falsified: TC < 10%).
+- **Validity condition:** final TC >= -5 nats in total and no level below -2 nats. If it fails, the probe
+  approach is closed: P1 stays inconclusive and no further re-runs are made.
+
+## S1 — Tier-L Sudoku: on-policy corruption and board-feedback repair passes (registered 2026-10-23, before any run)
+- **Setup:** the released Sudoku-hard generator (25.5M) and tokenizer (frozen). Training data: our generated hard
+  puzzles (`assets/sudoku_train/hard.npz`, 98k, validity-preserving augmentation); val = the first 1000 of the
+  held-out 2000 (model selection and operating points); test = the 2000 released hard puzzles, scored once at
+  the end. Recipe for every arm: 5000 steps x 256 (or fewer at equal FLOPs), lr 5e-5 (200 warmup, cosine to 5e-6),
+  AdamW (0.9, 0.99), weight decay 0.01, dropout 0.1, same data order per seed (`configs/scale/L_sdk_*.yaml`,
+  `scripts/train_sudoku_L.py`).
+- **Arms:** A0 released, no training; A1 control = plain teacher forcing (the released config records no
+  corruption); A1u = A1 + NCM's uniform conditioning corruption (mean 0.5, linear 0.75 -> 0.25, clean labels);
+  A2 = conditioning codes replaced by the model's own one-step greedy predictions at A1u's rates, clean labels
+  (3750 steps); A3 repair = A1's loss on half of each batch, and on the other half one parallel pass from each
+  state of a pool of the model's own in-progress Jacobi decodes. In that pass the input is the puzzle plus a
+  zero-initialized embedding of the board decoded from the previous pass (lr x20 for this embedding), and the
+  label is the solution's canonical codes. States advance by that pass's argmax and are replaced by fresh
+  puzzles when solved or after 16 passes.
+- **Decoding:** D1 sequential greedy (12 NFE, paper protocol). D2 greedy Jacobi passes that stop at the first
+  board satisfying the rules and the clues (verifier), at a fixed point, or at the cap c in {4, 8, 12, 16, 24};
+  board feedback for A3 only (for A0-A2, D2 is training-free Jacobi with verifier stopping). D2-nocheck: the same
+  without the verifier.
+- **Operating point:** per arm, c* = the largest cap whose mean NFE on val is <= 12. The best control is the
+  max over {A0, A1, A1u} of the D2 solve rate at its own c* on val. Verifier stopping alone adds ~4 points (R020),
+  so no arm gets credit for it.
+- **H10 (B6/C5):** A3 beats the best control by >= +3 points on the test set under D2 at mean NFE <= 12. Kill:
+  < +3 points (plan, bet 3).
+- **H11 (B1a on Sudoku):** A2's D1 solve rate beats the better of A1 / A1u. Kill: < +1 point.
+- **Screen (seed 0, val n = 1000, SE ~1 point):** A2 or A3 advances to seeds 1-2 if >= +2 points over the
+  relevant control on val. A1 (and A1u if it is the best control) always gets seeds 1-2.
+- **Claim (Phase 3):** 3 seeds; mean gain > 2x the pooled seed SD and >= the kill threshold, on the test set.
+  Reported with D1, D2, D2-nocheck, mean NFE, FLOPs and solve rate by propagation depth.
+- **Sanity checks:** A0 D1 test 86.15% and D2 ~90.3% at ~2.4 passes (R020). If A1 ends > 2 points below A0 on
+  val D1, the fine-tuning recipe damages the model: lower the lr and re-run A1 before reading any arm.
+- **Caveat:** verifier stopping uses task knowledge that text tasks lack; D2-nocheck is reported for every arm.

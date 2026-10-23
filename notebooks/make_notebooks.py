@@ -101,7 +101,7 @@ for arm, what in L_ARMS.items():
                 "each step has one extra forward pass). Final eval: 4 x 256 samples, Gen-PPL (GPT-2 large and "
                 "TinyStories-33M), entropy, repetition, duplicates, MAUVE. Run seed 0 first; seeds 1-2 only for the "
                 "arms that survive (edit SEEDS).",
-        "gpu": "L4 (A100 is ~3x faster for about the same CU)", "units": 4.5, "needs": ["ts", "ckpt"], "seeds": [0],
+        "gpu": "A100 (measured 2.2 s/step, ~67 min + eval) or L4", "units": 6, "needs": ["ts", "ckpt"], "seeds": [0],
         "cmds": [f"python scripts/train_gen.py --config configs/scale/{arm}.yaml --run_dir {{R}}/{arm}_s{{S}} --seed {{S}}"],
     }
 RUNS["w2_M_ncm"] = {
@@ -184,6 +184,9 @@ for seed in SEEDS:
         c = c.format(R=R, D=D, S=seed)
         if 'scripts/train.py ' in c or 'scripts/train_gen.py ' in c:
             c += ' --data_dir /content/ts'
+        if 'configs/scale/L_ts_' in c and '--micro_batch' not in c and torch.cuda.is_available() \
+                and torch.cuda.get_device_properties(0).total_memory > 39e9:
+            c += ' --micro_batch 64'   # 40-80 GB GPUs: same optimizer step, fewer accumulation chunks (13.7 GB at 32)
         if '{S}' not in str(CMDS) and seed != SEEDS[0]:
             continue   # seed-independent notebook: run once
         print('>>>', c, flush=True)
