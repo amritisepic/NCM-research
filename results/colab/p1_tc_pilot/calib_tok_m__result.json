@@ -1,0 +1,52 @@
+{
+ "run": "calib_tok_m",
+ "kind": "tokenizer",
+ "config": {
+  "model": {
+   "embed_dim": 256,
+   "codebook": 1024,
+   "enc_layers": 0,
+   "n_heads": 4,
+   "dropout": 0.1,
+   "learned_l1": false,
+   "fine_drop": 0.5,
+   "decay": 0.95
+  },
+  "train": {
+   "steps": 300,
+   "batch_size": 128,
+   "lr": 0.001,
+   "warmup": 50,
+   "weight_decay": 0.0,
+   "ckpt_every": 500,
+   "eval_every": 300,
+   "eval_n": 1000,
+   "seed": 0,
+   "log_every": 50
+  }
+ },
+ "params_total": 8428160,
+ "params_trainable": 5282432,
+ "steps": 300,
+ "flops_est_total": 195266661580800,
+ "wall_s": 83.91399455070496,
+ "device": "cuda",
+ "torch": "2.11.0+cu130",
+ "final_eval": {
+  "val_acc_per_level": [
+   0.0728,
+   0.088,
+   0.107,
+   0.1401,
+   0.2111,
+   0.264,
+   0.3493,
+   0.5238,
+   0.5818,
+   0.6467,
+   0.7042,
+   0.9361
+  ],
+  "val_acc_full": 0.9361
+ }
+}

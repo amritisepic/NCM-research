@@ -1,0 +1,20 @@
+model:
+  embed_dim: 256
+  codebook: 1024
+  enc_layers: 0
+  n_heads: 4
+  dropout: 0.1
+  learned_l1: false
+  fine_drop: 0.5
+  decay: 0.95
+train:
+  steps: 6000
+  batch_size: 64
+  lr: 0.001
+  warmup: 200
+  weight_decay: 0.0
+  ckpt_every: 500
+  eval_every: 500
+  eval_n: 1000
+  seed: 0
+  log_every: 100

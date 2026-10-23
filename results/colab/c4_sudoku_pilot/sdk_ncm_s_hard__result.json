@@ -1,0 +1,58 @@
+{
+ "run": "sdk_ncm_s_hard",
+ "kind": "ncm",
+ "level": "hard",
+ "config": {
+  "model": {
+   "n_layer": 6,
+   "n_head": 4,
+   "n_embd": 256,
+   "dropout": 0.1
+  },
+  "train": {
+   "steps": 20000,
+   "batch_size": 64,
+   "lr": 0.001,
+   "warmup": 500,
+   "weight_decay": 0.1,
+   "ckpt_every": 500,
+   "eval_every": 2000,
+   "eval_n": 1000,
+   "seed": 0,
+   "log_every": 200
+  }
+ },
+ "params_total": 5661196,
+ "steps": 20000,
+ "wall_s": 7449.254213094711,
+ "device": "cuda",
+ "final_eval_val": {
+  "val_solved": 0.021
+ },
+ "test_released": {
+  "solved_pct": 3.0,
+  "by_propagation_depth": {
+   "le6": {
+    "n": 563,
+    "solved_pct": 6.74955595026643
+   },
+   "7-8": {
+    "n": 705,
+    "solved_pct": 2.4113475177304964
+   },
+   "9-10": {
+    "n": 322,
+    "solved_pct": 0.6211180124223602
+   },
+   "ge11": {
+    "n": 119,
+    "solved_pct": 0.8403361344537815
+   },
+   "search": {
+    "n": 291,
+    "solved_pct": 0.6872852233676976
+   }
+  },
+  "nfe_per_sample": 12
+ }
+}

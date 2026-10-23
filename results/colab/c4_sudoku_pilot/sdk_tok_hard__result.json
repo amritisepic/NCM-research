@@ -1,0 +1,36 @@
+{
+ "run": "sdk_tok_hard",
+ "kind": "tokenizer",
+ "level": "hard",
+ "config": {
+  "model": {
+   "embed_dim": 256,
+   "codebook": 16,
+   "n_heads": 4,
+   "dropout": 0.3,
+   "learned_l1": false,
+   "fine_drop": 0.5,
+   "decay": 0.99
+  },
+  "train": {
+   "steps": 6000,
+   "batch_size": 256,
+   "lr": 0.001,
+   "warmup": 300,
+   "weight_decay": 0.0,
+   "ckpt_every": 500,
+   "eval_every": 1000,
+   "eval_n": 2000,
+   "seed": 0,
+   "log_every": 200
+  }
+ },
+ "params_total": 3227520,
+ "steps": 6000,
+ "wall_s": 1660.8607952594757,
+ "device": "cuda",
+ "final_eval_val": {
+  "val_token_acc": 1.0,
+  "val_board_exact": 1.0
+ }
+}

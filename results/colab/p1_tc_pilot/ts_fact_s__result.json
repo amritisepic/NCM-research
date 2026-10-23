@@ -1,0 +1,48 @@
+{
+ "run": "ts_fact_s",
+ "kind": "ts_fact",
+ "config": {
+  "model": {
+   "n_layer": 6,
+   "n_head": 4,
+   "n_embd": 256,
+   "dropout": 0.0
+  },
+  "train": {
+   "steps": 6000,
+   "batch_size": 32,
+   "lr": 0.001,
+   "warmup": 200,
+   "weight_decay": 0.1,
+   "ckpt_every": 500,
+   "eval_every": 500,
+   "eval_n": 1000,
+   "seed": 0,
+   "log_every": 100
+  }
+ },
+ "params_total": 8416267,
+ "params_trainable": 8416267,
+ "steps": 6000,
+ "flops_est_total": 7925429698560000,
+ "wall_s": 3385.60382604599,
+ "device": "cuda",
+ "torch": "2.11.0+cu130",
+ "final_eval": {
+  "val_nll_nats_per_seq": 1228.313375,
+  "val_nll_per_level_nats_per_seq": [
+   39.27299880981445,
+   72.23200225830078,
+   99.25199890136719,
+   119.09500122070312,
+   137.8800048828125,
+   146.81300354003906,
+   91.41600036621094,
+   146.97500610351562,
+   169.62399291992188,
+   171.7779998779297,
+   33.97600173950195
+  ],
+  "val_nll_level0_unigram": 4.510337829589844
+ }
+}

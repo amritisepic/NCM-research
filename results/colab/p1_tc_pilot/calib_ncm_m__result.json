@@ -1,0 +1,48 @@
+{
+ "run": "calib_ncm_m",
+ "kind": "ncm",
+ "config": {
+  "model": {
+   "n_layer": 6,
+   "n_head": 8,
+   "n_embd": 512,
+   "dropout": 0.0
+  },
+  "train": {
+   "steps": 300,
+   "batch_size": 32,
+   "lr": 0.0006,
+   "warmup": 50,
+   "weight_decay": 0.1,
+   "ckpt_every": 500,
+   "eval_every": 300,
+   "eval_n": 1000,
+   "seed": 0,
+   "log_every": 50
+  }
+ },
+ "params_total": 20495115,
+ "params_trainable": 20495115,
+ "steps": 300,
+ "flops_est_total": 735043741286400,
+ "wall_s": 174.63098120689392,
+ "device": "cuda",
+ "torch": "2.11.0+cu130",
+ "final_eval": {
+  "val_nll_nats_per_seq": 2232.859359375,
+  "val_nll_per_level_nats_per_seq": [
+   43.33599853515625,
+   83.20899963378906,
+   116.0989990234375,
+   139.7429962158203,
+   173.5469970703125,
+   196.7270050048828,
+   153.94400024414062,
+   351.3389892578125,
+   390.5050048828125,
+   445.843994140625,
+   138.5659942626953
+  ],
+  "val_nll_level0_unigram": 3.4162487983703613
+ }
+}

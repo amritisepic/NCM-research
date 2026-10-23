@@ -1,0 +1,8 @@
+{"step": 1, "wall_s": 0.7, "loss": 9.1442, "gnorm": 13.766}
+{"step": 50, "wall_s": 16.7, "loss": 3.8131, "gnorm": 1.967}
+{"step": 100, "wall_s": 33.7, "loss": 2.877, "gnorm": 0.946}
+{"step": 150, "wall_s": 50.3, "loss": 2.6571, "gnorm": 0.841}
+{"step": 200, "wall_s": 66.7, "loss": 2.4621, "gnorm": 0.832}
+{"step": 250, "wall_s": 83.0, "loss": 2.3446, "gnorm": 0.709}
+{"step": 300, "wall_s": 99.5, "loss": 2.388, "gnorm": 0.719}
+{"step": 300, "wall_s": 101.9, "eval": {"val_nll_nats_per_seq": 292.585953125}}

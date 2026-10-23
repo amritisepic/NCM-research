@@ -1,0 +1,58 @@
+{
+ "run": "sdk_rncm_s_hard",
+ "kind": "rncm",
+ "level": "hard",
+ "config": {
+  "model": {
+   "n_layer": 6,
+   "n_head": 4,
+   "n_embd": 256,
+   "dropout": 0.1
+  },
+  "train": {
+   "steps": 20000,
+   "batch_size": 64,
+   "lr": 0.001,
+   "warmup": 500,
+   "weight_decay": 0.1,
+   "ckpt_every": 500,
+   "eval_every": 2000,
+   "eval_n": 1000,
+   "seed": 0,
+   "log_every": 200
+  }
+ },
+ "params_total": 5661196,
+ "steps": 20000,
+ "wall_s": 8177.414453268051,
+ "device": "cuda",
+ "final_eval_val": {
+  "val_solved": 0.004
+ },
+ "test_released": {
+  "solved_pct": 1.05,
+  "by_propagation_depth": {
+   "le6": {
+    "n": 563,
+    "solved_pct": 3.374777975133215
+   },
+   "7-8": {
+    "n": 705,
+    "solved_pct": 0.28368794326241137
+   },
+   "9-10": {
+    "n": 322,
+    "solved_pct": 0.0
+   },
+   "ge11": {
+    "n": 119,
+    "solved_pct": 0.0
+   },
+   "search": {
+    "n": 291,
+    "solved_pct": 0.0
+   }
+  },
+  "nfe_per_sample": 12
+ }
+}
