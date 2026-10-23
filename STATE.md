@@ -17,6 +17,7 @@ Second code audit (R028): Sudoku / WMT14 trainers fixed (S1c / J1b); P1c step 1 
 Wave 1: the user launched `w1_L_ts_{ctrl,onpol,b1}` (2026-10-23; commit to be confirmed as post-R024).
 
 ## Environment
+- Code review (R029): gated code reaches `claude/ncm-research` only via a Codex-reviewed PR; see `CLAUDE.md`.
 - Cloud agent: no GPU (4-core Xeon). Fresh containers need `pip install torch omegaconf hydra-core regex
   transformers sacrebleu pyarrow` and `bash scripts/fetch_assets.sh checkpoints` (+ `sudoku`, `tinystories`,
   `wmt14` as needed). One heavy CPU job at a time; background jobs die at 2 h.

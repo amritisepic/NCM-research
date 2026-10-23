@@ -1,0 +1,28 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["summary", "findings", "spec_concerns"],
+  "properties": {
+    "summary": { "type": "string" },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "priority", "confidence", "file", "line", "issue", "evidence", "test_to_expose", "suggested_fix"],
+        "properties": {
+          "id": { "type": "string" },
+          "priority": { "type": "string", "enum": ["P0", "P1", "P2"] },
+          "confidence": { "type": "string", "enum": ["certain", "likely", "suspicion"] },
+          "file": { "type": "string" },
+          "line": { "type": "integer" },
+          "issue": { "type": "string" },
+          "evidence": { "type": "string" },
+          "test_to_expose": { "type": "string" },
+          "suggested_fix": { "type": "string" }
+        }
+      }
+    },
+    "spec_concerns": { "type": "array", "items": { "type": "string" } }
+  }
+}
