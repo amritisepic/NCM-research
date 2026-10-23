@@ -51,3 +51,21 @@ Compute units: CPU-h = wall-clock hours on the 4-core cloud container (Xeon w/ A
   in one window. Coarse "concepts" behave like bags of words. Caveat: level-0 changes confound level 1;
   a per-window, level-0-teacher-forced version is the clean follow-up.
 - **Compute:** ~0.1 CPU-h.
+
+## R004 — Phase-0 reproduction: released Sudoku-hard checkpoint (+ H1 serial-depth analysis)
+- **Setup:** `scripts/repro_sudoku.py --level hard` (upstream generate, eager, fp32, greedy, batch 128),
+  2000 released test boards; config = released `sudoku/hard/config.yaml`.
+- **Est. compute:** ~141 TFLOP, ~10 CPU-min. **Actual:** 716 s generation wall-clock (12 min), 0.2 CPU-h.
+- **Result** (`results/phase0_sudoku_repro_hard.json`): **86.30% solved** (paper 86.1; independent repro
+  86.3) — reproduced within noise. Cell acc 98.35%, NFE 12.
+- **Per-level (full-resolution truncated decodes):** cell accuracy 14.6% (L0) … 76.0% (L9), 81.9% (L10),
+  98.4% (L11); 0% of boards solved or verifiable before the last level => level-skipping early exit
+  (e.g. upstream PR #12) can never fire on this checkpoint.
+- **H1 (pre-registered: success falls with propagation depth) — supported**
+  (`results/phase0_sudoku_depth_analysis.json`): solved 97.8% (0-4 rounds, n=46), 99.0% (5-6, n=517),
+  95.6% (7-8, n=705), 84.8% (9-10, n=322), 63.9% (>=11, n=119), 50.2% (needs search, n=291).
+  Spearman(rounds, failure | singles-solvable) = 0.30, p = 6e-36. Failures are predictable: AUC 0.87
+  from the decoder's minimum cell confidence, 0.72 from max code entropy at the last level.
+- **Decision:** adopt "serial depth" as the organizing hypothesis for the Sudoku track (C10, C4). Any
+  adaptive-compute rule for Sudoku must change the tokenizer/level schedule (C5) or *add* compute where
+  confidence is low; the released hierarchy cannot exit early.

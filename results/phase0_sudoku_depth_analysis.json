@@ -1,0 +1,68 @@
+{
+ "hard": {
+  "n": 2000,
+  "solved_pct": 86.3,
+  "by_propagation_depth": [
+   {
+    "rounds": "0-4",
+    "n": 46,
+    "solved_pct": 97.8,
+    "ci95": [
+     88.7,
+     99.6
+    ]
+   },
+   {
+    "rounds": "5-6",
+    "n": 517,
+    "solved_pct": 99.0,
+    "ci95": [
+     97.8,
+     99.6
+    ]
+   },
+   {
+    "rounds": "7-8",
+    "n": 705,
+    "solved_pct": 95.6,
+    "ci95": [
+     93.8,
+     96.9
+    ]
+   },
+   {
+    "rounds": "9-10",
+    "n": 322,
+    "solved_pct": 84.8,
+    "ci95": [
+     80.5,
+     88.3
+    ]
+   },
+   {
+    "rounds": "11-99",
+    "n": 119,
+    "solved_pct": 63.9,
+    "ci95": [
+     54.9,
+     71.9
+    ]
+   },
+   {
+    "rounds": "needs search",
+    "n": 291,
+    "solved_pct": 50.2,
+    "ci95": [
+     44.5,
+     55.9
+    ]
+   }
+  ],
+  "spearman_rounds_vs_failure_prop_solvable": [
+   0.29622595003506463,
+   5.872178872204372e-36
+  ],
+  "auc_failure_from_final_level_max_code_entropy": 0.7154669672082619,
+  "auc_failure_from_decoder_min_cell_confidence": 0.8699125017973289
+ }
+}

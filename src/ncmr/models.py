@@ -61,6 +61,11 @@ class TiedOutputVQVAE(VQVAE):
         finally:
             sys.stdout.close()
             sys.stdout = _stdout
+        # Upstream inits wte and wpe ~ N(0, 1); GroupNorm before quantization removes their common scale, so
+        # scaling both to 0.02 keeps the encoder unchanged while giving the tied output layer sane logits.
+        nn.init.normal_(self.encoder.wte.weight, std=0.02)
+        if self.encoder.wpe is not None:
+            nn.init.normal_(self.encoder.wpe.weight, std=0.02)
         self.decoder.output_layer.weight = self.encoder.wte.weight
 
 
@@ -69,13 +74,18 @@ def build_tokenizer(**kw) -> TiedOutputVQVAE:
 
 
 def tokenizer_loss(vqvae: VQVAE, x: torch.Tensor, vq_weight: float = 1.0):
-    """Reconstruction CE over all 128 positions (PAD/EOS included: the decoder must recover length)
-    + upstream vq loss (commitment + cumulative-reconstruction MSE). Returns (loss, logs)."""
-    logits, vq_loss, util, gutil, _ = vqvae(x)
+    """Reconstruction CE over all 128 positions + upstream vq loss (commitment + cumulative-reconstruction
+    MSE). Same computation as upstream VQVAE.forward, except that quantization runs with autocast disabled:
+    under bf16/fp16 autocast the nearest-code distances would be computed in low precision (bf16 resolution
+    is ~2-4 at these magnitudes), making code assignment noisy. Returns (loss, logs)."""
+    z = vqvae._encode_pre_quant(x)
+    with torch.autocast(device_type=x.device.type, enabled=False):
+        z_q, vq_loss, util, gutil, _ = vqvae.vq(z.float())
+    logits = vqvae.decoder(z_q)
     ce = F.cross_entropy(logits.float().reshape(-1, logits.shape[-1]), x.reshape(-1))
     with torch.no_grad():
         acc = (logits.argmax(-1) == x).float().mean()
-    return ce + vq_weight * vq_loss, {"ce": ce.item(), "vq": float(vq_loss), "acc": acc.item(), "util": gutil}
+    return ce + vq_weight * vq_loss, {"ce": ce.item(), "vq": vq_loss.detach().item(), "acc": acc.item(), "util": gutil}
 
 
 # ----------------------------------------------------------------------------------------------- generators
@@ -106,9 +116,11 @@ def build_ncm_generator(vqvae: VQVAE, **kw) -> NextConceptTransformer:
 
 @torch.no_grad()
 def ncm_batch(vqvae: VQVAE, x: torch.Tensor, prefix: torch.Tensor):
-    """Teacher-forcing inputs/targets for the NCM generator (as upstream VQVAE.get_ncm_inputs)."""
-    z_in, targets = vqvae.get_ncm_inputs(x)            # (B, sum(l_1..l_K), D), codes of levels 1..K-1
-    z_prefix = vqvae.encoder.wte(prefix)              # raw-token prefix, as at generation time
+    """Teacher-forcing inputs/targets for the NCM generator (as upstream VQVAE.get_ncm_inputs), computed in
+    fp32 even inside an autocast region so the codes match the tokenizer's fp32 encoding exactly."""
+    with torch.autocast(device_type=x.device.type, enabled=False):
+        z_in, targets = vqvae.get_ncm_inputs(x)        # (B, sum(l_1..l_K), D), codes of levels 1..K-1
+        z_prefix = vqvae.encoder.wte(prefix)          # raw-token prefix, as at generation time
     return torch.cat([z_prefix, z_in], dim=1), targets
 
 
