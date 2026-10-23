@@ -14,8 +14,8 @@ Each notebook pulls the latest code of the branch at start, so re-running after 
 ## Queue
 | Run | Purpose | GPU | Est. CU | Status |
 |---|---|---|---|---|
-| `p1_tc_pilot` | P1: TC decomposition of the NCM–AR gap (small models) + 300-step throughput calibration at the matched scale | T4 | ~1.5 | **requested** |
-| `c4_sudoku_pilot` | C4 kill experiment: Recurrent NCM vs NCM on Sudoku-hard (1 seed each) | T4 | ~3.0 | **requested** |
+| `p1_tc_pilot` | P1: TC decomposition of the NCM–AR gap (small models) + 300-step throughput calibration at the matched scale | T4 | ~2-4 (≈1.5-3.5 h; the two-stream probes are ~1 h of it) | **running** |
+| `c4_sudoku_pilot` | C4 kill experiment: Recurrent NCM vs NCM on Sudoku-hard (1 seed each) | T4 | ~2.5-5 (≈2-4 h; 12 small sequential level passes per step are launch-overhead bound) | **running** |
 | `calib_t4` | calibration only (subset of p1; skip if p1 ran) | T4 | 0.6 | optional |
 
-Budget: 100 CU. Spent: 0. Requested so far: ~4.5.
+Budget: 100 CU. Spent: pending first two runs (est. 4.5-9 CU). Progress check: the notebook prints `{"step": ..., "wall_s": ...}`; steps per second x remaining steps = time left.

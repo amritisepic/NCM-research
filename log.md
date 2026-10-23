@@ -101,3 +101,9 @@ Compute units: CPU-h = wall-clock hours on the 4-core cloud container (Xeon w/ A
 - **Paper read (docs/2610.14162v1.pdf):** AR baseline on TinyStories (same architecture and updates)
   Gen-PPL 8.89 vs NCM 15.41; conditioning corruption is NCM's largest ablation effect (~48 -> ~19);
   more levels keep helping. Plan revised in `docs/phase1b_reevaluation.md`.
+
+## R009 — repository hygiene (public repo)
+- Rewrote branch history (force-push with lease) so no commit carries a personal name/email or a
+  session link; trees unchanged. Later commits omit session links.
+- Colab time estimates revised upward: p1_tc_pilot ~1.5-3.5 h on a T4, c4_sudoku_pilot ~2-4 h
+  (sequential level passes are kernel-launch bound; quantization runs in fp32). Actuals to follow.
