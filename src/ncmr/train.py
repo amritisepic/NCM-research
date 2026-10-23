@@ -44,7 +44,9 @@ def lr_at(step: int, max_lr: float, warmup: int, total: int, min_frac: float = 0
 class Trainer:
     def __init__(self, run_dir: str, params, max_lr: float, total_steps: int, warmup: int = 200,
                  weight_decay: float = 0.1, betas=(0.9, 0.95), clip: float = 1.0, ckpt_every: int = 500,
-                 device: str = "cpu", amp: bool = True, min_lr_frac: float = 0.1):
+                 device: str = "cpu", amp: bool = True, min_lr_frac: float = 0.1, extra_groups=()):
+        """extra_groups: (params, lr_mult) pairs for newly added parameters (no weight decay), e.g. a zero-init
+        embedding fine-tuned next to a pretrained network at a higher learning rate."""
         os.makedirs(run_dir, exist_ok=True)
         self.run_dir, self.max_lr, self.total, self.warmup = run_dir, max_lr, total_steps, warmup
         self.min_lr_frac = min_lr_frac
@@ -52,8 +54,9 @@ class Trainer:
         params = [p for p in params if p.requires_grad]
         decay = [p for p in params if p.dim() >= 2]
         no_decay = [p for p in params if p.dim() < 2]
-        self.opt = torch.optim.AdamW([{"params": decay, "weight_decay": weight_decay},
-                                      {"params": no_decay, "weight_decay": 0.0}], lr=max_lr, betas=betas)
+        groups = [{"params": decay, "weight_decay": weight_decay}, {"params": no_decay, "weight_decay": 0.0}]
+        groups += [{"params": list(ps), "weight_decay": 0.0, "lr_mult": float(m)} for ps, m in extra_groups]
+        self.opt = torch.optim.AdamW(groups, lr=max_lr, betas=betas)
         self.ctx, self.scaler = autocast_ctx(device, amp)
         self.step = 0
         self.t_start = time.time()
@@ -100,7 +103,7 @@ class Trainer:
 
     def step_opt(self, params) -> float:
         for g in self.opt.param_groups:
-            g["lr"] = lr_at(self.step, self.max_lr, self.warmup, self.total, self.min_lr_frac)
+            g["lr"] = lr_at(self.step, self.max_lr, self.warmup, self.total, self.min_lr_frac) * g.get("lr_mult", 1.0)
         if self.scaler:
             self.scaler.unscale_(self.opt)
         gn = torch.nn.utils.clip_grad_norm_(params, self.clip)
@@ -115,7 +118,7 @@ class Trainer:
 
     def backward_step(self, loss: torch.Tensor, params) -> float:
         for g in self.opt.param_groups:
-            g["lr"] = lr_at(self.step, self.max_lr, self.warmup, self.total, self.min_lr_frac)
+            g["lr"] = lr_at(self.step, self.max_lr, self.warmup, self.total, self.min_lr_frac) * g.get("lr_mult", 1.0)
         if self.scaler:
             self.scaler.scale(loss).backward()
             self.scaler.unscale_(self.opt)

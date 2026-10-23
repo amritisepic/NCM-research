@@ -1,0 +1,9 @@
+# Tier L Sudoku (S1): fine-tune the released 25.5M Sudoku-hard generator. Arm = B6/C5: ctrl on half the batch + board-feedback repair passes (pool of in-progress Jacobi decodes) on the other half.
+# Same data order (seed), schedule and training FLOPs across arms; only the training signal differs.
+arm: repair
+model: {dropout: 0.1}
+corruption: {mean_rate: 0.5, spread: 0.5}
+repair: {max_age: 16, new_lr_mult: 20.0}
+train: {steps: 5000, batch_size: 256, lr: 5.0e-05, warmup: 200, min_lr_frac: 0.1, weight_decay: 0.01, beta2: 0.99,
+  ckpt_every: 250, eval_every: 1000, log_every: 50, seed: 0}
+eval: {n_val: 1000, caps: [4, 8, 12, 16, 24]}
