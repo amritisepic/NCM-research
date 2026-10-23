@@ -1,46 +1,47 @@
 # STATE — read this first
 
-_Last updated: 2026-10-23, session 1. Branch: `claude/ncm-research`._
+_Last updated: 2026-10-23, session 1. Branch: `claude/ncm-research`. Repo is PUBLIC: commit nothing
+identifying (no personal names/emails, no absolute local paths, no session links, no credentials)._
 
 ## Current phase
-**Phase 0 (harness + baselines)** nearly done for the released checkpoints; Phase 1 draft written
-(`docs/phase1_literature_and_candidates.md`); Phase-2 pilot P1 ready to launch on Colab.
+Phase 0 done for released checkpoints (Sudoku reproduced; TinyStories eval running). Phase 1 re-evaluated
+after reading the paper: `docs/phase1b_reevaluation.md` (bets B1-B7). Phase 2: P1 and C4 running on Colab.
 
-## Environment facts that change the plan
-- This agent runs in a **cloud container with no GPU** (4-core Xeon with AMX, 15 GB RAM), not on the
-  RTX 4050 laptop. Measured: ~0.5 TFLOPS fp32, ~2-3 TFLOPS bf16 on large matmuls. One heavy CPU job at a
-  time (two 4-thread jobs slow each other ~10x). Small pilots here; matched baselines on Colab.
-- arXiv/stanford.edu/alphaxiv are unreachable (DNS): **the NCM paper text has not been read.** Facts come
-  from code (vendored, upstream c702742), HF abstract, GitHub issues/PRs, and the independent repro
-  (HF `velaia/ncm-reproduction`). User asked to drop the PDF into `docs/`.
+## Environment
+- Cloud agent: no GPU (4-core Xeon w/ AMX; ~0.5 TFLOPS fp32, ~2-3 bf16 peak). One heavy CPU job at a time.
+- Colab (user launches notebooks from `notebooks/`, see `docs/colab_runs.md`).
+- Optional laptop GPU via a separate local session: `docs/laptop_gpu_runbook.md`.
+- Paper: `docs/2610.14162v1.pdf` (read).
 
 ## Established (measured unless marked)
-- **Sudoku-hard reproduced: 86.30%** (paper 86.1). Easy/medium: see R004+ in log.md.
-- Released TinyStories tokenizer: lookup-table encoder; ~lossless at full depth (184 ppm token errors;
-  names 918 ppm, rare words 4588 ppm); PAD never reconstructed (packed training windows).
-- Coarse codes behave like window bags-of-words (R003).
-- Sudoku success falls with constraint-propagation depth (R004): 99% at 5-6 rounds -> 64% at >=11 -> 50%
-  needing search. No board correct before the last level.
-- NCM costs ~4.25x AR FLOPs per sequence at equal params (641 vs 128 positions); its edge is NFE (11 vs 128).
-- Training code for upstream NCM is still unreleased (issues #2/#10).
+- **Sudoku reproduced:** easy 99.4 / medium 96.4 / hard 86.3 (paper 99.5 / 96.5 / 86.1), NFE 12.
+- Sudoku success falls with constraint-propagation depth (99% at 5-6 rounds -> 64% at >=11 -> 50% needing
+  search); no board correct before the last level.
+- TinyStories tokenizer: lookup encoder; ~lossless (184 ppm token errors); coarse codes are window
+  bags-of-words — with coarser levels held fixed, L1/L2 codes are 100% invariant to in-window shuffles (40-ex check).
+- Released generator's teacher-forced code NLL: 870 nats/window (6.8 nats/token); 43% in the
+  token-straddling levels (76/92/108 codes).
+- Paper (not ours): TinyStories AR 8.89 vs NCM 15.41 Gen-PPL (data-matched training; AR used ~4x fewer
+  FLOPs); conditioning corruption is NCM's biggest lever; more levels keep helping.
+- NCM costs ~4.25x AR FLOPs per sequence at equal params.
 
-## Live hypotheses
-- H3 (P1): a large share of the NCM–AR NLL gap is within-level conditional total correlation (TC).
-- H4 (C4): carrying the generator state across levels (trained with backprop through levels) raises the
-  propagation depth NCM can handle (Sudoku rounds >= 9).
-- H5 (C6): a contextual encoder removes the bag-of-words property of coarse codes.
+## Live hypotheses / bets (see docs/phase1b_reevaluation.md)
+- H3 (P1, running): within-level TC is a large share of the NCM–AR NLL gap.
+- H4 (C4, running): carrying generator state across levels raises solvable propagation depth.
+- B1 (top priority): self-correcting NCM — on-policy errors + re-quantized targets.
+- B2: Jacobi decoding across levels (exact, adaptive) — training-free test queued on CPU.
+- B7: equivalence-class soft targets (nuisance entropy). B3: CorEx/RSMI tokenizer (high risk).
 
-## Killed ideas
-- "Fix the lossy tokenizer" as a primary lever on TinyStories: full-depth error is 0.018%; not the bottleneck.
-- Level-skipping early exit with the released Sudoku hierarchy: never fires (0% solved before last level).
+## Killed / demoted
+- Fixing tokenizer loss on TinyStories (0.018% error). Level-skipping early exit on released Sudoku hierarchy.
+- C7 (importance resampling), C8 (lifting tokenizer), C11 (JEPA) demoted.
 
 ## Compute
-- Colab: 0 / 100 CU spent. Requested: `p1_tc_pilot` (~1.5 CU) and `c4_sudoku_pilot` (~3 CU) — awaiting launch (docs/colab_runs.md).
-- CPU (container): ~1.5 CPU-h so far.
+- Colab: launched p1_tc_pilot (~1.5 CU est.) and c4_sudoku_pilot (~3 CU est.); actuals pending.
+- CPU: ~3 CPU-h so far.
 
 ## Next 3 actions
-1. Finish easy/medium Sudoku repro (running); then released TinyStories generator: per-level NLL, 5x256
-   samples, full eval suite (reproduce genPPL 15.41 / entropy 3.98).
-2. Level probes (`scripts/probe_levels.py`) on the released tokenizer; then train tok_s on CPU and run the
-   same probes (lookup vs contextual encoder = C6) while Colab pilots run.
-3. When P1/C4 results arrive: `scripts/analyze_p1.py`, compare C4 arms against docs/preregistration.md.
+1. CPU queue (running): B2 Jacobi on Sudoku-hard; released TinyStories eval suite; full invariance probe;
+   level probes.
+2. Implement NCM conditioning corruption + B1 (shared code path) + B7 soft targets; small-scale kill test configs.
+3. When P1/C4 results arrive: analyze against docs/preregistration.md; update priors.
