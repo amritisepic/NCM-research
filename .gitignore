@@ -1,0 +1,11 @@
+# downloaded data and checkpoints (re-fetch with scripts/fetch_assets.sh)
+data/
+artifacts/
+runs/
+*.pt
+*.pkl
+*.bin
+*.npy
+__pycache__/
+*.pyc
+.ipynb_checkpoints/

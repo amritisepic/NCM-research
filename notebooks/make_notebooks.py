@@ -1,0 +1,147 @@
+"""Generate self-contained Colab notebooks, one per planned run (see docs/colab_runs.md).
+
+Each notebook: mounts Drive -> clones/updates the repo branch -> installs deps -> fetches data (cached on
+Drive) -> runs the commands (each resumes automatically from its Drive checkpoint, saved every
+`ckpt_every` steps, default 500) -> copies result JSONs to Drive/ncm-research/results/<run>/ for you to
+drop into the repo's results/.
+Re-running a notebook after a disconnect continues where it stopped.
+
+Usage: python notebooks/make_notebooks.py   (writes notebooks/<run>.ipynb for every RUNS entry)
+"""
+from __future__ import annotations
+
+import json
+import os
+
+REPO = "https://github.com/amritisepic/NCM-research.git"
+BRANCH = "claude/ncm-research"
+
+# name -> (description, gpu, est_units, list of commands; {R} = Drive run root, {D} = data dir)
+RUNS: dict[str, dict] = {
+    "p1_tc_pilot": {
+        "desc": "Pilot P1 (small scale) + throughput calibration. Trains the small NCM-style tokenizer, then "
+                "the factorized NCM generator, the two-stream TC probes (factorized vs within-level AR), and a "
+                "FLOP-matched AR baseline; then 300-step calibration runs at the matched 'm' scale. "
+                "Answers: how much of NCM's NLL gap to AR is within-level dependence (TC)?",
+        "gpu": "T4 (any GPU works)", "units": 1.0,
+        "cmds": [
+            "python scripts/train.py tokenizer --config configs/pilot/tok_s.yaml --run_dir {R}/tok_s",
+            "python scripts/train.py ncm --config configs/pilot/ncm_s.yaml --tokenizer {R}/tok_s/final.pt --run_dir {R}/ncm_s",
+            "python scripts/train.py ts_fact --config configs/pilot/ncm_s.yaml --tokenizer {R}/tok_s/final.pt --run_dir {R}/ts_fact_s",
+            "python scripts/train.py ts_ar --config configs/pilot/ncm_s.yaml --tokenizer {R}/tok_s/final.pt --run_dir {R}/ts_ar_s",
+            "python scripts/train.py ar --config configs/pilot/ar_s.yaml --run_dir {R}/ar_s",
+            "python scripts/train.py tokenizer --config configs/calib/tok_m.yaml --run_dir {R}/calib_tok_m",
+            "python scripts/train.py ar --config configs/calib/ar_m.yaml --run_dir {R}/calib_ar_m",
+            "python scripts/train.py ncm --config configs/calib/ncm_m.yaml --tokenizer {R}/calib_tok_m/final.pt "
+            "--run_dir {R}/calib_ncm_m",
+        ],
+    },
+    "calib_t4": {
+        "desc": "Throughput calibration: 300 steps each of tokenizer / NCM generator / AR at the 'm' scale. "
+                "Measures real TFLOPS on this GPU so all later estimates are grounded.",
+        "gpu": "T4", "units": 0.6,
+        "cmds": [
+            "python scripts/train.py tokenizer --config configs/calib/tok_m.yaml --run_dir {R}/calib_tok_m",
+            "python scripts/train.py ar --config configs/calib/ar_m.yaml --run_dir {R}/calib_ar_m",
+            "python scripts/train.py ncm --config configs/calib/ncm_m.yaml --tokenizer {R}/calib_tok_m/final.pt "
+            "--run_dir {R}/calib_ncm_m",
+        ],
+    },
+}
+
+SETUP = r'''
+import os, subprocess, sys, json, shutil, time
+from google.colab import drive
+drive.mount('/content/drive')
+DRIVE = '/content/drive/MyDrive/ncm-research'
+R = f'{DRIVE}/runs'; D = f'{DRIVE}/data/tinystories'
+os.makedirs(R, exist_ok=True); os.makedirs(D, exist_ok=True)
+REPO, BRANCH = '__REPO__', '__BRANCH__'
+if not os.path.exists('/content/NCM-research'):
+    subprocess.run(['git', 'clone', '-b', BRANCH, REPO, '/content/NCM-research'], check=True)
+else:
+    subprocess.run(f'cd /content/NCM-research && git fetch origin {BRANCH} && git checkout {BRANCH} && git reset --hard origin/{BRANCH}', shell=True, check=True)
+os.chdir('/content/NCM-research')
+print(subprocess.run(['git', 'log', '-1', '--oneline'], capture_output=True, text=True).stdout)
+subprocess.run([sys.executable, '-m', 'pip', 'install', '-q', 'omegaconf', 'hydra-core', 'regex', 'mauve-text', 'faiss-cpu'], check=True)
+'''
+
+DATA = r'''
+import urllib.request
+B = 'https://huggingface.co/datasets/hazyresearch/ncm-datasets/resolve/main/tinystories/'
+for f in ['bpe_vocab_8192.pickle', 'bpe_merges_8192.pickle', 'valid_bpe_8192.pickle',
+          'train_bpe_8192_offsets.npy', 'train_bpe_8192.bin']:
+    p = f'{D}/{f}'
+    if not os.path.exists(p):
+        print('downloading', f, flush=True)
+        urllib.request.urlretrieve(B + f, p + '.tmp'); os.replace(p + '.tmp', p)
+os.makedirs('data', exist_ok=True)
+if not os.path.exists('data/tinystories'):
+    os.symlink(D, 'data/tinystories')
+# local copy of the big stream for fast random access (Drive reads are slow)
+if not os.path.exists('/content/ts'):
+    os.makedirs('/content/ts');
+    for f in os.listdir(D): shutil.copy(f'{D}/{f}', f'/content/ts/{f}')
+import torch; print('GPU:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'none')
+'''
+
+RUN = r'''
+CMDS = __CMDS__
+for c in CMDS:
+    c = c.format(R=R, D=D) + ' --data_dir /content/ts'
+    print('>>>', c, flush=True)
+    t = time.time()
+    p = subprocess.run(c, shell=True)
+    print(f'<<< exit {p.returncode} after {(time.time()-t)/60:.1f} min', flush=True)
+    if p.returncode != 0:
+        raise SystemExit('command failed; fix and re-run this cell (it resumes)')
+'''
+
+COLLECT = r'''
+out = f'{DRIVE}/results/__NAME__'; os.makedirs(out, exist_ok=True)
+for c in CMDS:
+    rd = c.split('--run_dir ')[1].split()[0].format(R=R)
+    name = os.path.basename(rd)
+    for f in ['result.json', 'metrics.jsonl', 'config.yaml']:
+        if os.path.exists(f'{rd}/{f}'):
+            shutil.copy(f'{rd}/{f}', f'{out}/{name}__{f}')
+gpu = torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'cpu'
+json.dump({'run': '__NAME__', 'gpu': gpu, 'finished': time.ctime()}, open(f'{out}/_meta.json', 'w'))
+print('Results copied to', out, '-> please drop this folder into the repo under results/colab/')
+'''
+
+
+def cell(src: str, kind: str = "code") -> dict:
+    lines = src.strip("\n").splitlines(keepends=True)
+    c = {"cell_type": kind, "metadata": {}, "source": lines}
+    if kind == "code":
+        c.update({"execution_count": None, "outputs": []})
+    return c
+
+
+def make(name: str, spec: dict) -> dict:
+    head = (f"# NCM research run: `{name}`\n\n{spec['desc']}\n\n"
+            f"- Recommended GPU: **{spec['gpu']}**. Estimated cost: **{spec['units']} compute units**.\n"
+            "- Runtime > Change runtime type > GPU, then Runtime > Run all.\n"
+            "- If Colab disconnects, just Run all again: every command resumes from its last Drive checkpoint.\n"
+            f"- When done, copy `MyDrive/ncm-research/results/{name}/` into the repo's `results/colab/`.")
+    return {
+        "nbformat": 4, "nbformat_minor": 5,
+        "metadata": {"accelerator": "GPU", "colab": {"provenance": []},
+                     "kernelspec": {"name": "python3", "display_name": "Python 3"}},
+        "cells": [
+            cell(head, "markdown"),
+            cell(SETUP.replace("__REPO__", REPO).replace("__BRANCH__", BRANCH)),
+            cell(DATA),
+            cell(RUN.replace("__CMDS__", json.dumps(spec["cmds"], indent=1))),
+            cell(COLLECT.replace("__NAME__", name)),
+        ],
+    }
+
+
+if __name__ == "__main__":
+    here = os.path.dirname(os.path.abspath(__file__))
+    for name, spec in RUNS.items():
+        with open(os.path.join(here, f"{name}.ipynb"), "w") as f:
+            json.dump(make(name, spec), f, indent=1)
+        print("wrote", f"notebooks/{name}.ipynb")

@@ -1,0 +1,4 @@
+# P1 tokenizer (CPU): NCM-style multiscale residual VQ, lookup encoder (as released NCM), scaled to ~8.4M params.
+# Levels = NCM TinyStories schedule [1,8,...,128]; codebook 1024 x 256 (NCM: 4096 x 384).
+model: {embed_dim: 256, codebook: 1024, enc_layers: 0, n_heads: 4, dropout: 0.1, learned_l1: false, fine_drop: 0.5, decay: 0.95}
+train: {steps: 4000, batch_size: 64, lr: 1.0e-3, warmup: 200, weight_decay: 0.0, ckpt_every: 500, eval_every: 500, eval_n: 1000, seed: 0, log_every: 100}
