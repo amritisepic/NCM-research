@@ -15,6 +15,16 @@
   108,
   128
  ],
+ "top_names": [
+  "tim",
+  "lily",
+  "tom",
+  "max",
+  "sue",
+  "sam",
+  "ben",
+  "mia"
+ ],
  "probes": {
   "L0": {
    "main_char_code": 0.281,
@@ -63,6 +73,57 @@
    "tok64_cum": 0.107,
    "order_cum": 0.717,
    "source": "transcribed from the run log of the interrupted full run (3 decimals)"
+  },
+  "L4": {
+   "main_char_code": 0.785046081498121,
+   "dialogue_code": 0.8720739364929531,
+   "content_code": 0.8258287455749245,
+   "tok64_code": 0.10566037735849057,
+   "main_char_cum": 0.852891902672517,
+   "dialogue_cum": 0.9397138623973236,
+   "content_cum": 0.8733881349732373,
+   "tok64_cum": 0.09811320754716982,
+   "order_cum": 0.6859999999999999
+  },
+  "L5": {
+   "main_char_code": 0.7516228245124179,
+   "dialogue_code": 0.8483759906527701,
+   "content_code": 0.7991064692644977,
+   "tok64_code": 0.10314465408805032,
+   "main_char_cum": 0.8831398400268722,
+   "dialogue_cum": 0.9431644760433512,
+   "content_cum": 0.8838878615338839,
+   "tok64_cum": 0.09559748427672957,
+   "order_cum": 0.6744999999999999
+  },
+  "L6": {
+   "main_char_code": 0.6810268091449206,
+   "dialogue_code": 0.7976401652316888,
+   "content_code": 0.7613201394851598,
+   "tok64_code": 0.11257861635220126,
+   "main_char_cum": 0.8858868851426532,
+   "dialogue_cum": 0.9425618515260155,
+   "content_cum": 0.8887944431569412,
+   "tok64_cum": 0.0949685534591195,
+   "order_cum": 0.6621250000000001
+  },
+  "L7": {
+   "main_char_code": 0.8464793315558541,
+   "dialogue_code": 0.8407152410156268,
+   "content_code": 0.8364887479087191,
+   "tok64_code": 0.11509433962264151,
+   "main_char_cum": 0.8900100770474252,
+   "dialogue_cum": 0.9429019875804373,
+   "content_cum": 0.8896538571312604,
+   "tok64_cum": 0.09559748427672957,
+   "order_cum": 0.680375
   }
+ },
+ "chance": {
+  "main_char": 0.3629697525206233,
+  "dialogue_balanced": 0.5,
+  "content_balanced": 0.5,
+  "tok@64": 0.18742138364779873,
+  "order_balanced": 0.5
  }
 }
