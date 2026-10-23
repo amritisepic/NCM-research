@@ -289,3 +289,28 @@ Compute units: CPU-h = wall-clock hours on the 4-core cloud container (Xeon w/ A
   level, 20% with three, saturates at 63% after six. A repair level built from the finest codebook is a weak
   correction channel (16 codes meant for tiny residuals). Decision: the repair arm uses a representationally
   complete pass instead (re-predict the whole hierarchy conditioned on the current board; `preregistration.md` S1).
+
+## R022 — throughput -> step counts; Sudoku and WMT14 tier-L builds (2026-10-23)
+- **Calibration (w0, A100-40GB, user-uploaded `calib_*__calib.json`):** tier L fine-tune 2.23 s/step at 256 windows
+  = **39.2 useful TFLOPS** (13.7 GB peak at micro-batch 32); tier M NCM from scratch 1.11 s/step = 24.7 TFLOPS; tier M
+  AR 0.133 s/step = 44.2 TFLOPS. The plan assumed ~3x the L4 rate on an A100 (75-117 TFLOPS) -> 33-52%, below the
+  60% rule. **Wave-1 steps cut to 45%** (W1a: 1800 / 1350 / 1080; ~6 CU per arm on an A100). Notebooks use
+  micro-batch 64 on >= 40 GB GPUs (same optimizer step).
+- **Tier M is over the per-run cap at this throughput:** `M_ncm` 15k steps ~ 4.6 A100-h ~ 25 CU per seed, `M_ar`
+  70k steps ~ 14 CU. Both on hold; re-plan after wave 1 (a run > 15 CU needs the user's approval).
+- **Sudoku tier L built** (`scripts/train_sudoku_L.py`, `src/ncmr/jacobi_train.py`, `configs/scale/L_sdk_*.yaml`;
+  pre-registered S1/S1a): arms ctrl / uniform / onpolicy / repair (board-feedback parallel passes trained on the
+  model's own in-progress Jacobi decodes). Checks: the shared Jacobi decoder's fixed point equals sequential
+  decoding on 100/100 val puzzles (6.32 passes); clean hierarchy = upstream inputs exactly; all four arms train,
+  evaluate, resume (incl. the repair pool) and run eval-only on CPU. Cost re-estimate ~5 CU per 5000-step arm ->
+  halved to 2500 steps (S1a). Carry not included (R019).
+- **WMT14 target format found from the released generator's teacher-forced NLL** (48 newstest2014 pairs, nats/seq):
+  English ids + EOS + PAD padding 392.5; PAD padding 459.7; packed text 1014.2; EOS padding 2706.2. The tokenizer
+  reconstructs the PAD tail poorly (45% of all 64 positions) but decoding cuts at the first EOS.
+- **WMT14 tier L built** (`scripts/prep_wmt14.py`, `scripts/train_wmt14_L.py`, `configs/scale/L_wmt_*.yaml`;
+  pre-registered J1): control (teacher forcing on references, 3000 x 128) vs self-consistency on the model's own
+  greedy Jacobi trajectories (2000 steps, equal FLOPs). CPU smoke test: both losses, trajectory sampling, fp32 eval;
+  fixed point = sequential output in 100% of the smoke sentences. Data: 400k pairs from HF `wmt/wmt14`, val =
+  newstest2013 (3000; 2953 within the 63-id target limit for NLL).
+- Notebooks: `w2b_L_sdk_*` (4), `w2c_L_wmt_*` (2), `p1b_tc_rerun`; seed-independent commands now run once per
+  notebook. CPU: ~0.7 h this session.

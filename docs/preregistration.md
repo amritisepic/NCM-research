@@ -126,3 +126,28 @@
 - 5000 x 256 is ~83 PFLOP per arm. At the ~25 TFLOPS that wave 0 measured for a 25M generator on an A100
   (`calib_M__calib.json`), that is ~5 CU per arm, not the planned 1.3. Every S1 arm therefore runs half its
   steps: A1 / A1u / A3 2500, A2 1875 (val curves every 500). Nothing else in S1 changes.
+
+## J1 — WMT14 self-consistency fine-tune for early exact Jacobi convergence (criterion d, text) (registered 2026-10-23, before any run)
+- **Setup:** the released WMT14 De-En NCM (120M generator, 11 levels, greedy) and tokenizer (frozen). Training
+  pairs: 400k sampled uniformly (seed 0) from the HF `wmt/wmt14` de-en training set in the released format
+  (`scripts/prep_wmt14.py`); val = newstest2013 (3000, selection); test = newstest2014 (3003), scored once at the
+  end. Recipe for both arms: batch 128, lr 5e-5 (200 warmup, cosine to 5e-6), AdamW (0.9, 0.95), weight decay
+  0.01, dropout 0.1, same data order per seed (`configs/scale/L_wmt_*.yaml`, `scripts/train_wmt14_L.py`).
+- **Arms:** J0 released, no training (w0: 11.07 exact passes, BLEU 22.63 on test). J1 control = teacher forcing
+  on reference translations, 3000 steps. J2 consist = J1's loss on half of each batch; on the other half, the
+  current model's greedy Jacobi trajectory is run to its fixed point (no grad), 4 input states are sampled
+  uniformly from those before the fixed point, and one parallel pass from each is trained to output the fixed
+  point. 2000 steps (equal training FLOPs, trajectory passes counted).
+- **Decoding:** exact Jacobi (stop when no code changes; output identical to the model's own sequential greedy
+  output, verified per sentence), fp32. NFE = passes including the one that detects convergence; sequential = 11.
+- **H12 (B2-trained):** J2 reaches mean exact passes <= 8.25 on test (>= 25% fewer than 11) with BLEU >= 21.63
+  (J0 - 1). This meets the text half of criterion (d). Kill: J2 saves < 25% NFE at < 1 BLEU loss, or J2's
+  passes are not below J1's by >= 1.
+- **Screen (seed 0, val):** J2 advances to seeds 1-2 if val passes <= 9.0 and val BLEU >= J0 val BLEU - 1.
+  J1 gets seeds 1-2 if J2 advances.
+- **Claim:** 3 seeds; passes <= 8.25 and BLEU loss < 1 vs J0 on test in the seed mean, and the pass reduction vs J1
+  > 2x the pooled seed SD. Reported with the pass histogram, FLOPs (each Jacobi pass processes every level) and
+  wall-clock. Per the brief, a result believed to meet criterion (d) goes to the user before more compute is
+  spent on it.
+- **Sanity checks:** J0 re-evaluation reproduces 11.07 passes / 22.63 BLEU. If J1 loses > 1 BLEU vs J0, the
+  recipe damages the model: lower the lr and re-run J1 before reading J2.

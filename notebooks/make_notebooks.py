@@ -129,6 +129,23 @@ for arm, what in SDK_ARMS.items():
                 "at caps 4-24. Run seed 0 first; seeds 1-2 only for the control and arms that pass the screen.",
         "gpu": "A100 or L4", "units": 2.5, "needs": ["ckpt"], "seeds": [0], "cmds": cmds,
     }
+WMT_PREP = ("python scripts/prep_wmt14.py --n 400000 --cache {R}/../data/wmt14_hf "
+            "--out {R}/../data/wmt14_train_pairs.npz")
+for arm, what in {"ctrl": "control: teacher forcing on reference translations (also re-evaluates the released model once, J0)",
+                  "consist": "B2-trained: self-consistency on the model's own Jacobi trajectories"}.items():
+    cmds = [WMT_PREP]
+    if arm == "ctrl":
+        cmds.append("python scripts/train_wmt14_L.py --config configs/scale/L_wmt_ctrl.yaml --run_dir {R}/L_wmt_released "
+                    "--data {R}/../data/wmt14_train_pairs.npz --eval_only")
+    cmds.append(f"python scripts/train_wmt14_L.py --config configs/scale/L_wmt_{arm}.yaml --run_dir {{R}}/L_wmt_{arm}_s{{S}} "
+                f"--seed {{S}} --data {{R}}/../data/wmt14_train_pairs.npz")
+    RUNS[f"w2c_L_wmt_{arm}"] = {
+        "desc": f"Wave 2c, tier L WMT14 De-En (pre-registered J1): fine-tune the released 120M NCM; arm = {what}. "
+                "Goal (criterion d, text): exact Jacobi decoding converges in <= 8.25 of 11 passes at < 1 BLEU loss. "
+                "First run downloads ~0.8 GB of WMT14 training data to Drive and tokenizes 400k pairs (~10 min). "
+                "Run seed 0 first.",
+        "gpu": "A100 or L4", "units": 4, "needs": ["ckpt", "wmt14"], "seeds": [0], "cmds": cmds,
+    }
 RUNS["w2_M_ncm"] = {
     "desc": "Wave 2, tier M: NCM generator from scratch (d512 x 8, 25M body) on the released tokenizer, paper recipe "
             "with conditioning corruption; ~411 PFLOP. Matched baseline for Phase 3 (3 seeds).",
@@ -231,7 +248,7 @@ for seed in SEEDS:
             continue
         rd = c.split('--run_dir ')[1].split()[0].format(R=R, S=seed)
         name = os.path.basename(rd)
-        for f in ['result.json', 'metrics.jsonl', 'config.yaml', 'calib.json', 'eval_final.json', 'eval_15k.json', 'samples_final.json']:
+        for f in ['result.json', 'metrics.jsonl', 'config.yaml', 'calib.json', 'hyp_test.json', 'eval_final.json', 'eval_15k.json', 'samples_final.json']:
             if os.path.exists(f'{rd}/{f}'):
                 shutil.copy(f'{rd}/{f}', f'{out}/{name}__{f}')
 for f in os.listdir('results'):   # diagnostics write straight into the repo's results/

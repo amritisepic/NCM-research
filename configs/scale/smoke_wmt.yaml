@@ -1,0 +1,6 @@
+# CPU smoke test for scripts/train_wmt14_L.py
+arm: consist
+consist: {states_per_traj: 4}
+train: {steps: 3, batch_size: 8, lr: 5.0e-05, warmup: 1, min_lr_frac: 0.1, weight_decay: 0.01, beta2: 0.95,
+  ckpt_every: 2, eval_every: 3, log_every: 1, seed: 0}
+eval: {n_curve: 4}
