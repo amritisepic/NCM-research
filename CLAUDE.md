@@ -14,8 +14,8 @@ Codex (OpenAI) is the independent reviewer. Past audits caught bugs that would h
    `python scripts/review/codex_pr.py wait <PR>` (polls up to 90 min; run it in the background or with Monitor).
 3. Triage every P0/P1 comment in `docs/reviews/triage_pr<N>.md`, in the table format of
    `docs/reviews/triage_2026-10-23.md`: the comment id, the finding, verdict (**accept**, **partial**, **reject**)
-   with evidence, and the action. Reproduce a finding before acting on it. Add a regression test for every
-   accepted correctness finding.
+   with evidence, and the action. The gate counts an id only on a line that also says accept / partial /
+   reject. Reproduce a finding before acting on it. Add a regression test for every accepted correctness finding.
 4. If you changed code, push, then `request` and `wait` again (this reviews the new head). At most two
    review rounds; if a P0/P1 is still disputed after round two, stop and ask the user.
 5. `python scripts/review/codex_pr.py merge <PR>`. It merges only if Codex responded to the current head and
@@ -26,7 +26,7 @@ Required before launching any Colab run whose trainer, sampler, corruption, eval
 the last deep audit, and before claiming any success-bar result. Write the brief from
 `docs/reviews/AUDIT_BRIEF_TEMPLATE.md`, then:
 - Cloud session: `python scripts/review/codex_pr.py request <PR> --audit-file <brief>` (Codex works in its
-  cloud and pushes the audit doc and tests to the PR branch), then `wait`.
+  cloud and pushes the audit doc and tests to the PR branch), then `wait <PR> --audit`.
 - Laptop session with `codex login` done: `scripts/review/codex_local.sh audit <id> <brief>` (gpt-6.1-sol at
   ultra effort by default; the audit lands on branch `codex/<id>`).
 Then triage as in R028: re-run the audit's suite first (strict xfails must fail), fix, port the tests to the

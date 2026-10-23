@@ -18,6 +18,7 @@ Wave 1: the user launched `w1_L_ts_{ctrl,onpol,b1}` (2026-10-23; commit to be co
 
 ## Environment
 - Code review (R029): gated code reaches `claude/ncm-research` only via a Codex-reviewed PR; see `CLAUDE.md`.
+  **Blocked:** Codex has not responded on PR #1; the user must enable Codex code review for the repo.
 - Cloud agent: no GPU (4-core Xeon). Fresh containers need `pip install torch omegaconf hydra-core regex
   transformers sacrebleu pyarrow` and `bash scripts/fetch_assets.sh checkpoints` (+ `sudoku`, `tinystories`,
   `wmt14` as needed). One heavy CPU job at a time; background jobs die at 2 h.
