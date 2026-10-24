@@ -1,0 +1,209 @@
+{
+  "audit_ref": "c91126a6bcf229721ef59379a27999b1e9c8f0ba",
+  "subject_git_blob_sha256": {
+    "scripts/train_wmt14_L.py": "d9ae2af24ad88fd4f68e5df7bd7a34d471b4c6d335944ac52c46a3a1866b2add",
+    "scripts/prep_wmt14.py": "3d85f0bcca2cbdc08d0ff7503e440b43488aa6384c504a04482b8c87a5c46b9a",
+    "src/ncmr/jacobi_train.py": "b370ba48c74c97af740f535c0702971c277615bd04fd1e0a4f9b1a6db7103e4b",
+    "src/ncmr/train.py": "b54bab13628524d5d7b84e1e33cafeca53631995e97dce9e0b214e90280e5832",
+    "configs/scale/L_wmt_ctrl.yaml": "e96d973ea8073de3f8f5b164b2b7245ff8e23f694d2364e54bce8c5336f4a909",
+    "configs/scale/L_wmt_consist.yaml": "c18c399d8b51d9d093ce7f079fe29d50ab963e4bdc6b91a2a8eb3d287dc0a45f",
+    "notebooks/make_notebooks.py": "25ad11d2cee924f24deac92f59048a29958912d8898102fc6539eaf632810846",
+    "docs/preregistration.md": "882580e68e97bc22d59fa7f2c7dd8ee8121fcd238f7494caee1ad348fbca86b0",
+    "log.md": "99b0112b7945c33b8aace43a0e9aa1db92c8c6b9957b7cd180e59c65e79aec36"
+  },
+  "results_utf8_lf_sha256": {
+    "results/colab/w0_calib_diag/b2_jacobi_wmt14_n3003.json": "a72a607abcb66f3932d1dadadfde8e2f70867280c61ceaf8ffae831c09f1a146",
+    "results/b2_jacobi_wmt14_n6.json": "5bceca0c5820ad28f4c623b4a28fe1bc152e9afb1bcd5c7943c13452c499c5d9",
+    "results/colab/w0_calib_diag/b2_jacobi_wmt14_n6.json": "5bceca0c5820ad28f4c623b4a28fe1bc152e9afb1bcd5c7943c13452c499c5d9"
+  },
+  "history": {
+    "R020": {
+      "source": "results/colab/w0_calib_diag/b2_jacobi_wmt14_n3003.json",
+      "n": 3003,
+      "exact_total_passes": 33233,
+      "exact_histogram": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        2,
+        38,
+        155,
+        517,
+        1136,
+        1154
+      ],
+      "exact_mean": 11.066600066600067,
+      "exact_nfe_saving_pct": -0.6054551509097061,
+      "saved_stable_mean": 10.588411588411589,
+      "implied_stable_total_passes": 31797,
+      "saved_bleu_exact": 22.625980088896835,
+      "saved_bleu_stable": 22.639255560616412,
+      "saved_first_final_output_pass_mean": 9.58075258075258,
+      "unrounded_baseline_minus_one": 21.625980088896835,
+      "checks": [
+        {
+          "id": "R020_wmt_n",
+          "log_value": 3003,
+          "recomputed_or_readback": 3003,
+          "method": "sum(exact_passes_hist)",
+          "independently_recomputed": true,
+          "matches": true
+        },
+        {
+          "id": "R020_wmt_exact_passes",
+          "log_value": 11.07,
+          "recomputed_or_readback": 11.066600066600067,
+          "method": "sum(pass * count) / sum(count)",
+          "independently_recomputed": true,
+          "matches": true
+        },
+        {
+          "id": "R020_wmt_sequential_nfe",
+          "log_value": 11,
+          "recomputed_or_readback": 11,
+          "method": "aggregate field readback",
+          "independently_recomputed": false,
+          "matches": true
+        },
+        {
+          "id": "R020_wmt_exact_bleu",
+          "log_value": 22.63,
+          "recomputed_or_readback": 22.625980088896835,
+          "method": "aggregate field readback; hypotheses absent",
+          "independently_recomputed": false,
+          "matches": true
+        },
+        {
+          "id": "R020_wmt_stable_passes",
+          "log_value": 10.59,
+          "recomputed_or_readback": 10.588411588411589,
+          "method": "aggregate field readback; per-sentence stable passes absent",
+          "independently_recomputed": false,
+          "matches": true
+        },
+        {
+          "id": "R020_wmt_stable_bleu",
+          "log_value": 22.64,
+          "recomputed_or_readback": 22.639255560616412,
+          "method": "aggregate field readback; hypotheses absent",
+          "independently_recomputed": false,
+          "matches": true
+        },
+        {
+          "id": "R020_wmt_sequential_equality_pct",
+          "log_value": 100.0,
+          "recomputed_or_readback": 100.0,
+          "method": "aggregate field readback; per-sentence codes absent",
+          "independently_recomputed": false,
+          "matches": true
+        },
+        {
+          "id": "R020_wmt_25pct_target",
+          "log_value": 8.25,
+          "recomputed_or_readback": 8.25,
+          "method": "0.75 * 11",
+          "independently_recomputed": true,
+          "matches": true
+        },
+        {
+          "id": "R020_wmt_bleu_floor",
+          "log_value": 21.63,
+          "recomputed_or_readback": 21.63,
+          "method": "rounded registered baseline minus 1; unrounded floor is also reported",
+          "independently_recomputed": false,
+          "matches": true
+        },
+        {
+          "id": "R020_json_exact_mean_consistency",
+          "log_value": 11.066600066600067,
+          "recomputed_or_readback": 11.066600066600067,
+          "method": "histogram mean vs saved mean",
+          "independently_recomputed": true,
+          "matches": true
+        },
+        {
+          "id": "R020_json_exact_nfe_saving_pct",
+          "log_value": -0.6054551509097061,
+          "recomputed_or_readback": -0.6054551509097061,
+          "method": "100 * (1 - mean / 11)",
+          "independently_recomputed": true,
+          "matches": true
+        },
+        {
+          "id": "R020_json_position_proxy_ratio",
+          "log_value": 3.3005649321438795,
+          "recomputed_or_readback": 3.3005649321438795,
+          "method": "mean * saved position-count ratio",
+          "independently_recomputed": false,
+          "matches": true
+        },
+        {
+          "id": "R020_n6_is_stale_copy",
+          "log_value": 1,
+          "recomputed_or_readback": 1,
+          "method": "byte equality of both n6 artifacts",
+          "independently_recomputed": true,
+          "matches": true
+        }
+      ]
+    },
+    "R028": {
+      "status": "unverifiable_from_results_json",
+      "old_early_stop_proxy": {
+        "method": "registered row-count algebra, not a historical execution measurement",
+        "full_teacher_rows_per_step": 576,
+        "two_pass_teacher_rows_per_step": 416,
+        "two_pass_total_rows": 832000,
+        "shortfall_pct": 27.77777777777778,
+        "log_rounded_shortfall_pct": 28
+      },
+      "results_json_count": 62,
+      "wmt_named_json": [
+        "results/b2_jacobi_wmt14_n6.json",
+        "results/colab/w0_calib_diag/b2_jacobi_wmt14_n3003.json",
+        "results/colab/w0_calib_diag/b2_jacobi_wmt14_n6.json"
+      ],
+      "other_json_mentioning_wmt": [],
+      "missing_evidence": [
+        "WMT14 consistency smoke fp32 teacher execution and zero degenerate sources",
+        "caps 1-12, val/test ordered hypotheses and exact/sequential sentence equality in that smoke",
+        "20k prep smoke archive selection equality and mismatch-refusal transcript",
+        "historical 59-test total / 25 audit-2 tests / 14 pre-fix failures as a saved test report"
+      ],
+      "interpretation": "No matching WMT smoke JSON is present. Prose and current code tests do not reproduce a historical run."
+    },
+    "disagreements": [],
+    "limitations": [
+      "R020 stores aggregate WMT summaries only: no per-sentence hypotheses, references, codes or stable-pass records.",
+      "BLEU, stable mean, output equality and first-final-output mean cannot be independently rederived from these JSON files.",
+      "R028 WMT smoke artifacts were not committed under results; zero degenerates and 20k selection equality are unverified.",
+      "The old n6 files report sequential_nfe=10; they are excluded as the log explicitly calls them stale.",
+      "Saved exact_flops_ratio is a position-count proxy, not an attention-inclusive execution measurement."
+    ]
+  },
+  "cpu_evidence": {
+    "torch": "2.6.0+cu124",
+    "numpy": "2.4.6",
+    "device": "cpu",
+    "threads": 4,
+    "model": "tiny upstream WMT-style NCM: 11 levels, source-prefix L0 head, dropout 0.1, EOS/PAD targets",
+    "trainable_tensors": 41,
+    "finite_nonzero_gradient_tensors": 41,
+    "trainable_elements": 16235,
+    "gradient_reached_elements": 16235,
+    "gradient_definition": "Reached means a parameter tensor has a finite gradient with nonzero norm; element totals count sizes of reached parameter tensors, not nonzero scalar gradients.",
+    "amp_val_nll": 548.315185546875,
+    "fp32_val_nll": 548.3743286132812,
+    "nll_difference": -0.05914306640625,
+    "nondegenerate_proxy_rows": 576,
+    "one_degenerate_proxy_rows": 564,
+    "all_degenerate_proxy_rows": 384,
+    "registered_total_forward_rows": 1152000,
+    "consist_total_without_degenerates": 1152000,
+    "limits": "CPU evidence on a small upstream model; not a gradient census or BLEU rerun on the released 120M WMT weights; CUDA not tested."
+  }
+}

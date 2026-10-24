@@ -26,14 +26,16 @@ def parallel_logits(net, z_prefix: torch.Tensor, codes: torch.Tensor, pad_mask: 
 
 @torch.no_grad()
 def jacobi_decode(net, prefix_fn, n: int, S: int, device, max_passes: int, pad_mask=None, check_fn=None,
-                  keep_history: bool = False, full_budget: bool = False):
+                  keep_history: bool = False, full_budget: bool = False, initial_fixed_ok: bool = False):
     """Greedy Jacobi decoding with per-sample stopping.
 
     prefix_fn(codes, has_prev) -> z_prefix: lets the prefix depend on the previous pass (board feedback);
     has_prev is False on pass 1. check_fn(codes) -> bool tensor (n,): optional task check (stop when True).
     Returns dict(codes=(n, S) final codes, nfe=(n,) passes used, stop=(n,) 0 = cap, 1 = fixed point, 2 = check,
     history=list of (n, S) codes per pass if keep_history). full_budget: always run max_passes passes (stopped
-    samples keep their codes), so the executed compute is fixed (training teacher, codex audit2 A2-7)."""
+    samples keep their codes), so the executed compute is fixed (training teacher, codex audit2 A2-7).
+    initial_fixed_ok: a static prefix_fn may detect convergence on pass 1 (WMT14; codex audit 4, A4-4); the
+    default keeps pass-1 detection off for prefixes that change after the first pass (board feedback)."""
     codes = torch.zeros(n, S, dtype=torch.long, device=device)
     done = torch.zeros(n, dtype=torch.bool, device=device)
     nfe = torch.full((n,), max_passes, dtype=torch.long, device=device)
@@ -43,7 +45,7 @@ def jacobi_decode(net, prefix_fn, n: int, S: int, device, max_passes: int, pad_m
         logits = parallel_logits(net, prefix_fn(codes, t > 1), codes, pad_mask).float()
         new = logits.argmax(-1)
         new = torch.where(done[:, None], codes, new)
-        fixed = (new == codes).all(1) & ~done & (t > 1)
+        fixed = (new == codes).all(1) & ~done & (initial_fixed_ok or t > 1)
         chk = check_fn(new) & ~done & ~fixed if check_fn is not None else torch.zeros_like(done)
         for m, code in ((fixed, 1), (chk, 2)):
             nfe[m], stop[m] = t, code
