@@ -61,6 +61,15 @@ def test_fresh_run_records_start_and_end(tmp_path):
     assert rec[0]["had_ckpt"] is False and rec[1]["exit"] == 0
 
 
+def test_provenance_records_no_absolute_path(tmp_path):
+    """Codex PR 7 comment 4367597222: provenance is published with the results, so it records the command template."""
+    run_cell(tmp_path, "a" * 40, FakeSubprocess())
+    rec = records(tmp_path / "L_ts_ctrl_s0")
+    values = [v for r in rec for v in r.values() if isinstance(v, str)]
+    assert not any(str(tmp_path) in v or str(tmp_path).replace("\\", "/") in v for v in values)
+    assert rec[0]["cmd"] == CMD and rec[0]["seed"] == 0
+
+
 def test_refuses_checkpoint_without_provenance(tmp_path):
     """Codex PR 3 comment 4365630299: a checkpoint from before provenance existed must not resume silently."""
     rd = tmp_path / "L_ts_ctrl_s0"

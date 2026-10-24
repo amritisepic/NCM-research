@@ -291,7 +291,11 @@ for seed in SEEDS:
                     raise SystemExit(f'{rd} was trained in a session at commit {old[:9]}; the code under {CODE_PATHS} differs '
                                      f'from now ({GIT_SHA[:9]}). Resuming would mix code versions: rename the run directory '
                                      'to start fresh, or set ALLOW_CODE_CHANGE = True only if you mean it.')
-            provenance(rd, {'event': 'start', 'git_sha': GIT_SHA, 'utc': utc(), 'gpu': GPU, 'cmd': c,
+            # the command as a template ({R} = the Drive run root) plus the flags this cell added: no absolute path is
+            # recorded, because provenance is published with the results (Codex PR 7)
+            provenance(rd, {'event': 'start', 'git_sha': GIT_SHA, 'utc': utc(), 'gpu': GPU, 'cmd': CMDS_RAW[i],
+                            'seed': seed, 'local_data_copy': ' --data_dir /content/ts' in c,
+                            'micro_batch_64': ' --micro_batch 64' in c,
                             'had_ckpt': os.path.exists(f'{rd}/ckpt.pt'), 'last_logged_step': last_step(rd)})
         print('>>>', c, flush=True)
         t = time.time()

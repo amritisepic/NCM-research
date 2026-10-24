@@ -75,15 +75,20 @@ def oracle_sample(net, tok, L0, x, j, g, dev, temp=1.0, return_codes=False):
     return (out, codes) if return_codes else out
 
 
-def reproduction(per_group, seeds, expect):
+def reproduction(per_group, seeds, expect, tol=0.01):
     """Compare this run's T = 1 groups with a wave-1 result's groups for the same seeds. Both lists are in sorted-seed
-    order (evaluate_samples sorts its groups); returns per-seed pairs and the largest absolute difference."""
+    order (evaluate_samples sorts its groups). ok only if every requested seed has a wave-1 group, every value is finite
+    and no group differs by more than tol (W1d: a wrong checkpoint or sampler must not pass; Codex PR 7)."""
     fe = expect["final_eval"]
     theirs = dict(zip(sorted(int(s) for s in expect["config"]["sample_eval"]["final_seeds"]),
                       fe["genppl_gpt2-large_per_group"]))
     ours = dict(zip(sorted(seeds), per_group))
     pairs = {s: [ours[s], theirs[s]] for s in sorted(ours) if s in theirs}
-    return {"pairs": pairs, "max_abs_diff": max((abs(u - v) for u, v in pairs.values()), default=None)}
+    missing = sorted(s for s in ours if s not in theirs)
+    finite = all(np.isfinite(v) for pair in pairs.values() for v in pair)
+    diff = max((abs(u - v) for u, v in pairs.values()), default=float("inf")) if finite else float("inf")
+    return {"pairs": pairs, "missing_seeds": missing, "max_abs_diff": diff, "tol": tol,
+            "ok": bool(pairs) and not missing and finite and diff <= tol}
 
 
 def digest(path):
@@ -91,7 +96,7 @@ def digest(path):
         return hashlib.file_digest(f, "sha256").hexdigest()
 
 
-def main():
+def build_parser():
     ap = argparse.ArgumentParser()
     ap.add_argument("--name", required=True)
     ap.add_argument("--ckpt", default="", help="a wave-1 final.pt; empty = the released model (A0)")
@@ -103,7 +108,14 @@ def main():
     ap.add_argument("--n_oracle", type=int, default=1024)
     ap.add_argument("--oracle_seed", type=int, default=0)
     ap.add_argument("--expect", default="", help="wave-1 result.json the T = 1 groups must reproduce")
-    a = ap.parse_args()
+    ap.add_argument("--tol", type=float, default=0.01, help="largest per-group Gen-PPL difference that counts as reproduced")
+    return ap
+
+
+def main():
+    a = build_parser().parse_args()
+    if a.expect and 1.0 not in a.temps:
+        sys.exit("--expect needs T = 1.0 in --temps (the reproduction check runs at T = 1)")
     from ncmr.eval_text import evaluate_samples, mauve_features
     from ncmr.ncm_ref_loader import load_ncm
 
@@ -126,19 +138,21 @@ def main():
     t0 = time.time()
     out = {"name": a.name, "checkpoint": ident, "device": dev,
            "gpu": torch.cuda.get_device_name() if dev == "cuda" else None, "torch": torch.__version__,
-           "eval_precision": "fp32 sampling and scoring, TF32 off",
+           "eval_precision": "fp32 sampling, scoring and MAUVE featurization, TF32 off",
            "args": {k: v for k, v in vars(a).items() if k not in ("ckpt", "run_dir", "expect")},
            "frontier": {}, "oracle": {}}
     n_f = a.n * len(a.seeds)
-    cache = os.path.join(ROOT, "runs", "cache", f"mauve_ref_val_{n_f}.npy")   # as train_gen.py
+    # fp32 featurization (W1b's helper default is bf16 autocast), so its own reference cache (Codex PR 7)
+    cache = os.path.join(ROOT, "runs", "cache", f"mauve_ref_val_{n_f}_fp32.npy")
     if os.path.exists(cache):
         ref = np.load(cache)
     else:
-        ref = mauve_features([bpe.decode(cut_at_eos(r)) for r in examples("val", n_f)], dev)
+        ref = mauve_features([bpe.decode(cut_at_eos(r)) for r in examples("val", n_f)], dev, amp=False)
         os.makedirs(os.path.dirname(cache), exist_ok=True)
         np.save(cache, ref)
     samples = {}
-    for temp in a.temps:
+    # T = 1 first: with --expect, a run that does not reproduce wave 1 stops before spending anything else
+    for temp in sorted(a.temps, key=lambda t: abs(t - 1.0) > 1e-9):
         ids, groups = [], []
         for sd in a.seeds:
             o = draw(net, tok, L0, a.n, sd, temp, dev)
@@ -146,13 +160,20 @@ def main():
             groups += [sd] * len(o)
         reenc = [bpe.encode(bpe.decode(s)) for s in ids]   # token statistics on the re-encoding, as train_gen.py
         res = evaluate_samples(reenc, bpe.decode, groups, scorers=("gpt2-large", "roneneldan/TinyStories-33M"),
-                               ref_feats=ref, device=dev)
+                               ref_feats=ref, device=dev, mauve_amp=False)
         if a.expect and abs(temp - 1.0) < 1e-9:
-            res["reproduction"] = reproduction(res["genppl_gpt2-large_per_group"], a.seeds, json.load(open(a.expect)))
+            res["reproduction"] = rep = reproduction(res["genppl_gpt2-large_per_group"], a.seeds,
+                                                     json.load(open(a.expect)), a.tol)
+            if not rep["ok"]:
+                out["frontier"][str(temp)] = res
+                out["reproduction_failed"] = True
+                json.dump(out, open(os.path.join(a.run_dir, "result.json"), "w"), indent=1)
+                sys.exit(f"T = 1 does not reproduce wave 1 (missing seeds {rep['missing_seeds']}, max |diff| "
+                         f"{rep['max_abs_diff']:.4f} > {a.tol}): wrong checkpoint, sampler or GPU type; nothing else run")
         out["frontier"][str(temp)] = res
         samples[str(temp)] = {"ids": ids, "groups": groups}
         print(f"T={temp}: Gen-PPL {res['genppl_gpt2-large']:.2f} H {res['entropy']:.3f} MAUVE {res['mauve']:.3f}"
-              + (f" | reproduction max |diff| {res['reproduction']['max_abs_diff']:.4f}" if "reproduction" in res else "")
+              + (f" | reproduced, max |diff| {res['reproduction']['max_abs_diff']:.4f}" if "reproduction" in res else "")
               + f" | {time.time() - t0:.0f}s", flush=True)
     X = torch.from_numpy(examples("val", a.n_oracle))
     for j in a.js:

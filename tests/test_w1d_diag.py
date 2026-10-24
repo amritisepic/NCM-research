@@ -74,4 +74,76 @@ def test_reproduction_reads_sorted_seed_order():
               "final_eval": {"genppl_gpt2-large_per_group": [10.0, 11.0, 12.0, 13.0]}}   # seeds 0, 1, 2, 42
     rep = diag().reproduction([10.0, 11.5, 13.0], [42, 0, 2], expect)            # ours, sorted: 0, 2, 42
     assert rep["pairs"] == {0: [10.0, 10.0], 2: [11.5, 12.0], 42: [13.0, 13.0]}
-    assert rep["max_abs_diff"] == 0.5
+    assert rep["max_abs_diff"] == 0.5 and rep["ok"] is False                   # 0.5 > the 0.01 tolerance
+    assert diag().reproduction([10.0, 12.0, 13.0], [42, 0, 2], expect)["ok"] is True
+
+
+EXPECT = {"config": {"sample_eval": {"final_seeds": [42, 0, 1, 2]}},
+          "final_eval": {"genppl_gpt2-large_per_group": [10.0, 11.0, 12.0, 13.0]}}
+
+
+def test_reproduction_fails_on_unmatched_seed():
+    """Codex PR 7 comment 4367597216: a seed with no wave-1 group must not be ignored."""
+    rep = diag().reproduction([10.0, 99.0], [0, 999], EXPECT)
+    assert rep["missing_seeds"] == [999] and rep["ok"] is False
+
+
+def test_reproduction_fails_on_substituted_checkpoint_scores():
+    """A swapped checkpoint shifts every group; NaN scores must not pass either."""
+    assert diag().reproduction([10.3, 11.2, 12.4, 13.1], [42, 0, 1, 2], EXPECT)["ok"] is False
+    assert diag().reproduction([10.0, float("nan"), 12.0, 13.0], [42, 0, 1, 2], EXPECT)["ok"] is False
+
+
+def test_mauve_features_are_fp32_when_amp_is_off(monkeypatch):
+    """Codex PR 7 comment 4367597219: W1d featurizes MAUVE in fp32; the default stays bf16 (wave 1's protocol)."""
+    from ncmr import eval_text
+    seen = []
+
+    class Tok:
+        eos_token, eos_token_id = "<eos>", 0
+
+        def __call__(self, text, truncation=True, max_length=256):
+            return {"input_ids": [1, 2, 3][:max(1, len(text) % 3 + 1)]}
+
+    class LM(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.lin = torch.nn.Linear(4, 4)
+
+        def forward(self, ids, output_hidden_states=True):
+            seen.append(torch.is_autocast_enabled("cpu"))
+            h = self.lin(torch.ones(ids.shape[0], ids.shape[1], 4))
+            return type("Out", (), {"hidden_states": [h]})()
+
+    monkeypatch.setattr(eval_text, "_load_lm", lambda name, device: (Tok(), LM()))
+    monkeypatch.setattr(eval_text, "mauve_score", lambda p, q, seed=0: 0.5)
+    eval_text.mauve_features(["a b", "c"], "cpu", amp=False)
+    eval_text.mauve_features(["a b", "c"], "cpu")
+    assert seen == [False, True]
+    seen.clear()
+    eval_text.evaluate_samples([[5, 6], [7]], lambda ids: " ".join(map(str, ids)), scorers=(),
+                               ref_feats=np.zeros((2, 4)), device="cpu", mauve_amp=False)
+    assert seen == [False]
+
+
+def test_registration_matches_script_defaults_and_notebook():
+    """Codex PR 7 comment 4367597223: the W1d registration, the script defaults and the notebook agree."""
+    reg = (ROOT / "docs/preregistration.md").read_text(encoding="utf-8").replace("\r\n", "\n").split("## W1d")[1].split("\n## ")[0]
+    for phrase in ("T in {0.8, 0.9, 1.0}", "8 groups x 256", "seeds 42, 0-6", "first 1024 val windows",
+                   "j in {-1, 3, 5, 7}", "max |diff| <=\n  0.01"):
+        assert phrase in reg, phrase
+    d = diag().build_parser().parse_args(["--name", "x", "--run_dir", "r"])
+    assert (d.temps, d.seeds, d.n, d.n_oracle, d.js, d.tol) == ([0.8, 0.9, 1.0], [42, 0, 1, 2, 3, 4, 5, 6], 256, 1024,
+                                                               [-1, 3, 5, 7], 0.01)
+    spec = importlib.util.spec_from_file_location("make_notebooks", ROOT / "notebooks/make_notebooks.py")
+    nb = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(nb)
+    cmds = nb.RUNS["w1d_requant_diag"]["cmds"]
+    pairs = {"A0": (None, "L_ts_released16__result.json"), "A1": ("L_ts_ctrl_s0/final.pt", "L_ts_ctrl_s0__result.json"),
+             "A2": ("L_ts_requant_s0/final.pt", "L_ts_requant_s0__result.json")}
+    assert len(cmds) == 3
+    for c in cmds:
+        assert not any(f in c for f in ("--temps", "--seeds", "--n ", "--n_oracle", "--js", "--tol")), c
+        name = c.split("--name ")[1].split()[0]
+        ckpt, expect = pairs[name]
+        assert ("--ckpt" in c) == (ckpt is not None) and (ckpt is None or ckpt in c) and expect in c, c

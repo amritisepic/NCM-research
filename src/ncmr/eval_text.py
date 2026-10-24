@@ -91,11 +91,12 @@ def gen_ppl(texts: list[str], scorer: str, device: str | None = None, batch_size
 
 
 @torch.no_grad()
-def mauve_features(texts: list[str], device: str | None = None, max_len: int = 256, batch_size: int = 16) -> np.ndarray:
+def mauve_features(texts: list[str], device: str | None = None, max_len: int = 256, batch_size: int = 16,
+                   amp: bool = True) -> np.ndarray:
     """gpt2-large final-layer hidden state at the last real token (MAUVE's default featurization).
     Right-padded batches (GPT-2 positions are absolute and attention is causal, so the last real token's
-    state is unaffected by padding); bf16 autocast. Every method and the human references go through this
-    same function, so the featurization is identical across comparisons."""
+    state is unaffected by padding). amp=True: bf16 autocast, as every run through wave 1 featurized (identical across
+    comparisons, but not fp32); amp=False: fp32, autocast off, for protocols that require fp32 scoring (W1d)."""
     device = device or default_device()
     tok, lm = _load_lm("gpt2-large", device)
     feats = []
@@ -106,7 +107,7 @@ def mauve_features(texts: list[str], device: str | None = None, max_len: int = 2
         ids = torch.full((len(enc), T), tok.eos_token_id, dtype=torch.long)
         for i, e in enumerate(enc):
             ids[i, :len(e)] = torch.tensor(e)
-        with torch.autocast(device_type=device, dtype=amp_dtype(device)):
+        with torch.autocast(device_type=device, dtype=amp_dtype(device), enabled=amp):
             hs = lm(ids.to(device), output_hidden_states=True).hidden_states[-1]
         last = torch.tensor([len(e) - 1 for e in enc], device=hs.device)
         feats.append(hs[torch.arange(len(enc), device=hs.device), last].float().cpu().numpy())
@@ -121,7 +122,7 @@ def mauve_score(p_feats: np.ndarray, q_feats: np.ndarray, seed: int = 0) -> floa
 
 def evaluate_samples(sample_ids: list[list[int]], decode, groups: list[int] | None = None,
                      scorers=("gpt2-large", "roneneldan/TinyStories-33M"), ref_feats: np.ndarray | None = None,
-                     device: str | None = None) -> dict:
+                     device: str | None = None, mauve_amp: bool = True) -> dict:
     """sample_ids: BPE ids per sample, already cut at EOS. decode: ids -> str.
     groups: seed index per sample; genppl/MAUVE are computed per group and averaged (mean, sd)."""
     device = device or default_device()
@@ -144,7 +145,7 @@ def evaluate_samples(sample_ids: list[list[int]], decode, groups: list[int] | No
     if ref_feats is not None:
         # MAUVE is noisy at a few hundred samples, so pool all samples against an equal-size human set
         # and report the spread over 5 quantization seeds.
-        feats = mauve_features(texts, device)
+        feats = mauve_features(texts, device, amp=mauve_amp)   # ref_feats must use the same precision
         q = ref_feats[: len(feats)]
         vals = [mauve_score(feats, q, seed=s) for s in range(5)]
         res["mauve"] = float(np.mean(vals))
