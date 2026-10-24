@@ -651,3 +651,164 @@ codes replaced in both arms; labels canonical. Only the wrong code differs: unif
   followed, by the user's decision. Saves ~39 CU (~52 with A3 as their comparator).
 - A1's seeds 1-2 (registered: "A1 always gets seeds 1-2") are held until M1's gate or a new tier-L comparison needs the
   training-seed SD (~13 CU).
+
+## R034 — W1d diagnostic built; audits 3 (completed), 4 and 5; MAUVE precision correction (2026-10-24)
+- **W1d** (registered before any run; `docs/preregistration.md`): eval-only temperature frontier (T = 0.8 / 0.9 / 1.0,
+  8 x 256 samples) and oracle-intervention curve (j = -1 / 3 / 5 / 7, 1024 val windows) for A0 / A1 / A2, to decide
+  whether A2 (re-quantized labels) earns a confirmation. `scripts/diag_w1_frontier.py`, notebook `w1d_requant_diag`
+  (A100, ~2.5 CU; the ~1 CU first estimate was too low for this precision). Its sampler is tested equal to
+  `train_gen.py`'s; at T = 1 every group must reproduce wave 1's group for the same seed within 0.01 Gen-PPL or the run
+  stops before anything else. PR 7: Codex round 1 raised four P1s (reproduction only reported, MAUVE features in bf16,
+  notebook provenance publishing absolute Drive paths, registration not on the PR branch), all fixed or answered with
+  mutation-checked tests (`docs/reviews/triage_pr7.md`); round 2 clean. Deep audit 5 (local Codex CLI; its sandbox could
+  not run Python, so its tests were run here): no P0/P1; one P2 (A5-1, the reproduction helper could drop or collapse
+  groups) reproduced and fixed (`docs/reviews/triage_audit5_2026-10-24.md`).
+- **Correction to R030 (precision label):** wave 1's Gen-PPL scorers ran in fp32, but its MAUVE features were computed
+  under bf16 autocast (the default of `mauve_features`), identically for every arm. "fp32 sampling and
+  scoring" in the result files covers sampling and Gen-PPL only. W1d featurizes MAUVE in fp32 (new opt-in flag; default
+  unchanged so later W1 / M1 runs stay comparable with wave 1).
+- **Audit 3 completed** (Codex desktop, `codex/audit3-onpolicy` `1697171`): its CPU diagnostic (51 small-batch steps,
+  greedy on-policy vs uniform on the released Sudoku model) found no rapid collapse, an inconclusive negative consistent
+  with R031; final verification 18 passed / 8 strict xfails on `1bd3816` (A3-1..A3-3 open until PR 5 merges). The
+  report and numbers on the branch were updated verbatim; PR 5 was reconciled with the completed tests (97 -> 98 pass,
+  torch 2.11 and 2.6) and now also writes the run's name, not its absolute path, into `samples_final.json`.
+- **Audit 4** (Codex desktop on `c91126a`, `codex/audit4` `665c24b`): "hold launch" for three P1s in the WMT14 trainer:
+  validation NLL under the training autocast, base checkpoint identified by size, and dropped degenerate sources still
+  charged at the full FLOP proxy (576 - 12d rows executed vs 576 reported); two P2s (an initial fixed point charged two
+  passes; curve evaluations discarding per-sentence records). Suite reproduced (18 passed, 7 strict xfails); all five
+  fixed in PR 8 with the audit's patches, plus checkpointed run-level degenerate totals (from the audit's draft); 103
+  tests pass on torch 2.11 and 2.6 (`docs/reviews/triage_audit4_2026-10-24.md`). Registered as J1c before any J1 run.
+- **Codex channels:** pull-request reviews work; deep audits requested as PR comments need a Codex cloud environment for
+  the repository ("create an environment"), so audits run locally (`scripts/review/codex_local.sh`, or Codex desktop).
+- Launch state at the time of writing: nothing is cleared yet. W1d waits for PR 7's last review and merge; the WMT14 pair
+  waits for PR 8's review and merge.
+- **Adversarial analysis of the on-policy explanation** (Codex desktop, run by the user; `docs/reviews/
+  codex_adversarial_onpolicy.md`, triage `docs/reviews/triage_adversarial_onpolicy_2026-10-24.md`): (b') survives but is
+  not established. New direct evidence on R031's saved Sudoku checkpoints: plausible-wrong training cuts the model's
+  reliance on its true L6 code by 76% (finer-target NLL advantage) and 81% (normalized logit response) relative to
+  uniform-wrong training. Accepted: ADV-1 (P1, a dropout-RNG confound in `scripts/onpolicy_repro.py`, same class as A3-2;
+  fix in PR 6, paired rerun needed before calling R031's Sudoku contrast controlled); a competing explanation R031 missed
+  (L1 proposals are sampled under the canonical L0 while 75% of windows then carry a unigram L0, so about half the L1
+  positions condition on a parent the proposal never saw; inference has no such mismatch); and a wording correction to
+  R031: the corrupted-context posterior depends on the clean and replaced joint-context densities, not on the nominal
+  corruption rate. The tier-L mechanism arms will add a used-parent proposal ablation and follow the review's design
+  notes (flag from the mask, not from correctness; the lower-rate uniform arm registered under its own name).
+
+## Advisory literature report published (2026-10-24; documentation only)
+- Saved `docs/literature_advice_2026-10-24.md`: six-question primary-source review, paper/settings/effect-size
+  table, mechanism alternatives and discriminating tests, likelihood caveats, level interventions, Jacobi
+  consistency evidence, a proposed compute budget and explicit falsification thresholds.
+- Recomputed released TinyStories L8-L11 clean-NLL share (46.79%) and predicted-slot share (63.13%), and
+  WMT14's position-count proxy at 8.25 full Jacobi passes (2.46 times sequential). These are descriptive
+  calculations, not new model evaluations or attention-inclusive FLOP measurements.
+- Preserved the report's R030-R033 evidence scope and added a publication note pointing to R034's newer
+  Sudoku dropout-RNG confound, used-parent proposal mismatch, MAUVE precision correction and J1c amendment.
+- Experimental proposals remain speculation; no registrations, training code or launch decisions changed.
+
+## R035 — Session close: Codex at its usage limit, PR 6's review finding fixed, handoff written (2026-10-24; process)
+- Codex's review of PR 7's head `f087a48` failed at the code-review usage limit (16:36 UTC). Per `CLAUDE.md`, no gated
+  merge until it resets: W1d (`w1d_requant_diag`) is not cleared; the WMT14 pair is (PR 8 merged before the limit).
+- PR 6: Codex's P1 (the exploratory scripts printed absolute output paths) accepted and fixed: a `shown()` helper prints
+  repo-relative paths or file names only; `tests/test_exploratory_print_paths.py`, each print site mutation-checked
+  (`docs/reviews/triage_pr6.md`). Its new head `8516fea` needs a review.
+- Handoff for the next session: `docs/prompts/handoff_2026-10-24.md` (re-check the Codex work, the open PRs, next
+  steps, and the literature report's frozen-teacher arm J2-F and mechanism 2x2 as decisions for the user).
+
+## R036 — WMT14 pair, seed 0: J2 misses its screen; its pass saving comes partly from a collapse onto input-independent outputs (2026-10-24; registered J1 + J1a + J1b + J1c)
+Runs `w2c_L_wmt_ctrl` (J0 re-evaluation, J1 control 3000 steps) and `w2c_L_wmt_consist` (J2, 2000 steps), A100-40GB,
+torch 2.11, both at `c60f8b4` (PR 8 merged), one session each, no resumes. 132 A100-minutes, ~11.9 CU (planned ~9).
+Results `results/colab/w2c_L_wmt_{ctrl,consist}/` (provenance `cmd` fields templated to `{R}`; the notebook's copies of
+repository result files left out). Registered numbers recomputed by `scripts/analyze_j1.py` (PR 9, awaiting Codex)
+into `results/j1_analysis_s0.json`; every number below is in that file or in the result files.
+
+| | val passes | val BLEU | test passes | test BLEU | test length ratio |
+|---|---|---|---|---|---|
+| J0 released | 10.916 | 23.55 | 11.069 | 22.61 | 0.930 |
+| J1 control | 11.527 | 22.82 | 11.622 | 21.81 | 0.930 |
+| J2 consist | 9.357 | 18.53 | 8.890 | 16.02 | 0.750 |
+
+**Registered readings**
+- Sanity: J0 reproduces R020 (11.069 passes vs 11.07, BLEU 22.61 vs 22.63; no sentence converges on pass 1, so J1c's
+  pass-1 rule changes nothing for J0). J1 loses 0.73 (val) / 0.80 (test) BLEU vs J0: under the 1-BLEU limit, the recipe
+  is not damaging. J2: 32,000 trajectory sources, 0 degenerate (J1b's 1% rule satisfied); executed FLOP proxy equal for
+  J1 and J2 (8.38e16). Exact differs from sequential for 1 J1 test sentence (1294) and 2 J2 val sentences (531, 1118);
+  "exact" excludes them.
+- **Screen (val): J2 fails both conditions** (passes 9.357 > 9.0; BLEU 18.53 < 22.55). J2 does not advance; J1 gets no
+  seeds 1-2. **H12 kill condition met on test:** 19.2% NFE saving at a 6.59 BLEU loss (needs >= 25% at < 1). J2's passes
+  are 2.73 below J1's, so that kill clause alone would not fire.
+- J1a at cap ceil(8.89) = 9: J0 22.51 BLEU (8.99 passes), J1 21.56; J2 is 6.49 and 5.54 below them. Length ratio 0.18
+  below J0's (limit 0.02). The paired bootstrap was not computed: the reference translations are not in the repository,
+  and with differences of 5.5-6.5 BLEU it cannot change the reading. J0 at cap 8 loses 1.11 BLEU (not within 1), at 8.0
+  passes (27% fewer than 11); at cap 9, 0.10 BLEU at 18% fewer. A fixed cap is not an adaptive rule (J1a), but it is the
+  bar any consistency arm must beat.
+
+**Exploratory (labelled; not registered analyses)**
+- J2 decodes 8.7% of val and 16.2% of test sentences to one of two input-independent strings ("In 1999 , the-D-D-D-...
+  ." for 428 test sentences, "Staff was very friendly and helpful." for 59), reached in ~3 passes on average. J0 and J1
+  produce no string shared by >= 5 sentences. For 352 test sentences J2's first pass from the all-zero start already
+  emits the first string. On the remaining sentences J2 averages 10.04 test passes (8.7% saving; J0 11.04) and emits 9%
+  fewer words than J0; adjacent duplicated words rise 17.1 -> 25.6 per 1k (J1 21.0).
+- Course of training (first 500 val sentences, the curve subset; J2's last curve point equals the final evaluation on
+  those sentences): J2's passes fall to 9.81 by step 500 and drift to 9.64 by step 2000 (J1 11.34-11.52); the shared
+  output share grows 0 -> 1.8 -> 1.6 -> 2.8%. The curve subset understates the collapse (2.8% vs 8.7% on all of val; its
+  BLEU 24.19 vs 18.53).
+- Reading: the self-consistency loss with the current model as its own teacher rewards fast convergence whatever the
+  output; an input-independent output that is its own fixed point within a pass or two is a cheap solution, and once a
+  source maps to it, the teacher's target for that source is that output. This is a moving-teacher feedback loop, the
+  failure the literature report's frozen-teacher arm (J2-F) was proposed to separate. One seed; not established.
+- Wall-clock: J2 took 1.37x J1's time (4202 s vs 3071 s, including evaluations) at an equal generator FLOP proxy.
+
+**Decisions**
+- J2 is dead for criterion (d) as registered. The user's decision (this session): register J2-F as a contingent arm that
+  runs if J2 misses its screen; registered in `docs/preregistration.md` (J2-F), after this result, with that timing
+  stated in the registration. J2's miss triggers it. Build and deep-audit it once Codex is back; then ~6.5 CU.
+- Criterion (d), text half: no candidate is left besides J2-F.
+
+**Review of the previous session's work (handoff section 2; an analyst agent's re-read, checked here before logging)**
+- Codex triages re-read at their fix heads: audits 3, 4, 5 and PR 7's rows stand. Two corrections and two test gaps:
+  - **Correction (R031, R034, `triage_audit3`):** "every arm alike, so it cannot make one arm collapse" is wrong for
+    the policy forward. Wave 1's `policy_codes` (`scripts/train_gen.py`) runs inside `compute_loss`'s bf16 autocast
+    with TF32 on, and only the on-policy arms have it. Precision is therefore an untested competitor for the on-policy
+    collapse, not an excluded one (validation NLL, shared by all arms, is as stated). Logged as a re-check row in
+    `docs/reviews/triage_audit3_2026-10-24.md` and `triage_adversarial_onpolicy_2026-10-24.md`.
+  - **Correction (R031 item 5):** "the arm does not take larger steps" was inferred from lower loss and gradient norm;
+    under AdamW the update size is not set by the gradient norm, and no update norms were saved. Withdrawn.
+  - Test gaps: PR 5 has no test of the text `run_manifest.json` or of the missing-`policy_rng` resume branch (add before
+    its review and deep audit); A4-3's padding has a row-count test but no test that the real rows' loss and gradient
+    are unchanged by the padding (add with J2-F's trainer option, which reuses `consist_loss`).
+- Riskier decisions: A4-3 padding (loss uses only the real rows; an all-degenerate step returns exactly `loss_tf` and
+  still runs the registered rows; dropout draws for the real rows differ bitwise from an unpadded batch, not in
+  distribution): agree. A4-4 `initial_fixed_ok`: changes only the pass count of sentences whose all-zero start is the
+  fixed point, applied to the teacher and every J0 / J1 / J2 evaluation; measured effect on J0 here: none (no such
+  sentence, 11.069 passes). Clearing the WMT14 pair on the R028 precedent: no objection found. Ported Codex tests:
+  legitimate (marker removals, the one snapshot count, two structural assertions that the fixes made necessary); one
+  more port this session (below).
+- Wave-1 clean NLL under autocast: every R030 / R031 conclusion that rests on clean NLL involves differences of 24-154
+  nats per window, against at most ~9 nats for precision and window packing combined (R008's 870.5 fp32 vs 861.8);
+  none flips on scoring precision. R031 item 5's per-level split (+15 of +24 nats at L3-L6) is the least robust.
+- R030's screen reading (comparator-relative entropy / MAUVE) was chosen after the data but reports both readings;
+  moot after R033. R031's "replicated across domains" for the Sudoku contrast was too strong while ADV-1 was open:
+  see the paired rerun below.
+- Full suite on `claude/ncm-research`: 102 passed, 1 failed on both torch 2.6 and 2.11. The failure was caused by this
+  session's results commit: the ported audit-4 numbers test compared the exact list of WMT-named result files, which
+  the WMT14 results extend. Ported like its file count (the audited files must all still exist; mutation-checked by
+  removing one); it now passes on both versions, the other 102 having passed in the full runs (`3a41304`).
+
+**R031's Sudoku contrast, paired rerun with ADV-1 fixed** (exploratory; `scripts/onpolicy_repro.py` at PR 6's head
+`8516fea`, CPU fp32, R031's settings: batch 16, lr 1e-4, 20 warmup, 200 steps, seed 0, the same 300 puzzles, 8 threads;
+`results/onpolicy_repro/{uniform,plausible}_wrong_adv1_s0.json`). With the fix both arms draw replacements from their own
+generator and share the dropout stream; the logged per-level corrupted fractions are identical in the two arms at every logged step (same masks).
+- The uniform arm is unchanged to the printed digit (its draws already used their own generator): clean NLL 45.89,
+  greedy 83.7%, T = 1 82.7%.
+- **Hedging replicates:** clean teacher-forced NLL 43.2 -> 75.6 nats per puzzle (plausible) vs 45.9 (uniform); R031:
+  75.2. The excess sits in L8-L10 as before (+24.6 nats). Predictive entropy per code, summed over levels: 2.09 -> 3.16
+  (plausible; R031 3.15) vs 2.33 (uniform). Training loss 0.399 vs 0.308.
+- **"Greedy decoding hides the hedge" does not replicate.** Paired change in greedy solve rate by step 200: uniform
+  -4.7 ± 1.5, plausible -5.0 ± 1.5 (plausible minus uniform -0.3 ± 1.5; R031: +3.7 ± 1.6). At T = 1: uniform
+  -4.3 ± 1.6, plausible -6.3 ± 1.6 (difference -2.0 ± 1.8; R031: -1.0 ± 2.0). R031's greedy advantage of the plausible
+  arm came from the dropout-RNG confound. Corrected reading: at matched slots and rates, plausible wrong codes make
+  the model hedge on clean contexts (clean NLL +30 nats vs +3), while solve rates fall by similar amounts in both arms
+  (~5 points greedy, 4-6 sampled). One seed; the step from hedging to a collapse is still not shown.
+- The first attempt ran the two arms in parallel; the uniform process exited with status 1 and no traceback after
+  start-up. Run again alone, it finished normally; the plausible run from the parallel attempt is the one reported.
+- CPU: ~1.0 h wall (two arms, 8 threads each), plus the two suite runs (~5 min).

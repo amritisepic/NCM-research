@@ -30,20 +30,22 @@ Final eval per W1 arm: 16 x 256 samples in fp32 (~5-10 min on an A100).
 | `w1_L_ts_b1` | B1: on-policy + re-quantized labels, 1350 steps | A100 / L4 | ~9.7 (incl. restarts) | done (R030: collapsed; nominally advances vs A3) -> seeds **dropped** (user, R033) |
 | `w1_L_ts_requant` | B1b: re-quantized labels, 1800 steps | A100 / L4 | ~6.5 | done (R030: 0.31 below A1, bar 0.35) |
 | `w1_L_ts_soft` | B7: soft labels, 1800 steps | A100 / L4 | ~6.5 | done (R030: 0.85 worse than A1) |
+| `w1d_requant_diag` | W1d (eval-only): temperature frontier and oracle curve for A0 / A1 / A2 from the wave-1 checkpoints on Drive | **A100** (exact reproduction gate) | ~2.5 | **blocked**: PR 7's head awaits a Codex review (usage limit hit 2026-10-24 16:36 UTC) |
 | `w2b_L_sdk_ctrl` | Sudoku tier L control (+ released reference A0), S1 | A100 / L4 | ~2.5 | **hold** (after WMT14; R031) |
 | `w2b_L_sdk_uniform` | Sudoku: uniform corruption control | A100 / L4 | ~2.5 | **hold** (after WMT14; R031) |
 | `w2b_L_sdk_onpolicy` | Sudoku: on-policy greedy corruption (B1a) | A100 / L4 | ~2.5 | **drop** (recommended, R031: the greedy policy corrupts a few % of codes; the mechanism is tested on CPU instead) |
 | `w2b_L_sdk_repair` | Sudoku: board-feedback repair passes (B6/C5) | A100 / L4 | ~2.5 | **hold** (after WMT14; R031) |
-| `w2c_L_wmt_ctrl` | WMT14 control (+ released reference J0), J1 | A100 / L4 | ~4 | **next**, after deep audit 4 (PR 4; blocked by the Codex usage limit) |
-| `w2c_L_wmt_consist` | WMT14 self-consistency fine-tune (criterion d, text); fp32 teacher (J1b) | A100 / L4 | ~5 | **next**, after deep audit 4 (PR 4; blocked by the Codex usage limit) |
+| `w2c_L_wmt_ctrl` | WMT14 control (+ released reference J0), J1 + J1c | A100 / L4 | ~4.6 | done (R036: J1 loses 0.8 BLEU, recipe OK); seeds 1-2 only if J2-F advances |
+| `w2c_L_wmt_consist` | WMT14 self-consistency fine-tune (criterion d, text); fp32 teacher (J1b), padded degenerate rows (J1c) | A100 / L4 | ~6.4 | done (R036: misses the screen; 16% of test sentences collapse onto two fixed strings); no further seeds |
+| `w2c_L_wmt_consist_frozen` | J2-F: J2 with a frozen released-model teacher (contingent arm, triggered by J2's miss) | A100 (as the pair) | ~6.5 | **registered, not built**: trainer option, Codex review and a deep audit first (Codex at its usage limit) |
 | `p1b_tc_rerun` | P1b: within-level-AR TC probe | — | — | **withdrawn** (R023: false premise; notebook removed; P1c to come) |
 | `w2_Mc_ncm` | tier M design C (M1): NCM from scratch, d512 x 6, 6k steps, seed 0 | A100 / L4 | ~7.7 | **hold** (criterion b needs a candidate; wave 1 produced none) |
 | `w2_Mc_ar` | tier M design C (M1): AR, same body, FLOP-matched, seed 0 | A100 / L4 | ~4.3 | **hold** (as above) |
 | `w2_Mc_ar15` | M1 conditional: AR at 1.5x steps, seed 0 | A100 / L4 | ~6.4 | only when asked (before a criterion-(b) claim) |
 | `calib_t4` | old calibration (superseded by w0) | T4 | 0.6 | skip |
 
-Budget: ~200 CU (raised 2026-10-23). Spent: ~58 CU (p1, c4, w0 ~12.5; wave 1 ~46 incl. restarts, R030). Next: WMT14
-pair ~9 CU once deep audit 4 has run. Held: Sudoku 3 arms ~7.5, A1 seeds 1-2 ~13, M1 pair ~12. Reasons and
+Budget: ~200 CU (raised 2026-10-23). Spent: ~70 CU (p1, c4, w0 ~12.5; wave 1 ~46 incl. restarts, R030; WMT14 pair ~11.9, R036). Next: W1d ~2.5
+and J2-F ~6.5 once their code is reviewed. Held: Sudoku 3 arms ~7.5, A1 seeds 1-2 ~13, M1 pair ~12. Reasons and
 ranking: `log.md` R031 and `STATE.md`. Every notebook now records the git SHA and each session's resume point
 (`_meta.json`, `<run>__provenance.jsonl`) and refuses to resume a run directory under changed code (PR 3). Progress check: the notebook prints `{"step": ..., "steps_per_s": ...,
 "tflops_eff": ...}`; remaining steps / steps_per_s = time left.

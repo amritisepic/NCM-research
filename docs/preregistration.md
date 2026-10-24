@@ -296,3 +296,55 @@ Why: `docs/reviews/codex_audit2.md` (A2-3 to A2-8, A2-10).
   rendering) any later W2 arm targets.
 - **Cost:** ~2.5 CU (A100).
 
+## J1c — amendment to J1 / J1a / J1b after the fourth code audit (registered 2026-10-24, before any J1 run)
+Why: `docs/reviews/codex_audit4.md` (A4-1 to A4-5); triage `docs/reviews/triage_audit4_2026-10-24.md`.
+- **Degenerate consistency sources** (J1b): still dropped from the loss and counted. Their student rows now run as
+  zero-loss padding, so the executed generator proxy equals the registered one (J2: 2000 x 576 forward rows) in every
+  step, including a step whose sources are all degenerate. Run-level source and degenerate totals are checkpointed,
+  restored on resume and reported (`degenerate_pct`); J1b's 1% rule reads those totals.
+- **NFE:** with WMT's static source prefix, convergence may be detected on pass 1, so a sentence whose all-zero start is
+  already its fixed point costs 1 pass, not 2. This applies to J0, J1 and J2 alike. J0's sanity reference (11.07 passes,
+  R020) was measured with pass-1 detection off, so J0's re-evaluation may differ by at most 1 pass times the share of such
+  sentences; the difference is reported, not treated as a failed sanity check.
+- **Evaluation records:** validation NLL is scored in fp32; every curve evaluation keeps ordered exact and capped
+  hypotheses and per-sentence passes, and checks exact = sequential.
+- **Run identity:** the run manifest identifies the base tokenizer and generator by SHA-256, not by file size.
+
+
+## J2-F — frozen-teacher consistency arm, contingent on J2 missing its screen (registered 2026-10-24, before any J2-F run or code)
+- **Timing, stated plainly:** the user decided to register J2-F as a contingent arm (run only if J2 misses the J1
+  screen). This text was written after J2's seed-0 result had arrived and been analysed (R036: J2 missed the screen;
+  about 9% of val and 16% of test sentences decode to one of two input-independent outputs). J2's miss triggers J2-F.
+  The design is the one proposed before J2's result (`docs/literature_advice_2026-10-24.md`, "frozen versus
+  moving-teacher Jacobi distillation"); nothing in it, and none of its criteria, was changed in response to J2's result.
+  The question is narrower than J2's: does a fixed teacher remove the failure J2 showed?
+- **Arm:** identical to J2 (J1 + J1a + J1b + J1c: data, common batch draw per step, rows 1-64 teacher forcing on
+  references, every 4th of rows 65-128 as trajectory sources, 4 states per trajectory sampled uniformly before the fixed
+  point, one parallel student pass per state, 2000 steps, recipe, seed handling, degenerate-source rule with zero-loss
+  padding) except for one thing: the trajectories and fixed points come from a **frozen copy of the released
+  generator** (J0), not from the current model. The teacher runs in eval mode, no grad, fp32 with TF32 off, always
+  K + 1 = 12 passes (`full_budget`, `initial_fixed_ok` as J1c). Its targets are therefore J0's own greedy outputs, and
+  its input states are J0's intermediate Jacobi states. The student is the current model, initialised from the released
+  generator as in J2. The generator FLOP proxy is the same as J2's (2000 x 576 forward rows; the teacher has the same
+  architecture), and the extra fp32 copy changes memory, not the proxy. Config `configs/scale/L_wmt_consist_frozen.yaml`
+  (arm name `consist_frozen`), notebook `w2c_L_wmt_consist_frozen`; J0 and J1 are not re-run (their seed-0 results are
+  `results/colab/w2c_L_wmt_ctrl/`).
+- **Readings, unchanged from J1 / J1a / J1b / J1c:** the J1 screen (val passes <= 9.0 and val BLEU >= J0 val - 1 =
+  22.55), H12 on test (<= 8.25 mean exact passes, BLEU >= J0 - 1, passes below J1's by >= 1), the J1a comparators at
+  ceil(J2-F's mean passes) with the paired bootstrap and the 0.02 length-ratio rule, J1b's 1% degenerate rule, exact =
+  sequential checks, and the 3-seed claim rule. If J2-F advances, J2-F and J1 get seeds 1-2 (J1's seeds 1-2 were
+  contingent on J2 advancing; they now follow J2-F). Per the brief, a result believed to meet criterion (d) goes to the
+  user before more compute is spent on it.
+- **Diagnostic (reported for J0, J1, J2 and J2-F; not a criterion):** share of sentences whose output string is shared
+  by >= 5 sentences (`scripts/analyze_j1.py`, "shared outputs"), mean passes on the remaining sentences, and the length
+  ratio on them.
+- **Prediction and what overturns it:** the moving teacher caused J2's collapse onto input-independent outputs, so J2-F
+  has a shared-output share <= 1% on test (J0 and J1: 0%; J2: 16%). Overturned if J2-F's share is > 5%: then the
+  collapse does not need a moving teacher. Secondary prediction (no claim attached): J2-F saves fewer passes than J2,
+  because the student is trained on J0's states and decodes through its own. If J2-F's test passes are >= 10.0, the
+  frozen-teacher route is reported as not reducing passes; if it passes the screen, it is read only through H12 and J1a.
+- **Code gate:** a trainer option for the frozen teacher (the only change), with tests that (1) the teacher's fixed
+  points equal J0's exact-decode outputs on a fixed batch, (2) the teacher's weights never change and receive no grad,
+  (3) the executed proxy equals J2's, (4) the arm is in the run manifest and a run directory refuses a different arm.
+  Review by PR (Codex) and a deep audit before launch (`CLAUDE.md`, tier 2).
+- **Cost:** ~6.5 CU seed 0 (J2 took 70.6 A100-minutes); seeds 1-2 of J2-F and J1 ~22 CU if it advances (J1 took 51.5 A100-minutes).
