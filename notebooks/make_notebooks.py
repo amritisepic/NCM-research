@@ -262,6 +262,10 @@ for seed in SEEDS:
         rd = c.split('--run_dir ')[1].split()[0] if '--run_dir ' in c else None
         if rd:
             started = [h['git_sha'] for h in history(rd) if h.get('event') == 'start']
+            if not started and os.path.exists(f'{rd}/ckpt.pt') and not ALLOW_CODE_CHANGE:
+                raise SystemExit(f'{rd} holds a checkpoint written before provenance was recorded, so the code that trained '
+                                 'it is unknown. Rename the run directory to start fresh, or set ALLOW_CODE_CHANGE = True '
+                                 'only after checking which commit trained it.')
             if started and started[0] != GIT_SHA and not ALLOW_CODE_CHANGE:
                 same = subprocess.run(['git', 'diff', '--quiet', started[0], GIT_SHA, '--'] + CODE_PATHS).returncode == 0
                 if not same:
