@@ -44,6 +44,16 @@ from ncmr.sudoku import cells  # noqa: E402
 from ncmr.sudoku_data import SudokuTrain  # noqa: E402
 from ncmr.train import Trainer  # noqa: E402
 
+
+def shown(path):
+    """`path` for printing: repo-relative inside the repository, else only its name (AGENTS.md: no local paths)."""
+    try:
+        rel = os.path.relpath(os.path.abspath(path), ROOT)
+    except ValueError:  # another drive on Windows
+        return os.path.basename(path)
+    return os.path.basename(path) if rel.split(os.sep)[0] == os.pardir else rel.replace(os.sep, "/")
+
+
 ARMS = ("none", "uniform", "onpol_sample", "onpol_greedy", "onpol_frozen", "onpol_requant", "swap",
         "uniform_wrong", "plausible_wrong", "plausible_wrong_requant")
 ap = argparse.ArgumentParser()
@@ -197,4 +207,4 @@ json.dump(out, open(a.out, "w"), indent=1)
 if a.save:
     os.makedirs(os.path.dirname(a.save) or ".", exist_ok=True)
     torch.save(net.state_dict(), a.save)
-print("wrote", a.out)
+print("wrote", shown(a.out))

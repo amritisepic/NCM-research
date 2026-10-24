@@ -33,6 +33,15 @@ ARMS = {"A0": ("w1_L_ts_ctrl", "L_ts_released16"), "A1": ("w1_L_ts_ctrl", "L_ts_
 V, W, LAM = 8192, 128, 0.1
 
 
+def shown(path):
+    """`path` for printing: repo-relative inside the repository, else only its name (AGENTS.md: no local paths)."""
+    try:
+        rel = os.path.relpath(os.path.abspath(path), ROOT)
+    except ValueError:  # another drive on Windows
+        return os.path.basename(path)
+    return os.path.basename(path) if rel.split(os.sep)[0] == os.pardir else rel.replace(os.sep, "/")
+
+
 def bigram_model(n_tokens, data_dir):
     tok = np.memmap(os.path.join(data_dir, "train_bpe_8192.bin"), dtype=np.uint16, mode="r")[:n_tokens].astype(np.int64)
     uni = np.bincount(tok, minlength=V).astype(np.float64)
@@ -104,7 +113,7 @@ def main():
               " ".join(f"{v['bigram_gain']:.2f}" for v in r["by_position"].values()), flush=True)
     os.makedirs(os.path.dirname(a.out), exist_ok=True)
     json.dump(out, open(a.out, "w"), indent=1)
-    print("wrote", a.out)
+    print("wrote", shown(a.out))
     if a.read:
         vocab = safe_pickle_load(os.path.join(a.data_dir, "bpe_vocab_8192.pickle"))
         dec = lambda ids: b"".join(vocab[int(t)] for t in ids if int(t) not in (EOS, PAD)).decode("utf-8", "replace")
@@ -119,7 +128,7 @@ def main():
                 for i in idx:
                     f.write(f"- [{int(i)}] {' '.join(dec(sets[arm][i]).split())}\n")
                 f.write("\n")
-        print("wrote", path)
+        print("wrote", shown(path))
 
 
 if __name__ == "__main__":
