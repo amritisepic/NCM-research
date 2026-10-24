@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import hashlib
 import json
 import os
 import sys
@@ -35,10 +36,10 @@ sys.path.insert(0, os.path.join(ROOT, "src"))
 
 from ncmr import flops as FL  # noqa: E402
 from ncmr.corruption import CorruptionCfg, build_hierarchy, soft_ce  # noqa: E402
-from ncmr.data import EOS, PAD, TrainStream, cut_at_eos, examples  # noqa: E402
+from ncmr.data import DATA_DIR, EOS, PAD, TrainStream, cut_at_eos, examples  # noqa: E402
 from ncmr.models import build_ncm_generator, n_params  # noqa: E402
 from ncmr.ncm_ref_loader import ForwardCounter, load_ncm  # noqa: E402
-from ncmr.train import Calib, Trainer, pick_device  # noqa: E402
+from ncmr.train import Calib, Trainer, fp32_eval, pick_device  # noqa: E402
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--config", required=True)
@@ -77,16 +78,42 @@ if a.eval_only and os.path.exists(ckpt_path):
 
 
 def _run_key(c):
-    """What defines a training run (micro-batching and eval/log cadence do not change it)."""
+    """What defines a training run. Eval / log / checkpoint cadence do not change it; the micro-batch partition does
+    (dropout, corruption and policy draws and float reductions follow it; codex audit 3, A3-3)."""
     c = OmegaConf.to_container(c, resolve=True)
-    t = {k: v for k, v in c.get("train", {}).items() if k not in ("grad_accum", "eval_every", "ckpt_every", "log_every")}
-    return [c.get("init"), c.get("model"), c.get("corruption"), t]
+    t = {k: v for k, v in c.get("train", {}).items() if k not in ("eval_every", "ckpt_every", "log_every")}
+    return [c.get("init"), c.get("model"), c.get("corruption"), c.get("level0"), t]
 
 
-if os.path.exists(ckpt_path) and os.path.exists(cfg_path) and not a.calib_steps:
+if os.path.exists(ckpt_path) and not a.calib_steps:
+    if not os.path.exists(cfg_path):   # codex audit 3, A3-3: a checkpoint whose run cannot be identified fails closed
+        sys.exit(f"{a.run_dir} holds a checkpoint without its config.yaml: the run cannot be verified; use a fresh run directory")
     if _run_key(OmegaConf.load(cfg_path)) != _run_key(cfg):   # codex audit F5
         sys.exit(f"{a.run_dir} holds a checkpoint of a different run (init / model / corruption / train differ)")
+
+
+def _digest(path):
+    with open(path, "rb") as f:
+        return hashlib.file_digest(f, "sha256").hexdigest()
+
+
+# run identity beyond the config (codex audit 3, A3-3): released bundle, BPE, data bytes and runtime. A checkpoint is
+# resumed only with an identical manifest; checked before anything in run_dir is overwritten.
+_art, _data = os.path.join(ROOT, "artifacts", "tinystories"), a.data_dir or DATA_DIR
+manifest = {"base_sha256": {n: _digest(os.path.join(_art, n)) for n in ("config.yaml", "tokenizer.pt", "generator.pt",
+                                                                        "bpe_vocab_8192.pickle", "bpe_merges_8192.pickle")},
+            "data_sha256": {n: _digest(os.path.join(d, n)) for d, n in ((_data, "train_bpe_8192.bin"),
+                                                                       (_data, "train_bpe_8192_offsets.npy"),
+                                                                       (DATA_DIR, "valid_bpe_8192.pickle"))},
+            "torch": torch.__version__, "cuda": torch.version.cuda}
+manifest_path = os.path.join(a.run_dir, "run_manifest.json")
+if os.path.exists(ckpt_path) and not a.calib_steps:
+    if not os.path.exists(manifest_path) or json.load(open(manifest_path)) != manifest:
+        sys.exit(f"{a.run_dir} holds a checkpoint whose base checkpoint, data or torch runtime differs from now (or was "
+                 "not recorded): use a fresh run directory")
 OmegaConf.save(cfg, cfg_path)
+if not a.calib_steps:
+    json.dump(manifest, open(manifest_path, "w"), indent=1)
 if device == "cuda":
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
@@ -157,28 +184,24 @@ def prefix_emb(b):
 def policy_codes(x, gen):
     """The generator's own samples at every level (level 0: unigram, as at inference). Pass 1 samples each level
     given the clean coarser levels (one-step errors); pass t samples given pass t-1's codes (t-step errors:
-    t = K-1 would be full sequential sampling given the true level 0)."""
-    was = net.training
-    net.eval()
-    with torch.autocast(device_type=device, enabled=False):
-        idx = tok.vq.z_to_idx(tok._encode_pre_quant(x))
-    codes = idx
-    # inference level 0 (unigram), drawn once: pass 1 sees the clean levels, pass t > 1 sees pass t-1's hierarchy
-    # including this level 0 (codex audit F3)
-    lv0 = torch.multinomial(L0, x.shape[0] * l0, replacement=True, generator=gen).view(x.shape[0], l0)
-    for _ in range(policy_passes):
-        with torch.autocast(device_type=device, enabled=False):
+    t = K-1 would be full sequential sampling given the true level 0). fp32, TF32 off, every module in eval mode
+    and all draws from `gen`, the policy's own checkpointed RNG (codex audit 3, A3-1 / A3-2)."""
+    with fp32_eval(net, device):
+        codes = tok.vq.z_to_idx(tok._encode_pre_quant(x))
+        # inference level 0 (unigram), drawn once: pass 1 sees the clean levels, pass t > 1 sees pass t-1's hierarchy
+        # including this level 0 (codex audit F3)
+        lv0 = torch.multinomial(L0, x.shape[0] * l0, replacement=True, generator=gen).view(x.shape[0], l0)
+        for _ in range(policy_passes):
             z_in = tok.vq.idx_to_ncm_input(codes)
-        # runs inside compute_loss's autocast; entering another context here leaked autocast (codex audit F2)
-        logits = fnet(torch.cat([prefix_emb(x.shape[0]), z_in], 1)).float()
-        samp = torch.distributions.Categorical(logits=logits / policy_temp).sample()
-        codes = torch.cat([lv0, samp], 1)
-    net.train(was)
+            logits = fnet(torch.cat([prefix_emb(x.shape[0]), z_in], 1)).float()
+            probs = torch.softmax(logits / policy_temp, -1)
+            samp = torch.multinomial(probs.flatten(0, 1), 1, generator=gen).view(logits.shape[:-1])
+            codes = torch.cat([lv0, samp], 1)
     return codes
 
 
 def compute_loss(x, gen):
-    pol = policy_codes(x, gen) if corr.mode == "onpolicy" else None
+    pol = policy_codes(x, policy_gen) if corr.mode == "onpolicy" else None
     h = build_hierarchy(tok, x, corr, policy_codes=pol, generator=gen)
     logits = fnet(torch.cat([prefix_emb(x.shape[0]), h["inputs"]], 1))
     tgt = h["targets"][:, l0:]
@@ -198,19 +221,17 @@ def compute_loss(x, gen):
 
 @torch.no_grad()
 def val_nll():
-    """Teacher-forced NLL of the canonical codes given the clean hierarchy (nats/window, per level)."""
-    net.eval()
+    """Teacher-forced NLL of the canonical codes given the clean hierarchy (nats/window, per level); fp32, TF32 off,
+    caller's module modes restored (codex audit 3, A3-1; wave 1 scored this under the training autocast)."""
     tot, per = 0.0, torch.zeros(K - 1)
-    for s in range(0, len(val_x), 100):
-        x = val_x[s:s + 100].to(device)
-        with torch.autocast(device_type=device, enabled=False):
+    with fp32_eval(net, device):
+        for s in range(0, len(val_x), 100):
+            x = val_x[s:s + 100].to(device)
             z_in, tgt = tok.get_ncm_inputs(x)
-        with trainer.ctx:
             logits = fnet(torch.cat([prefix_emb(x.shape[0]), z_in], 1)).float()
-        nll = F.cross_entropy(logits.reshape(-1, logits.shape[-1]), tgt.reshape(-1), reduction="none").view(tgt.shape)
-        tot += nll.sum().item()
-        per += torch.stack([c.sum(1) for c in torch.split(nll, levels[1:], dim=1)], 1).sum(0).cpu()
-    net.train()
+            nll = F.cross_entropy(logits.reshape(-1, logits.shape[-1]), tgt.reshape(-1), reduction="none").view(tgt.shape)
+            tot += nll.sum().item()
+            per += torch.stack([c.sum(1) for c in torch.split(nll, levels[1:], dim=1)], 1).sum(0).cpu()
     n = len(val_x)
     return {"val_nll": tot / n, "val_nll_per_level": (per / n).round(decimals=2).tolist()}
 
@@ -277,16 +298,20 @@ def _sample_metrics(n, seeds, mauve=False):
 net.train()
 deadline = time.time() + 60 * a.max_minutes if a.max_minutes else None
 gen = torch.Generator(device=device).manual_seed(seed * 7919)
+policy_gen = torch.Generator(device=device).manual_seed(seed * 7919 + 104729)   # on-policy draws only (audit 3, A3-2)
 if trainer.step:
-    if "corruption_rng" in resume_extra:   # codex audit F1
-        gen.set_state(resume_extra["corruption_rng"].cpu())
-    else:   # checkpoints written before that fix
-        gen.manual_seed(seed * 7919 + trainer.step)
-        print("[resume] checkpoint has no corruption RNG state: reseeded (not bit-identical to an uninterrupted run)")
+    # an exact continuation needs every RNG the run draws from (codex audit F1; audit 3, A3-3): fail closed
+    if "corruption_rng" not in resume_extra:
+        raise RuntimeError("checkpoint lacks the corruption RNG state; exact resume unavailable: use a fresh run directory")
+    gen.set_state(resume_extra["corruption_rng"].cpu())
+    if corr.mode == "onpolicy":
+        if "policy_rng" not in resume_extra:
+            raise RuntimeError("checkpoint lacks the policy RNG state (written before audit 3's fix): use a fresh run directory")
+        policy_gen.set_state(resume_extra["policy_rng"].cpu())
 
 
 def save_ckpt():
-    trainer.save(modules, data_rng, extra={"corruption_rng": gen.get_state()})
+    trainer.save(modules, data_rng, extra={"corruption_rng": gen.get_state(), "policy_rng": policy_gen.get_state()})
 
 
 accum = int(tc.get("grad_accum", 1))
@@ -338,7 +363,7 @@ if not a.skip_final_eval:
     seeds = [int(s) for s in sc.get("final_seeds", [42, 0, 1, 2])]
     sm, ids, groups = sample_metrics(int(sc.get("final_n", 256)), seeds, mauve=bool(sc.get("mauve", True)))
     final.update(sm)
-    json.dump({"ids": ids, "groups": groups, "nfe_per_sample": sm["nfe_per_sample"], "run_dir": a.run_dir},
+    json.dump({"ids": ids, "groups": groups, "nfe_per_sample": sm["nfe_per_sample"], "run": os.path.basename(os.path.normpath(a.run_dir))},   # no absolute path in published results
               open(os.path.join(a.run_dir, "samples_final.json"), "w"))
 wall = trainer.wall_prev + time.time() - trainer.t_start
 res = {"run": os.path.basename(a.run_dir.rstrip("/")), "config": OmegaConf.to_container(cfg),
