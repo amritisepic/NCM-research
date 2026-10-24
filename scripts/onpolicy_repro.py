@@ -82,7 +82,7 @@ val_p, val_s = (torch.as_tensor(np.asarray(v)) for v in data.val(a.n_eval))
 mode = {"none": "none", "uniform": "uniform"}.get(a.arm, "onpolicy")
 corr = CorruptionCfg(mode=mode, mean_rate=0.5, spread=0.5, retarget=a.arm.endswith("requant"))
 gen = torch.Generator().manual_seed(a.seed * 7919)          # corruption masks: identical across arms
-rep_gen = torch.Generator().manual_seed(a.seed * 7919 + 1)  # uniform_wrong replacement draws
+rep_gen = torch.Generator().manual_seed(a.seed * 7919 + 1)  # every replacement draw: dropout's RNG stays shared (ADV-1)
 params = [p for p in net.parameters() if p.requires_grad]
 trainer = Trainer(tempfile.mkdtemp(prefix="onpol_repro_"), params, max_lr=a.lr, total_steps=a.steps, warmup=a.warmup,
                   weight_decay=0.01, betas=(0.9, 0.99), ckpt_every=10 ** 9, device="cpu", amp=False)
@@ -112,7 +112,7 @@ def loss_fn(p, s):
         with torch.no_grad():
             lg = parallel_logits(src, z, c).float()
         net.train(was)
-        pol = lg.argmax(-1) if a.arm == "onpol_greedy" else torch.distributions.Categorical(logits=lg).sample()
+        pol = lg.argmax(-1) if a.arm == "onpol_greedy" else torch.multinomial(lg.softmax(-1).flatten(0, 1), 1, generator=rep_gen).view(lg.shape[:-1])
     elif a.arm == "swap":
         pol = c.roll(1, 0)
     elif a.arm == "uniform_wrong":
@@ -125,7 +125,7 @@ def loss_fn(p, s):
             lg = parallel_logits(net, z, c).float()
         net.train(was)
         lg.scatter_(-1, c[..., None], float("-inf"))
-        pol = torch.distributions.Categorical(logits=lg).sample()
+        pol = torch.multinomial(lg.softmax(-1).flatten(0, 1), 1, generator=rep_gen).view(lg.shape[:-1])
     h = build_hierarchy(tok, s, corr, policy_codes=pol, generator=gen)
     q0 = [net.build_l0_query_input(s.shape[0], h["inputs"].dtype)]
     logits = net(torch.cat([z, q0[0], h["inputs"]], 1))

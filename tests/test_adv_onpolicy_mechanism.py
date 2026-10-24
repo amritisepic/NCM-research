@@ -79,7 +79,7 @@ def rng_after_subject_policy(arm):
     return seen[0]
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="ADV-1: policy sampling changes training dropout RNG")
+# fixed in PR 6 (was a strict xfail: ADV-1: policy sampling changes training dropout RNG)
 def test_sudoku_wrong_arms_share_dropout_rng():
     assert torch.equal(rng_after_subject_policy("uniform_wrong"),
                        rng_after_subject_policy("plausible_wrong"))
