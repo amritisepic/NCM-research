@@ -153,6 +153,14 @@
     },
     "R028": {
       "status": "unverifiable_from_results_json",
+      "old_early_stop_proxy": {
+        "method": "registered row-count algebra, not a historical execution measurement",
+        "full_teacher_rows_per_step": 576,
+        "two_pass_teacher_rows_per_step": 416,
+        "two_pass_total_rows": 832000,
+        "shortfall_pct": 27.77777777777778,
+        "log_rounded_shortfall_pct": 28
+      },
       "results_json_count": 62,
       "wmt_named_json": [
         "results/b2_jacobi_wmt14_n6.json",
@@ -187,6 +195,7 @@
     "finite_nonzero_gradient_tensors": 41,
     "trainable_elements": 16235,
     "gradient_reached_elements": 16235,
+    "gradient_definition": "Reached means a parameter tensor has a finite gradient with nonzero norm; element totals count sizes of reached parameter tensors, not nonzero scalar gradients.",
     "amp_val_nll": 548.315185546875,
     "fp32_val_nll": 548.3743286132812,
     "nll_difference": -0.05914306640625,

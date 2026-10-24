@@ -25,6 +25,12 @@ XPASS. Shared imports must also come from the subject checkout when pinning a
 different checkout. Existing audit-2 tests are regression evidence, not an attempt
 to reconstruct the historical R028 test transcript.
 
+All five cumulative diffs below were also parsed and applied **in memory only**;
+the notebook collection string was syntax-checked. With expected-failure markers
+removed for that proposal check, all **23 protocol cases passed**. This checks
+the proposed repair against the counterexamples; it does not apply it or replace
+integration and CUDA testing.
+
 Runtime: Torch **2.6.0+cu124**, CPU, four Torch threads. The small upstream
 WMT-style network uses 11 levels, a source-prefix level-0 head, dropout 0.1,
 64-token targets and EOS/PAD. A second check uses the released weights verified
@@ -116,7 +122,7 @@ without validating the bytes would preserve this defect.
 
 ### A4-3 — P1: dropping degenerate sources breaks the reported FLOP match
 
-**Locations:** `scripts/train_wmt14_L.py:124`, `:172-185`, `:271-274`, `:318`.
+**Locations:** `scripts/train_wmt14_L.py:115`, `:172-185`, `:271-274`, `:318`.
 
 The teacher correctly executes all 12 passes over 16 sources, even when stopped.
 However, each dropped source also removes four gradient-bearing consistency rows.
@@ -314,8 +320,9 @@ audit's scope.
    prefix embedding lookups are not a no-grad autocast matrix forward through
    trainable generator weights. Hooks observe TF `(grad=True, amp=True)`, 12 teacher
    calls `(False, False)`, and student consistency `(True, True)`. All **41/41
-   trainable tensors, 16,235/16,235 elements** in the small upstream WMT-style
-   model receive finite nonzero gradient. Thus Torch 2.6 does not reproduce audit
+   trainable tensors**, containing **16,235 parameters**, in the small upstream
+   WMT-style model have finite gradient tensors with nonzero norm. This counts
+   reached parameter tensors, not nonzero individual gradient entries. Thus Torch 2.6 does not reproduce audit
    3's cache detachment here. On affected older Torch versions the dangerous
    no-grad weight cast requires enabled autocast; these teacher calls cannot
    create that cached cast. Fresh `Trainer.ctx` objects also avoid context reuse
@@ -329,15 +336,12 @@ audit's scope.
    checkpoint. `maybe_resume` restores them after model construction; no intervening
    data/random draw occurs before the next training step. A checkpoint after one
    J2 step followed by two further steps is bitwise equal to a fresh process-style
-   reconstruction plus restore and those same two steps: losses, weights, AdamW
+   reconstruction plus restore, an extra validation-NLL call and those same two steps: losses, weights, AdamW
    state, data RNG and global Torch RNG. No additional sampling generator is
    missing. This is same-runtime CPU evidence, not a guarantee across Torch,
    device or kernel changes; the manifest does not lock those numerical details.
-   `traj_stats` is only an interval logging accumulator, is not checkpointed and
-   resets on restart: unlogged degenerate counts can be lost after a time-budget
-   stop. Retain run-level source/degenerate totals in checkpoint `extra` before
-   using the J1b 1% rule on a resumed run; the model/optimizer equivalence result
-   does not establish completeness of these diagnostic totals.
+   This equivalence check covers stochastic training state, not wall-clock or
+   interval logging buffers.
 
 4. **Identifiability:** for fixed parameters and the visible, truncated/padded
    source prefix p, the eval-mode fp32 map Fp is deterministic. Its level k reads
@@ -431,6 +435,12 @@ comparison; no saved test transcript supports the historical 59/25/14 counts.
 This is missing evidence, not a numerical disagreement or a failed current smoke
 test. The present CPU tests corroborate particular current code paths but cannot
 authenticate those historical runs or their CU estimates.
+
+R028's earlier **up to 28%** compute shortfall is consistent with the registered
+proxy algebra: a two-pass teacher used `384 + 2 * 16 = 416` rows rather than
+576, a **27.77777777777778%** shortfall at the same 2000 steps. This recomputes
+the possible bound; it is not a measurement recovered from a historical smoke
+run. The JSON labels that distinction explicitly.
 
 ## Summary
 
