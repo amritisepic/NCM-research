@@ -83,12 +83,13 @@ def reproduction(per_group, seeds, expect, tol=0.01):
     theirs = dict(zip(sorted(int(s) for s in expect["config"]["sample_eval"]["final_seeds"]),
                       fe["genppl_gpt2-large_per_group"]))
     ours = dict(zip(sorted(seeds), per_group))
+    valid_groups = len(per_group) == len(seeds) == len(set(seeds))   # one score per distinct seed (audit 5, A5-1)
     pairs = {s: [ours[s], theirs[s]] for s in sorted(ours) if s in theirs}
-    missing = sorted(s for s in ours if s not in theirs)
+    missing = sorted(set(seeds) - set(theirs))
     finite = all(np.isfinite(v) for pair in pairs.values() for v in pair)
     diff = max((abs(u - v) for u, v in pairs.values()), default=float("inf")) if finite else float("inf")
-    return {"pairs": pairs, "missing_seeds": missing, "max_abs_diff": diff, "tol": tol,
-            "ok": bool(pairs) and not missing and finite and diff <= tol}
+    return {"pairs": pairs, "missing_seeds": missing, "max_abs_diff": diff, "tol": tol, "valid_groups": valid_groups,
+            "ok": valid_groups and bool(pairs) and not missing and finite and diff <= tol}
 
 
 def digest(path):

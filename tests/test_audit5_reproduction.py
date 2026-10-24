@@ -31,7 +31,7 @@ def expected_groups():
     }
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="A5-1: zip drops requested groups")
+# fixed (was a strict xfail: A5-1: zip drops requested groups)
 @pytest.mark.parametrize("seeds", [[0, 1], [0, 999]])
 def test_reproduction_rejects_missing_group_score(reproduction, expected_groups, seeds):
     # Seed 1 has a reference and seed 999 does not; neither has a current score.
@@ -39,7 +39,7 @@ def test_reproduction_rejects_missing_group_score(reproduction, expected_groups,
     assert not reproduction([10.0], seeds, expected_groups)["ok"]
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="A5-1: duplicate seeds collapse")
+# fixed (was a strict xfail: A5-1: duplicate seeds collapse)
 def test_reproduction_rejects_duplicate_seed(reproduction, expected_groups):
     # evaluate_samples produces one score per distinct group. This is the shape
     # that --seeds 0 0 supplies to reproduction after grouping identical draws.
