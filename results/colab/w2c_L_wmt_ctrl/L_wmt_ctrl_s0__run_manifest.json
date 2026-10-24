@@ -1,0 +1,31 @@
+{
+ "config": {
+  "arm": "ctrl",
+  "consist": {
+   "states_per_traj": 4
+  },
+  "train": {
+   "steps": 3000,
+   "batch_size": 128,
+   "lr": 5e-05,
+   "warmup": 200,
+   "min_lr_frac": 0.1,
+   "weight_decay": 0.01,
+   "beta2": 0.95,
+   "ckpt_every": 250,
+   "eval_every": 500,
+   "log_every": 25,
+   "seed": 0
+  },
+  "eval": {
+   "n_curve": 500
+  }
+ },
+ "data_sha256": "4beedc87b90dd8602b1ec5496ade7f3a6f358c046d27c190c2f6b82e845de236",
+ "base_config_sha256": "6401af2a14d41c6582c3181a0b683e8970c1eeefe8cf7afaf74f1597da3fcd72",
+ "base_sha256": {
+  "tokenizer.pt": "74f04176a3cd985e4142761bd7464ea6edb44dc0025c40302b5e45ea0d865702",
+  "generator.pt": "ae580cbbb400a27b30c616634745d4c9cfa8b66806f936c6c26041e5b9640d4f"
+ },
+ "device": "cuda"
+}

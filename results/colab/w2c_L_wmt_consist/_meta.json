@@ -1,0 +1,30 @@
+{
+ "run": "w2c_L_wmt_consist",
+ "gpu": "NVIDIA A100-SXM4-40GB",
+ "finished_utc": "2026-10-24T18:20:47Z",
+ "git_sha": "c60f8b43baf08562751b529c953c8ce36b4224f5",
+ "git_shas_all_sessions": [
+  "c60f8b43baf08562751b529c953c8ce36b4224f5"
+ ],
+ "sessions": {
+  "L_wmt_consist_s0": [
+   {
+    "event": "start",
+    "git_sha": "c60f8b43baf08562751b529c953c8ce36b4224f5",
+    "utc": "2026-10-24T17:10:12Z",
+    "gpu": "NVIDIA A100-SXM4-40GB",
+    "cmd": "python scripts/train_wmt14_L.py --config configs/scale/L_wmt_consist.yaml --run_dir {R}/L_wmt_consist_s0 --seed 0 --data {R}/../data/wmt14_train_pairs.npz",
+    "had_ckpt": false,
+    "last_logged_step": null
+   },
+   {
+    "event": "end",
+    "git_sha": "c60f8b43baf08562751b529c953c8ce36b4224f5",
+    "utc": "2026-10-24T18:20:47Z",
+    "exit": 0,
+    "minutes": 70.58,
+    "last_logged_step": 2000
+   }
+  ]
+ }
+}

@@ -1,0 +1,2 @@
+{"event": "start", "git_sha": "c60f8b43baf08562751b529c953c8ce36b4224f5", "utc": "2026-10-24T17:11:11Z", "gpu": "NVIDIA A100-SXM4-40GB", "cmd": "python scripts/train_wmt14_L.py --config configs/scale/L_wmt_ctrl.yaml --run_dir {R}/L_wmt_released --data {R}/../data/wmt14_train_pairs.npz --eval_only", "had_ckpt": false, "last_logged_step": null}
+{"event": "end", "git_sha": "c60f8b43baf08562751b529c953c8ce36b4224f5", "utc": "2026-10-24T17:21:05Z", "exit": 0, "minutes": 9.91, "last_logged_step": null}
