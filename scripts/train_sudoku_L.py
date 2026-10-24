@@ -89,7 +89,7 @@ if a.eval_only and os.path.exists(ckpt_path):
 _base = os.path.join(ROOT, "artifacts", "sudoku", "hard")
 manifest = {"config": OmegaConf.to_container(cfg, resolve=True), "data_sha256": digest(a.data),
             "base_config_sha256": digest(os.path.join(_base, "config.yaml")),
-            "base_bytes": {n: os.path.getsize(os.path.join(_base, n)) for n in ("tokenizer.pt", "generator.pt")},
+            "base_sha256": {n: digest(os.path.join(_base, n)) for n in ("tokenizer.pt", "generator.pt")},   # audit 3, A3-3
             "device": pick_device()}
 if os.path.exists(ckpt_path) and not a.calib_steps:
     if not os.path.exists(manifest_path) or json.load(open(manifest_path)) != manifest:

@@ -12,6 +12,7 @@ import pytest
 import torch
 
 from ncmr.corruption import CorruptionCfg, build_hierarchy
+from ncmr.train import fp32_eval
 from test_audit_hierarchy import tiny_text_tokenizer
 
 
@@ -31,7 +32,7 @@ def policy_fixture(passes=2):
 
     ctx = torch.autocast("cpu", dtype=torch.bfloat16)
     net = Net()
-    ns = dict(torch=torch, net=net, fnet=net, device="cpu", policy_passes=passes,
+    ns = dict(torch=torch, net=net, fnet=net, device="cpu", policy_passes=passes, fp32_eval=fp32_eval,
               policy_temp=1.0, l0=1, L0=torch.tensor([0.0, 1.0]),
               trainer=SimpleNamespace(ctx=ctx), prefix_emb=lambda b: torch.zeros(b, 1, 1),
               tok=SimpleNamespace(_encode_pre_quant=lambda x: x.float(), vq=SimpleNamespace(
