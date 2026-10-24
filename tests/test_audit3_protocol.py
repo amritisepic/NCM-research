@@ -127,7 +127,7 @@ def test_text_parallel_alignment_matches_forced_sequential(tmp_path, monkeypatch
     torch.testing.assert_close(torch.cat(seen, 1), full.float(), rtol=1e-4, atol=1e-5)
 
 
-@pytest.mark.xfail(reason="A3-1: policy forward inherits training AMP and TF32", **DEFECT)
+# fixed in PR 5 (was a strict xfail: A3-1: policy forward inherits training AMP and TF32)
 def test_text_policy_forward_is_fp32_with_tf32_off(tmp_path):
     ns, x = text_case(tmp_path)
     seen = []
@@ -146,7 +146,7 @@ def test_text_policy_forward_is_fp32_with_tf32_off(tmp_path):
         torch.backends.cuda.matmul.allow_tf32, torch.backends.cudnn.allow_tf32 = flags
 
 
-@pytest.mark.xfail(reason="A3-1: val_nll enters trainer.ctx and leaves TF32 enabled", **DEFECT)
+# fixed in PR 5 (was a strict xfail: A3-1: val_nll enters trainer.ctx and leaves TF32 enabled)
 def test_val_nll_is_fp32_scoring(tmp_path):
     ns, _ = text_case(tmp_path)
     seen = []
@@ -163,7 +163,7 @@ def test_val_nll_is_fp32_scoring(tmp_path):
         torch.backends.cuda.matmul.allow_tf32, torch.backends.cudnn.allow_tf32 = flags
 
 
-@pytest.mark.xfail(reason="A3-2: categorical policy samples consume the training global RNG", **DEFECT)
+# fixed in PR 5 (was a strict xfail: A3-2: categorical policy samples consume the training global RNG)
 def test_policy_preserves_global_training_rng():
     policy, ctx, _ = policy_fixture(1)
     before = torch.get_rng_state().clone()
@@ -172,7 +172,7 @@ def test_policy_preserves_global_training_rng():
     assert torch.equal(before, torch.get_rng_state())
 
 
-@pytest.mark.xfail(reason="A3-2: net.train(was) overwrites mixed submodule modes", **DEFECT)
+# fixed in PR 5 (was a strict xfail: A3-2: net.train(was) overwrites mixed submodule modes)
 def test_policy_preserves_each_module_mode(tmp_path):
     ns, x = text_case(tmp_path)
     ns["net"].train()
@@ -247,7 +247,7 @@ def test_identical_config_cpu_resume_is_exact(tmp_path):
     assert torch.equal(expected_rng[1], gen.get_state())
 
 
-@pytest.mark.xfail(reason="A3-3: run key accepts a changed stochastic microbatch partition", **DEFECT)
+# fixed in PR 5 (was a strict xfail: A3-3: run key accepts a changed stochastic microbatch partition)
 def test_resume_key_rejects_changed_microbatch_partition():
     ns = definitions("scripts/train_gen.py", ["_run_key"], {"OmegaConf": OmegaConf})
     cfg = OmegaConf.load(ROOT / "configs/scale/L_ts_onpol.yaml")
@@ -256,7 +256,7 @@ def test_resume_key_rejects_changed_microbatch_partition():
     assert before != ns["_run_key"](cfg)
 
 
-@pytest.mark.xfail(reason="A3-3: a checkpoint without config skips identity validation", **DEFECT)
+# fixed in PR 5 (was a strict xfail: A3-3: a checkpoint without config skips identity validation)
 def test_resume_without_config_fails_closed(tmp_path):
     tree = ast.parse((ROOT / "scripts/train_gen.py").read_text())
     node = next(n for n in tree.body if isinstance(n, ast.If)
@@ -286,7 +286,7 @@ def test_microbatch_partition_changes_masks(released_sudoku):
     assert not torch.equal(full["used"], torch.cat(parts))
 
 
-@pytest.mark.xfail(reason="A3-3: Sudoku base checkpoint identity is only its byte size", **DEFECT)
+# fixed in PR 5 (was a strict xfail: A3-3: Sudoku base checkpoint identity is only its byte size)
 def test_sudoku_manifest_rejects_same_size_base_change(tmp_path):
     base = tmp_path / "base"
     base.mkdir()
@@ -328,7 +328,7 @@ def test_sudoku_canonical_policy_has_identical_prefix_query_and_targets(released
     assert torch.equal(actual, expected)
 
 
-@pytest.mark.xfail(reason="A3-3: missing corruption RNG is silently reseeded", **DEFECT)
+# fixed in PR 5 (was a strict xfail: A3-3: missing corruption RNG is silently reseeded)
 def test_resume_without_corruption_rng_fails_closed():
     tree = ast.parse((ROOT / "scripts/train_gen.py").read_text())
     node = next(n for n in tree.body if isinstance(n, ast.If)
@@ -377,3 +377,14 @@ def test_notebook_collection_carries_source_identity():
               utc=lambda: "2026-10-24T00:00:00Z")
     exec(compile(ast.Module(body=[stmt], type_ignores=[]), "notebooks/make_notebooks.py", "exec"), ns)
     assert any(k in payloads[0] for k in ("git_sha", "code_sha", "source_revision"))
+
+
+def test_samples_file_carries_no_absolute_run_dir():
+    """Codex PR 7 comment 4367597222 (same class): samples_final.json is published, so it names the run, not its path."""
+    tree = ast.parse((ROOT / "scripts/train_gen.py").read_text())
+    dumps = [n for n in ast.walk(tree) if isinstance(n, ast.Call) and ast.unparse(n.func) == "json.dump"
+             and "samples_final.json" in ast.unparse(n)]
+    assert len(dumps) == 1
+    payload = ast.unparse(dumps[0].args[0])
+    assert "'run_dir'" not in payload and "os.path.basename" in payload
+

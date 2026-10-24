@@ -363,7 +363,7 @@ if not a.skip_final_eval:
     seeds = [int(s) for s in sc.get("final_seeds", [42, 0, 1, 2])]
     sm, ids, groups = sample_metrics(int(sc.get("final_n", 256)), seeds, mauve=bool(sc.get("mauve", True)))
     final.update(sm)
-    json.dump({"ids": ids, "groups": groups, "nfe_per_sample": sm["nfe_per_sample"], "run_dir": a.run_dir},
+    json.dump({"ids": ids, "groups": groups, "nfe_per_sample": sm["nfe_per_sample"], "run": os.path.basename(os.path.normpath(a.run_dir))},   # no absolute path in published results
               open(os.path.join(a.run_dir, "samples_final.json"), "w"))
 wall = trainer.wall_prev + time.time() - trainer.t_start
 res = {"run": os.path.basename(a.run_dir.rstrip("/")), "config": OmegaConf.to_container(cfg),
