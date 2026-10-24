@@ -140,6 +140,9 @@ def test_saved_history_numbers_recompute_exactly():
     # recomputable in the working tree (every number recomputed from a named file still is)
     for d in (expected, saved):
         d["history"]["R028"].pop("results_json_count", None)
+    # likewise later WMT14 result files (R036) extend the WMT-named list: the audited files must all still be there
+    audited = saved["history"]["R028"].pop("wmt_named_json")
+    assert set(audited) <= set(expected["history"]["R028"].pop("wmt_named_json"))
     assert {k: saved[k] for k in expected} == expected
     assert not saved["history"]["disagreements"]
 
