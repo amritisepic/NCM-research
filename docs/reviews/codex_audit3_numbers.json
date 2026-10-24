@@ -1,8 +1,17 @@
 {
   "audit_ref": "d501333",
+  "original_subject_git_blob_sha256": {
+    "scripts/train_gen.py": "b3c95d02a84153aed2338ab453149d24d1dc00f2577bfc31f06b41920637d665",
+    "scripts/train_sudoku_L.py": "539760cdaf1b5ad205a6530c44e435133991f9d0779ba749b0743bf06e835b84",
+    "src/ncmr/train.py": "b54bab13628524d5d7b84e1e33cafeca53631995e97dce9e0b214e90280e5832",
+    "src/ncmr/corruption.py": "97bd3af546cff3d97a605961f3ad807d3b0fea3582a679b0a18834442d33a427",
+    "notebooks/make_notebooks.py": "c1da7fb84116f79b80e5604d1a5f144cfcfe9d2d91585eeb2d8c14c8d8a35ab4",
+    "docs/preregistration.md": "882580e68e97bc22d59fa7f2c7dd8ee8121fcd238f7494caee1ad348fbca86b0"
+  },
+  "recomputation_checkout_ref": "1bd3816092c5434b9d786a732e675cacbaf0e3ca",
   "method": "stdlib means/sample SDs from saved group scores, five-seed MAUVE means/SDs; not a neural scorer rerun",
   "limitations": [
-    "Saved samples are pre-re-encoding IDs. Entropy is read back after the evaluation BPE decode/re-encode; tokenizer assets are absent locally.",
+    "Sample entropy, length, repetitions, distinct n-grams and word duplicates are independently recomputed after BPE decode/re-encode.",
     "NLL is read back, not rescored: W1 weights/checkpoints are absent. Per-level entries are rounded to .01.",
     "MAUVE SD is quantization-seed variability, not uncertainty across independent datasets.",
     "The group's sorted seed order differs from generation order [42,0,...,14]."
@@ -12,34 +21,36 @@
     "scripts/train_sudoku_L.py": "82a1592f9f76685a420f430c7aa8ae1ab4fdbf65834c5907ed77a33b56c0bc10",
     "src/ncmr/train.py": "74fa3c9a5a24861708ef59d38f9612c3f58b9052ac0d3201595a9fe0502249aa",
     "src/ncmr/corruption.py": "fc79afdfa98f21e7904b63620ae83f69f52d4500ea47893f130696fe2ac529e1",
-    "notebooks/make_notebooks.py": "c0a52bd3beb7fa321ba8461eb5010d88526aef9e7b5ff2a35046c129714772a0",
+    "notebooks/make_notebooks.py": "a8e1085cdfcadf6448e54bf986945efd64efd9a6c962fe0cd666c39e9e311626",
     "docs/preregistration.md": "dd0e124adfeef1d8b05a39b5fc04394cb7df5165070ab6630d6bd8560bd5c321",
-    "results/colab/w1_L_ts_ctrl/L_ts_released16__result.json": "3c4be8cdbf49d97efb599f647d407442d6a3183837623964418fc39e1e3ef516",
+    "results/colab/w1_L_ts_ctrl/L_ts_released16__result.json": "36961e0367c0851165fc6553e29da9e15be859438e27bdffa5e9f836a3d37db8",
     "results/colab/w1_L_ts_ctrl/L_ts_released16__samples_final.json": "f2195ad8ea2ae467bc78f88d6cab837a8fbab34e2540109813bf037750a85dfd",
+    "data/tinystories/bpe_vocab_8192.pickle": "fb176b4c68108e4b5ef61b9ff2af3731600124e3e160970a6bd78cd0a5d3ff6c",
+    "data/tinystories/bpe_merges_8192.pickle": "0d4cab13f2e7b684b75eaa290a52e596ba87744ef13d943cf3a50a5a8e080ec1",
     "results/colab/w1_L_ts_ctrl/_meta.json": "86f0bc311b1d4773e2a10b272ab144add6f50e5f648615a2c79fda95b374b13e",
-    "results/colab/w1_L_ts_ctrl/L_ts_ctrl_s0__result.json": "90e7b11da72423b4e937247566f3357a35f32a1fbe674ea9da7b10fc8ff2ac27",
+    "results/colab/w1_L_ts_ctrl/L_ts_ctrl_s0__result.json": "49fefd65cd85fd1cda2a77455764cb9d8f449c679a4aa26fdf0a0d8cf6a23187",
     "results/colab/w1_L_ts_ctrl/L_ts_ctrl_s0__samples_final.json": "9927a54a5315c48ac31c7346f3f264e35e9bed4a914c7c66b030270b2da7d865",
-    "results/colab/w1_L_ts_ctrl/L_ts_ctrl_s0__metrics.jsonl": "3ebd90ffd197a5e3218c135fcb1ababae5ed3406920f6cb6ac7a4832fee9850b",
-    "results/colab/w1_L_ts_requant/L_ts_requant_s0__result.json": "a41a9a7fe2223b2c156af5852d5a7e8dc618392dd6509fbab4b81e2e6989976a",
+    "results/colab/w1_L_ts_ctrl/L_ts_ctrl_s0__metrics.jsonl": "fe72460b6d815cf819e36ea0a351d3b57ca4135f14a1da7586cbda37308ae6ad",
+    "results/colab/w1_L_ts_requant/L_ts_requant_s0__result.json": "34bf43b9558402af07481d93c6bb3e01982d4d555791d1af8dc24a1beba8de2c",
     "results/colab/w1_L_ts_requant/L_ts_requant_s0__samples_final.json": "458f6ccb385c6f0dd26e3a06478e0d1cf3702be7f999e0b52f7829eccf1524ec",
     "results/colab/w1_L_ts_requant/_meta.json": "a0fa90abb498eb4d26c2d034f9cbc4cae515c130881102c59d19da7799b8070c",
-    "results/colab/w1_L_ts_requant/L_ts_requant_s0__metrics.jsonl": "5233cdd5bfbfc52ea7f9e7df554e7416a325955f1b14e4d5fbb92928946c566c",
-    "results/colab/w1_L_ts_onpol/L_ts_onpol_s0__result.json": "70f3482ce46de71b112f3f0d65502613e8f78767884067d8da2d22f2d74326f4",
+    "results/colab/w1_L_ts_requant/L_ts_requant_s0__metrics.jsonl": "55106f0d648edbf2ab0c7551b81f87dd2c68c11f36515d1fa2541dda77ee4c18",
+    "results/colab/w1_L_ts_onpol/L_ts_onpol_s0__result.json": "19262d6bd5bc2b329c9982c7910056c28a7c68bcbacccc2ca88ec0f702b2c50a",
     "results/colab/w1_L_ts_onpol/L_ts_onpol_s0__samples_final.json": "bb5982ad708c2b864c6282f888e0e5ff63f34d1cf174de11379552f4cbc62e9e",
     "results/colab/w1_L_ts_onpol/_meta.json": "09d54ef28bb82777104dd0ff6cda0e7ffbcb31cdbed295128b759711cfc0697d",
-    "results/colab/w1_L_ts_onpol/L_ts_onpol_s0__metrics.jsonl": "ed4c99e6544b82a8f410e0ea229465faadfd1a413ae117573d315756c6c30df7",
-    "results/colab/w1_L_ts_b1/L_ts_b1_s0__result.json": "6de4c77fb321bd6acdc908f36f14aa30533b4e1bb45c7f7b6a2af11ffb7498de",
+    "results/colab/w1_L_ts_onpol/L_ts_onpol_s0__metrics.jsonl": "56933e227fa16fb7ef44b2c6605cfa8f05ea1f0a3806a6a79fec85f52b2bd84d",
+    "results/colab/w1_L_ts_b1/L_ts_b1_s0__result.json": "9a7a440645cc3f066c91310744b25c87cbd6097689976591fcf061ac552f9516",
     "results/colab/w1_L_ts_b1/L_ts_b1_s0__samples_final.json": "a3c16bd0cedb404b40ad70766f87889ca48d6213d9c7c84f615b67cd97d58f0a",
     "results/colab/w1_L_ts_b1/_meta.json": "853ed3401977079d0d5cb3cc578a68b0183ff868c229e424032aeace8a5b531d",
-    "results/colab/w1_L_ts_b1/L_ts_b1_s0__metrics.jsonl": "201820efb5e6ab165a3b83715b875a7310edf1ae9c51e4d3cac2c6f478b09f83",
-    "results/colab/w1_L_ts_onpol2/L_ts_onpol2_s0__result.json": "4b4829a57e78d2f2084df35515b93463c41caae8f364ff91c5fb817a90fdaa5e",
+    "results/colab/w1_L_ts_b1/L_ts_b1_s0__metrics.jsonl": "42125e3e8774772f929381e812af9c7d8783535c34a62691d124dee097934448",
+    "results/colab/w1_L_ts_onpol2/L_ts_onpol2_s0__result.json": "f3d998c264efd1d0f1aff68f8454a97b093dfaa2531bc3cb2f3f0ffdcc75fd42",
     "results/colab/w1_L_ts_onpol2/L_ts_onpol2_s0__samples_final.json": "ba5da01797142786e7d4436b0da98408290f926412f4af5ab819e47fe4d3a516",
     "results/colab/w1_L_ts_onpol2/_meta.json": "8045cd00903aa0d10e93b79f18c760f73034a54173a8234dfa4c751f99a98867",
-    "results/colab/w1_L_ts_onpol2/L_ts_onpol2_s0__metrics.jsonl": "8929db6d0d900341860223fda02a06c76c6a3b12f6b7c79be60ec8650b602127",
-    "results/colab/w1_L_ts_soft/L_ts_soft_s0__result.json": "571523bdb515569ceb726906b729ac66f80e06f929e55a95bac65205539780e3",
+    "results/colab/w1_L_ts_onpol2/L_ts_onpol2_s0__metrics.jsonl": "84df21b9b93f16fa22ccd531194e1edc28ef9bd5b0c48fa2e4c3133d516ebd8c",
+    "results/colab/w1_L_ts_soft/L_ts_soft_s0__result.json": "69483e7b226a0222c58990229708fe907199ae6c81c6ed0a8008751a2fb8d861",
     "results/colab/w1_L_ts_soft/L_ts_soft_s0__samples_final.json": "10e2b6093115f5fcb9723681f8c03c769a60223f45ccb43d71d13df6f64de5b9",
     "results/colab/w1_L_ts_soft/_meta.json": "4896849481940ecf8bd5deee7f6569754463c1a1e91b6732475ee70a266c4077",
-    "results/colab/w1_L_ts_soft/L_ts_soft_s0__metrics.jsonl": "3f3932198f1470e28b5758d8032f3ac0f049b99150d13be5524e3870259e2225",
+    "results/colab/w1_L_ts_soft/L_ts_soft_s0__metrics.jsonl": "e8b7e324bede694bec8063f04a05811c8f59043526ac8083bbd7208534d499d3",
     "results/b1_repair_capacity.json": "bdd26aed567e0f4796cd36c5c9e0451dc65b26e0182fd10e892d7872a23183fe"
   },
   "arms": {
@@ -83,6 +94,17 @@
       ],
       "entropy_readback": 3.970221776395142,
       "nfe_per_sample": 11.0,
+      "sample_statistics_recomputed": {
+        "entropy": 3.9702217763951464,
+        "len_tokens": 127.86181640625,
+        "dup_adj1_per_1k": 10.01262174330765,
+        "dup_adj2_per_1k": 11.401955428291544,
+        "rep_2": 0.1016812483480291,
+        "rep_3": 0.022727204908408544,
+        "rep_4": 0.005821719852265672,
+        "distinct_2": 0.12535891060527915,
+        "distinct_3": 0.35358026128196923
+      },
       "genppl_gpt2-large": {
         "values": [
           16.36077025059937,
@@ -194,6 +216,17 @@
       ],
       "entropy_readback": 3.962499484186292,
       "nfe_per_sample": 11.0,
+      "sample_statistics_recomputed": {
+        "entropy": 3.9624994841862957,
+        "len_tokens": 127.612548828125,
+        "dup_adj1_per_1k": 9.745426085398599,
+        "dup_adj2_per_1k": 12.314974811350334,
+        "rep_2": 0.10504422968611397,
+        "rep_3": 0.02396807449330725,
+        "rep_4": 0.006347803051781491,
+        "distinct_2": 0.12698464730450476,
+        "distinct_3": 0.359141009618842
+      },
       "genppl_gpt2-large": {
         "values": [
           16.734317527205963,
@@ -305,6 +338,17 @@
       ],
       "entropy_readback": 3.9626452466985347,
       "nfe_per_sample": 11.0,
+      "sample_statistics_recomputed": {
+        "entropy": 3.9626452466985387,
+        "len_tokens": 127.723876953125,
+        "dup_adj1_per_1k": 10.080592792694935,
+        "dup_adj2_per_1k": 12.430133628659203,
+        "rep_2": 0.1072016020567857,
+        "rep_3": 0.024951135847772653,
+        "rep_4": 0.006548679529476023,
+        "distinct_2": 0.12401432586921383,
+        "distinct_3": 0.3522821939355102
+      },
       "genppl_gpt2-large": {
         "values": [
           16.151956445622314,
@@ -416,6 +460,17 @@
       ],
       "entropy_readback": 4.026335264854233,
       "nfe_per_sample": 11.0,
+      "sample_statistics_recomputed": {
+        "entropy": 4.026335264854236,
+        "len_tokens": 127.464111328125,
+        "dup_adj1_per_1k": 16.971761033063714,
+        "dup_adj2_per_1k": 11.981457830755405,
+        "rep_2": 0.07757913891091499,
+        "rep_3": 0.01399938233441248,
+        "rep_4": 0.003005998786724366,
+        "distinct_2": 0.2042000243244652,
+        "distinct_3": 0.5180744929470852
+      },
       "genppl_gpt2-large": {
         "values": [
           41.4205645230243,
@@ -527,6 +582,17 @@
       ],
       "entropy_readback": 4.037412573186066,
       "nfe_per_sample": 11.0,
+      "sample_statistics_recomputed": {
+        "entropy": 4.037412573186069,
+        "len_tokens": 127.5400390625,
+        "dup_adj1_per_1k": 13.591139124142304,
+        "dup_adj2_per_1k": 12.136797667396587,
+        "rep_2": 0.0799050228767749,
+        "rep_3": 0.014546929022563097,
+        "rep_4": 0.0030500417519167917,
+        "distinct_2": 0.20033802229943914,
+        "distinct_3": 0.5098558187836193
+      },
       "genppl_gpt2-large": {
         "values": [
           35.802117425657926,
@@ -638,6 +704,17 @@
       ],
       "entropy_readback": 3.98951224158961,
       "nfe_per_sample": 11.0,
+      "sample_statistics_recomputed": {
+        "entropy": 3.9895122415896127,
+        "len_tokens": 127.5107421875,
+        "dup_adj1_per_1k": 16.404355924241102,
+        "dup_adj2_per_1k": 13.651804620792385,
+        "rep_2": 0.0874292207161062,
+        "rep_3": 0.017313946764164707,
+        "rep_4": 0.004121008786831317,
+        "distinct_2": 0.1765864898453843,
+        "distinct_3": 0.46877018121270125
+      },
       "genppl_gpt2-large": {
         "values": [
           33.395984731648994,
@@ -749,6 +826,17 @@
       ],
       "entropy_readback": 3.958134152534928,
       "nfe_per_sample": 11.0,
+      "sample_statistics_recomputed": {
+        "entropy": 3.9581341525349316,
+        "len_tokens": 127.655029296875,
+        "dup_adj1_per_1k": 10.666666666666666,
+        "dup_adj2_per_1k": 12.399646330680813,
+        "rep_2": 0.10530420558347137,
+        "rep_3": 0.023857395089967568,
+        "rep_4": 0.0062273580933098925,
+        "distinct_2": 0.1283513789108657,
+        "distinct_3": 0.36198980731829106
+      },
       "genppl_gpt2-large": {
         "values": [
           17.33232960806849,
@@ -5569,6 +5657,35 @@
         }
       ]
     },
-    "limitations": "One training seed, batch 2, fp32, same steps not equal FLOPs; diagnostic only, not S1 replication."
+    "limitations": "One training seed, batch 2, fp32, same steps not equal FLOPs; diagnostic only, not S1 replication.",
+    "budget_target_cpu_s": 1050,
+    "budget_overrun_cpu_s": 268.59375,
+    "over_requested_20_cpu_minutes_s": 118.59375,
+    "budget_note": "Soft target: the 65-second reserve underestimated two final solve evaluations. Actual 21.9765625 CPU-minutes; no further training was run.",
+    "driver_source_sha256": "3346ff65482f537fbe4e80071c7a25ba46b3ad2311a4a9e2df7a5f163d93ef1a"
+  },
+  "verification": {
+    "completed_date": "2026-10-24",
+    "original_ref": "d5013334808ab4b946874e06671a6ef3f2c79ef6",
+    "original_suite": {
+      "passed": 12,
+      "strict_xfailed": 9,
+      "elapsed_s": 52.51
+    },
+    "final_ref": "1bd3816092c5434b9d786a732e675cacbaf0e3ca",
+    "final_command": "python -B -m pytest -p no:cacheprovider tests/test_audit3_protocol.py tests/test_audit3_numbers.py tests/test_notebook_provenance.py -q -rx",
+    "final_suite": {
+      "passed": 18,
+      "strict_xfailed": 8,
+      "elapsed_s": 13.61
+    },
+    "runtime": "2.11.0+cpu",
+    "A3_4_status": "Source identity omission addressed by merged notebook provenance changes; regression now passes.",
+    "cuda_replay_run": false,
+    "production_files_changed_by_audit": false,
+    "proposed_A3_1_A3_2_sources_compile_in_memory": true,
+    "sample_statistics_recomputed": true,
+    "sample_statistics_command": "python -B tests/test_audit3_numbers.py --write --sample-statistics",
+    "sample_statistics_discrepancies": 0
   }
 }

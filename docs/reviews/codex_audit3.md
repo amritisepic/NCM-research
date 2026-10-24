@@ -1,8 +1,12 @@
 # Deep audit 3: W1 on-policy corruption and S1 onpolicy
 
-Audit date: 2026-10-23. Subject: `d5013334808ab4b946874e06671a6ef3f2c79ef6`,
-the fetched head of `claude/ncm-research`. The shared checkout later moved to
-an analysis branch; the subject files remained byte-identical. This audit's
+Audit started 2026-10-23; completed 2026-10-24. Original subject:
+`d5013334808ab4b946874e06671a6ef3f2c79ef6`, then the fetched head of
+`claude/ncm-research`. Final verification also covers
+`1bd3816092c5434b9d786a732e675cacbaf0e3ca`: its trainers, corruption code and W1
+configs are unchanged; notebook provenance has since been fixed (A3-4 below).
+The shared checkout moved during the audit, so publication uses an isolated
+branch based on that newer head. This audit's
 publication contains only this report, `codex_audit3_numbers.json`, and
 `tests/test_audit3_*.py`. No production patch below is applied. Per the explicit
 file restriction, this report is also the run record; `log.md` is untouched.
@@ -32,8 +36,10 @@ not a recommendation to launch those seeds before resolving the audit.
 
 ## Findings
 
-Priorities below are P1: each blocks the specified protocol or reproducible
-continuation. None is promoted to a proven explanation of the large PPL effect.
+The original audit found four P1 issues: each blocks the specified protocol or
+reproducible continuation. A3-1 through A3-3 remain open at final verification;
+A3-4's source-identity omission is addressed upstream. None is promoted to a
+proven explanation of the large PPL effect.
 Strict xfails catch only `AssertionError`, so missing assets or broken imports
 cannot masquerade as a reproduced defect.
 
@@ -332,6 +338,15 @@ claim that the minimal guard diff alone provides full provenance.
 
 ### A3-4 — P1: notebook result bundles cannot identify code or checkpoint lineage
 
+**Final status:** historical finding against `d501333`. The merged notebook
+provenance changes through `c91126a` now record SHA, UTC times and session history,
+and reject an unprovenanced checkpoint or incompatible earlier code. The source
+identity probe is a normal passing regression on `1bd3816`; it remains a strict
+xfail when run against the original notebook. The original location and proposed
+diff below document the defect found during W1, rather than asserting that the
+new notebook still lacks source identity. Checkpoint content hashes and exact
+attempt/model lineage remain recommended improvements.
+
 **Locations:** `notebooks/make_notebooks.py:183`,
 `notebooks/make_notebooks.py:185`, `notebooks/make_notebooks.py:225`,
 `notebooks/make_notebooks.py:253`, `notebooks/make_notebooks.py:261`;
@@ -347,7 +362,9 @@ so subtracting A0's duration from the notebook finish does not date A0's launch.
 
 **Test:** `test_notebook_collection_carries_source_identity` executes the actual
 metadata-dump statement with I/O intercepted and strict-xfails on absent code
-identity. Metadata is not retroactively recoverable from this test.
+identity. Its stub namespace supports both the original proposed names and the
+merged implementation's names. Metadata for the old W1 runs is not retroactively
+recoverable from this test.
 
 **Proposed patch (not applied; illustrative notebook changes):**
 
@@ -431,7 +448,26 @@ uniform versus the actual extracted greedy `tf_loss`. Dropout seeds and augmente
 training batches match per step. A CPU-time cap stops both arms at the same step.
 This is a small-batch diagnostic at equal steps, not an equal-FLOP S1 replication.
 
-CPU_RESULT_PENDING
+The run completed **51 paired steps**, with **1318.59375 CPU seconds (21.9766
+CPU-minutes)** and 1434.9866 wall seconds. The target was 1050 CPU seconds; the
+65-second final-evaluation reserve was too short. Final solve-rate evaluations
+caused a roughly two-minute overrun of the requested ~20 CPU-minutes. No further
+training was run. The JSON preserves the target and actual time separately.
+
+| Arm | Step | Clean NLL (nats/puzzle) | D1 solved |
+| --- | ---: | ---: | ---: |
+| Released baseline, shared | 0 | 42.442291 | 31/32 (96.875%) |
+| Uniform corruption | 51 | 42.697693 | 31/32 (96.875%) |
+| Greedy on-policy corruption | 51 | 42.881468 | 31/32 (96.875%) |
+
+NLL rises by 0.255402 (uniform) versus 0.439177 (on-policy), an additional
+0.183774 nats/puzzle for on-policy. The same puzzle remains unsolved in both
+arms. **A comparable rapid collapse was not reproduced in this bounded
+diagnostic.** This is an inconclusive negative: 51 small-batch steps remain
+inside the 200-step warmup, only 102 training exposures per arm were processed,
+and there is one training seed and 32 validation puzzles. The experiment does
+not establish behavior after hundreds of steps, under bf16, on TinyStories, or
+at the registered S1 batch size. Full per-puzzle outcomes are saved in the JSON.
 
 **Important negative control:** the initially available Torch 2.6 runtime showed
 the known no-grad/autocast cache issue: on a released Sudoku forward/backward,
@@ -446,8 +482,8 @@ that attractive but unsupported causal conclusion from an older CPU environment.
 ## W1 arithmetic and registered screen
 
 All group means/SDs and MAUVE means/SDs below were recomputed from stored arrays;
-SD uses n-1. NLL and entropy are saved readbacks, not independently rescored
-checkpoints. Sixteen groups contain 256 samples each. Array group order is sorted
+SD uses n-1. NLL is a saved readback; entropy and the other non-neural sample statistics
+were independently recomputed after the evaluation BPE decode/re-encode. Sixteen groups contain 256 samples each. Array group order is sorted
 seed order **0..14,42**, not generation order **42,0..14**. MAUVE pools 4096 samples
 against 4096 validation windows and averages five quantization seeds.
 
@@ -494,9 +530,11 @@ variance, entropy/MAUVE gates and multiple-comparator selection.
 The JSON retains both scorers' 16 means, sample SDs, all comparator differences,
 sorted-seed difference arrays, entropy/MAUVE gaps, five MAUVE values, every eval
 curve occurrence, duplicate training payloads and source hashes. No discrepancy
-was found in the stored aggregate means/SDs. Entropy cannot be independently
-recomputed from saved raw IDs without the original BPE decode/re-encode assets;
-MAUVE features and per-example scorer losses are also not present.
+was found in the stored aggregate means/SDs. The locally available released BPE
+assets also reproduce entropy, length, repetition, distinct n-grams and word
+duplicates from all 28,672 saved samples. Their hashes and recomputed statistics
+are retained in the JSON. MAUVE features and per-example scorer losses are not
+present, so neural scores are checked by re-aggregating the saved score arrays.
 
 ## Resume evidence
 
@@ -597,16 +635,25 @@ tests cannot prove the historical timing, execution count or launch environment.
 
 ## Verification and reproducibility
 
-VERIFICATION_PENDING
+On the original trainer/notebook subject, the completed suite ran with Torch
+2.11.0+cpu: **12 passed, 9 strict xfailed in 52.51 seconds**. All expected
+failures were the intended assertions. On the final verified head `1bd3816`, the audit suite plus the five existing
+notebook provenance checks gave **18 passed, 8 strict xfailed in 13.61 seconds**.
+The remaining eight failures cover A3-1 through A3-3; A3-4 source identity passes.
+Full verification metadata is recorded in the accompanying JSON. The number writer found
+no discrepancy in stored aggregate means or sample SDs. The cumulative proposed
+A3-1/A3-2 Python replacements were syntax-checked in memory; no production patch
+was applied and no CUDA replay was run.
 
 Use the existing dependency environment with Torch 2.11 CPU and the hash-pinned
 audit assets. The optional local pytest installation can be exposed through
 `PYTHONPATH=tests/_deps:tests:src` (use the platform's path separator). No automatic
-asset download is performed by the tests.
+asset download is performed by the tests. The optional sample-statistics pass
+also needs the released BPE vocabulary and merges under `data/tinystories/`.
 
 ```sh
 python -B -m pytest -p no:cacheprovider tests/test_audit3_protocol.py tests/test_audit3_numbers.py -q -rx
-python -B tests/test_audit3_numbers.py --write
+python -B tests/test_audit3_numbers.py --write --sample-statistics
 python -B tests/test_audit3_cpu.py --run
 ```
 
@@ -621,4 +668,4 @@ the fix. No test is pinned to an old defective implementation by default.
 | A3-1 | P1 | `scripts/train_gen.py:173` | Text policy and clean-NLL forwards inherit training AMP/TF32 |
 | A3-2 | P1 | `scripts/train_gen.py:174` | Policy consumes global dropout RNG; mode restoration is incomplete |
 | A3-3 | P1 | `scripts/train_gen.py:82` | Resume permits changed partition/missing state; base identity is incomplete |
-| A3-4 | P1 | `notebooks/make_notebooks.py:261` | Result bundles omit source and checkpoint attempt lineage |
+| A3-4 | P1, addressed upstream | `notebooks/make_notebooks.py:261` at `d501333` | Original bundles omit source identity; new notebook records session provenance |
