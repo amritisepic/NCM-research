@@ -8,6 +8,9 @@ Arms (config `arm`; pre-registered as J1 in docs/preregistration.md):
            trajectory's input states before convergence (pass-1 input = all-zero codes), and train one parallel
            pass from each state to predict the fixed point's codes (the model's own sequential greedy output).
            Steps are cut so both arms use the same training FLOPs (trajectory passes counted).
+  consist_frozen  J2-F: consist with the trajectories and fixed points taken from a frozen copy of the released
+           generator (eval mode, no grad, never updated or checkpointed) instead of the current model; the student,
+           its loss and every draw are consist's.
 Evaluation (fp32, as wave 0): sequential greedy decoding (11 NFE) and exact Jacobi (stop when no code changes:
 output identical to sequential), mean passes, BLEU (lowercased sacreBLEU, as R020) on newstest2013 (val,
 selection) and once on newstest2014 (test, data/wmt14/sources.pickle).
@@ -18,6 +21,7 @@ selection) and once on newstest2014 (test, data/wmt14/sources.pickle).
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
 import os
@@ -107,12 +111,21 @@ m_states = int(kc.get("states_per_traj", 4))
 fwd = FL.ncm_gen_fwd_per_seq(int(B_.cfg.model.n_embd), int(B_.cfg.model.n_layer), levels, prefix=P,
                              codebook=vq.vqvae_vocab_sizes[0], vq_dim=tok.embed_dim, query_level0=True)
 bs = int(tc.batch_size)
-n_c = bs // 2 if arm == "consist" else 0
+if arm not in ("ctrl", "consist", "consist_frozen"):
+    raise ValueError(f"unknown arm {arm!r}")
+n_c = bs // 2 if arm in ("consist", "consist_frozen") else 0
 if m_states < 1 or (n_c and (bs % 2 or n_c % m_states)):
     raise ValueError("consistency needs an even batch and a half-batch divisible by states_per_traj")
 # per step: (bs - n_c) TF + n_c consistency samples (3 units each) + trajectories for n_c / m sources, always run for
 # exactly K + 1 passes (full budget), so the executed generator proxy equals this number (codex audit2 A2-7)
 fl_step = fwd * (3 * bs + (K + 1) * (n_c // max(m_states, 1)))
+# J2-F: the teacher is the released generator itself, copied before any checkpoint is restored into `net`; the
+# manifest's base hashes pin it, so it is rebuilt identically on resume and is not part of the checkpoint
+teacher = None
+if arm == "consist_frozen":
+    teacher = copy.deepcopy(net).eval()
+    for p in teacher.parameters():
+        p.requires_grad_(False)
 params = [p for p in net.parameters() if p.requires_grad]
 trainer = Trainer(a.run_dir, params, max_lr=float(tc.lr), total_steps=int(tc.steps), warmup=int(tc.warmup),
                   weight_decay=float(tc.weight_decay), betas=(0.9, float(tc.get("beta2", 0.95))),
@@ -159,18 +172,20 @@ def run_stats():
     return {"sources": traj_stats["run_sources"], "degenerate": traj_stats["run_degenerate"]}
 
 
-def consist_loss(n, sources):
-    """Self-consistency on the current model's own greedy Jacobi trajectories (n // m_states sources).
+def consist_loss(n, sources, teacher_net=None):
+    """Self-consistency on greedy Jacobi trajectories (n // m_states sources): the current model's own (J2), or
+    those of `teacher_net`, a frozen copy of the released generator (J2-F). The student is always `net`.
     Returns (loss or None, number of training states used)."""
     g = n // m_states
     z, pm = prefix(sources[:g])
-    was = net.training
-    net.eval()
+    tnet = net if teacher_net is None else teacher_net
+    was = tnet.training
+    tnet.eval()
     # the teacher is the fp32 greedy map that exact decoding evaluates, not the bf16 training map (codex audit2 A2-4)
     with torch.no_grad(), torch.autocast(device_type=dev, enabled=False):
-        out = jacobi_decode(net, lambda c, h: z.float(), g, S, dev, K + 1, pad_mask=pm, keep_history=True, full_budget=True,
+        out = jacobi_decode(tnet, lambda c, h: z.float(), g, S, dev, K + 1, pad_mask=pm, keep_history=True, full_budget=True,
                             initial_fixed_ok=True)   # static prefix (codex audit 4, A4-4)
-    net.train(was)
+    tnet.train(was)
     if not bool(out["stop"].eq(1).all()):
         raise RuntimeError("consistency teacher did not reach a fixed point in K + 1 passes")
     y = out["codes"]
@@ -286,7 +301,7 @@ while trainer.step < int(tc.steps):
         loss_tf = tf_loss(src[:bs - n_c], tgt[:bs - n_c])
         loss, logs = loss_tf, {}
         if n_c:
-            loss_c, n_used = consist_loss(n_c, src[bs - n_c:][::m_states])
+            loss_c, n_used = consist_loss(n_c, src[bs - n_c:][::m_states], teacher)
             if loss_c is not None:
                 loss = ((bs - n_c) * loss_tf + n_used * loss_c) / (bs - n_c + n_used)
                 logs = {"loss_tf": round(loss_tf.item(), 4), "loss_consist": round(loss_c.item(), 4)}

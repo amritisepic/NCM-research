@@ -118,11 +118,11 @@ def test_registered_loop_draws_128_rows_and_uses_rows_65_69_through_125(monkeypa
     def tf_loss(src, tgt):
         tf_rows.extend(src[:, 0].tolist())
         return torch.tensor(1.)
-    def consist(n, src):
+    def consist(n, src, teacher_net=None):   # J2-F passes the frozen teacher (None for J2)
         source_rows.extend(src[:, 0].tolist())
         return torch.tensor(2.), n
     ns = dict(trainer=SimpleNamespace(ctx=torch.autocast("cpu", enabled=False)), batch=batch,
-              bs=128, n_c=64, m_states=4, tf_loss=tf_loss, consist_loss=consist)
+              bs=128, n_c=64, m_states=4, tf_loss=tf_loss, consist_loss=consist, teacher=None)
     exec(compile(ast.Module(body=[node], type_ignores=[]), WMT, "exec"), ns)
     assert data_calls == [128] and tf_rows == list(range(1, 65))
     assert source_rows == list(range(65, 129, 4))
@@ -158,7 +158,7 @@ def tiny_wmt(tmp_path, amp=True):
               K=11, S=sum(levels), P=4, m_states=4, bs=8, n_c=4,
               params=list(net.parameters()),
               parallel_logits=jt.parallel_logits, jacobi_decode=jt.jacobi_decode,
-              traj_stats=dict(passes=0., n=0, states_before_fp=0., degenerate=0))
+              traj_stats=dict(passes=0., n=0, states_before_fp=0., degenerate=0), teacher=None)
     definitions(WMT, ["prefix", "canon", "ce", "batch", "tf_loss", "consist_loss", "val_nll"], ns)
     return ns
 
