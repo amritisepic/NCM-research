@@ -225,3 +225,55 @@ def test_padding_rows_leave_real_rows_loss_and_gradient_unchanged(tmp_path, froz
     assert padded[2].keys() == plain[2].keys()
     for k in plain[2]:
         assert torch.allclose(padded[2][k], plain[2][k], rtol=1e-4, atol=1e-6), k
+
+
+def teacher_check_ns(tmp_path):
+    ns = tiny_wmt(tmp_path)
+    ns.update(vq=ns["tok"].vq, os=os, json=json, sys=sys, pt=SimpleNamespace(
+        encode=lambda text: [int(t) for t in text.split()],
+        decode=lambda ids, **kw: " ".join(f"word{t}" for t in ids)))
+    srcs = [" ".join(str(int(t)) for t in row if t != 31) for row in ns["tr_src"][:6]]
+    ns["val_text"] = {"src": srcs, "ref": ["word1 word2"] * len(srcs)}
+    definitions(WMT, ["detok", "evaluate", "check_teacher"], ns)
+    return ns
+
+
+# gate (1) at launch, on the weights actually loaded: J0's saved exact decoding must be reproduced by the teacher
+def test_launch_check_accepts_the_released_teacher_and_refuses_a_different_one(tmp_path):
+    ns = teacher_check_ns(tmp_path)
+    net = ns["net"].train()
+    metrics, hyp, _ = ns["evaluate"](ns["val_text"]["src"], ns["val_text"]["ref"], bs_=128)   # J0's evaluation
+    j0 = tmp_path / "hyp_val.json"
+    j0.write_text(json.dumps({"hyp_val": hyp, "nfe_val": metrics["nfe_per_sentence"]}))
+    ns["teacher"] = production_teacher(net)
+    ns["check_teacher"](str(j0), n=6)
+    assert net.training and not ns["teacher"].training          # modes restored
+    with torch.no_grad():
+        for p in ns["teacher"].parameters():
+            p.add_(torch.randn_like(p) * 0.5)
+    with pytest.raises(SystemExit):
+        ns["check_teacher"](str(j0), n=6)
+    with pytest.raises(SystemExit):
+        ns["check_teacher"](str(tmp_path / "missing.json"), n=6)
+
+
+def test_launch_check_refuses_matching_text_with_different_pass_counts(tmp_path):
+    ns = teacher_check_ns(tmp_path)
+    net = ns["net"].train()
+    metrics, hyp, _ = ns["evaluate"](ns["val_text"]["src"], ns["val_text"]["ref"], bs_=128)
+    j0 = tmp_path / "hyp_val.json"
+    j0.write_text(json.dumps({"hyp_val": hyp, "nfe_val": [p + 1 for p in metrics["nfe_per_sentence"]]}))
+    ns["teacher"] = production_teacher(net)
+    with pytest.raises(SystemExit):
+        ns["check_teacher"](str(j0), n=6)
+
+
+def test_launch_check_runs_before_training_and_only_for_the_frozen_arm():
+    tree = ast.parse(source(WMT))
+    body = [ast.unparse(n) for n in tree.body]
+    at = next(i for i, s in enumerate(body) if s.startswith("if teacher is not None and a.teacher_check"))
+    loop = next(i for i, n in enumerate(tree.body) if isinstance(n, ast.While))
+    assert at < loop and "check_teacher(a.teacher_check)" in body[at]
+    nb = json.loads((ROOT / "notebooks/w2c_L_wmt_consist_frozen.ipynb").read_text(encoding="utf-8"))
+    cells = "".join("".join(c["source"]) for c in nb["cells"])
+    assert "--teacher_check {R}/L_wmt_released/hyp_val.json" in cells

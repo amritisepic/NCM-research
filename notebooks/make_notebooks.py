@@ -153,7 +153,9 @@ for arm, what in {"ctrl": "control: teacher forcing on reference translations (a
         cmds.append("python scripts/train_wmt14_L.py --config configs/scale/L_wmt_ctrl.yaml --run_dir {R}/L_wmt_released "
                     "--data {R}/../data/wmt14_train_pairs.npz --eval_only")
     cmds.append(f"python scripts/train_wmt14_L.py --config configs/scale/L_wmt_{arm}.yaml --run_dir {{R}}/L_wmt_{arm}_s{{S}} "
-                f"--seed {{S}} --data {{R}}/../data/wmt14_train_pairs.npz")
+                f"--seed {{S}} --data {{R}}/../data/wmt14_train_pairs.npz"
+                # J2-F gate 1 on the released weights: J0's saved exact decoding from w2c_L_wmt_ctrl (same Drive root)
+                + (" --teacher_check {R}/L_wmt_released/hyp_val.json" if arm == "consist_frozen" else ""))
     RUNS[f"w2c_L_wmt_{arm}"] = {
         "desc": f"Wave 2c, tier L WMT14 De-En (pre-registered J1): fine-tune the released 120M NCM; arm = {what}. "
                 "Goal (criterion d, text): exact Jacobi decoding converges in <= 8.25 of 11 passes at < 1 BLEU loss. "

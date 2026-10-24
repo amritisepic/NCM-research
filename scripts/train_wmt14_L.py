@@ -53,6 +53,8 @@ ap.add_argument("--calib_steps", type=int, default=0)
 ap.add_argument("--eval_only", action="store_true", help="no training: final eval of the released model (J0)")
 ap.add_argument("--n_val", type=int, default=0, help="final eval: first n val sentences (0 = all)")
 ap.add_argument("--n_test", type=int, default=0, help="final eval: first n test sentences (0 = all 3003)")
+ap.add_argument("--teacher_check", default="", help="J2-F: J0's hyp_val.json; before training, the frozen teacher must "
+                "reproduce its first 128 exact hypotheses and pass counts (registered gate 1, on the released weights)")
 a = ap.parse_args()
 if a.threads:
     torch.set_num_threads(a.threads)
@@ -88,9 +90,9 @@ manifest = {"config": OmegaConf.to_container(cfg, resolve=True), "data_sha256": 
             "base_config_sha256": digest(os.path.join(_base, "config.yaml")),
             "base_sha256": {n: digest(os.path.join(_base, n)) for n in ("tokenizer.pt", "generator.pt")},   # audit 4, A4-2
             "device": dev}
-if os.path.exists(ckpt_path) and not a.calib_steps:
+if not a.calib_steps and (os.path.exists(ckpt_path) or os.path.exists(manifest_path)):
     if not os.path.exists(manifest_path) or json.load(open(manifest_path)) != manifest:
-        sys.exit(f"{a.run_dir} holds a checkpoint of a different (or unrecorded) run: use a fresh run directory")
+        sys.exit(f"{a.run_dir} holds a different (or unrecorded) run: use a fresh run directory")
 if not a.calib_steps:
     json.dump(manifest, open(manifest_path, "w"), indent=1)
 OmegaConf.save(cfg, os.path.join(a.run_dir, "config.yaml"))
@@ -225,14 +227,17 @@ def detok(ids):
 
 
 @torch.no_grad()
-def evaluate(srcs, refs, bs_=128, sequential=True, caps=None):
+def evaluate(srcs, refs, bs_=128, sequential=True, caps=None, model=None):
     """fp32 eval: exact Jacobi passes + BLEU of its output (= sequential output); optionally verifies that.
     caps: also the output after at most c passes (fixed-cap Jacobi, J1a), with BLEU, mean passes and length ratio;
     default every cap 1..K+1 so any comparator cap exists (codex audit2 A2-10).
+    model: the generator to decode with (default `net`; J2-F's launch check passes the frozen teacher).
     Returns (metrics, exact hypotheses, {cap: capped hypotheses})."""
     import sacrebleu
     caps = tuple(range(1, K + 2)) if caps is None else tuple(caps)
-    net.eval()
+    m = net if model is None else model
+    was = m.training
+    m.eval()
     hyp, nfe, same = [], [], []
     hyp_cap = {c: [] for c in caps}
     with torch.autocast(device_type=dev, enabled=False):
@@ -240,10 +245,10 @@ def evaluate(srcs, refs, bs_=128, sequential=True, caps=None):
             ids = [(pt.encode(t)[:P] + [PAD] * P)[:P] for t in srcs[s:s + bs_]]
             x = torch.tensor(ids, device=dev)
             z, pm = prefix(x)
-            out = jacobi_decode(net, lambda c, h: z, len(x), S, dev, K + 1, pad_mask=pm, keep_history=True,
+            out = jacobi_decode(m, lambda c, h: z, len(x), S, dev, K + 1, pad_mask=pm, keep_history=True,
                                 initial_fixed_ok=True)   # static prefix (codex audit 4, A4-4)
             if sequential:   # disagreements are recorded per sentence (reported, not silently averaged)
-                seq = net.generate(None, x, temperature=0.0, top_k=0, top_p=1.0, cfg_scale=0.0, cfg_null_eos=EOS)
+                seq = m.generate(None, x, temperature=0.0, top_k=0, top_p=1.0, cfg_scale=0.0, cfg_null_eos=EOS)
                 same += (seq == out["codes"]).all(1).tolist()
             with torch.autocast(device_type=dev, enabled=False):
                 toks = tok.decoder(vq.idx_to_z_q(out["codes"])).argmax(-1).tolist()
@@ -253,7 +258,7 @@ def evaluate(srcs, refs, bs_=128, sequential=True, caps=None):
                 hc = out["history"][min(c, len(out["history"])) - 1]
                 with torch.autocast(device_type=dev, enabled=False):
                     hyp_cap[c] += [detok(r) for r in tok.decoder(vq.idx_to_z_q(hc)).argmax(-1).tolist()]
-    net.train()
+    m.train(was)
     res = {"n": len(srcs), "exact_passes_mean": float(np.mean(nfe)), "exact_passes_hist": np.bincount(nfe).tolist(),
            "sequential_nfe": K, "exact_nfe_saving_pct": 100 * (1 - float(np.mean(nfe)) / K),
            "bleu_lc": sacrebleu.corpus_bleu(hyp, [list(refs)], lowercase=True).score}
@@ -287,6 +292,23 @@ def val_nll(n=1000):
     net.train()
     return tot / len(vs)
 
+
+def check_teacher(path, n=128):   # J0 decoded in batches of 128: the same first batch
+    """J2-F gate 1 on the released weights: the frozen teacher's exact decode of the first n val sentences equals J0's
+    saved exact hypotheses and pass counts (same fp32 map; run on the GPU type J0 ran on)."""
+    if not os.path.exists(path):
+        sys.exit(f"--teacher_check: {path} not found (J0's hyp_val.json from w2c_L_wmt_ctrl)")
+    j0 = json.load(open(path, encoding="utf-8"))
+    ev, hyp, _ = evaluate(val_text["src"][:n], val_text["ref"][:n], sequential=False, caps=(), model=teacher)
+    same_hyp = sum(u == v for u, v in zip(hyp, j0["hyp_val"][:n]))
+    same_nfe = sum(int(u) == int(v) for u, v in zip(ev["nfe_per_sentence"], j0["nfe_val"][:n]))
+    print(json.dumps({"teacher_check": {"n": n, "hyp_equal": same_hyp, "passes_equal": same_nfe}}), flush=True)
+    if same_hyp != n or same_nfe != n:
+        sys.exit("the frozen teacher does not reproduce J0's exact decoding: not training (J2-F gate 1)")
+
+
+if teacher is not None and a.teacher_check and trainer.step < int(tc.steps):
+    check_teacher(a.teacher_check)
 
 # ------------------------------------------------------------------------------------------------ loop
 net.train()
