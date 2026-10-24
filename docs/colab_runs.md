@@ -24,10 +24,10 @@ Final eval per W1 arm: 16 x 256 samples in fp32 (~5-10 min on an A100).
 | `p1_tc_pilot` | P1: TC decomposition of the NCM–AR gap (small models) + throughput calibration | T4 | ~3.5 + setup | done (R018) |
 | `c4_sudoku_pilot` | C4 kill experiment: Recurrent NCM vs NCM on Sudoku-hard (1 seed each) | T4 | ~5.7 + setup | done (R019) |
 | `w0_calib_diag` | reference, calibration, where quality is lost, exact Jacobi | A100 | ~2.5 | done (R020) |
-| `w1_L_ts_ctrl` | tier L control (paper recipe, continued), 1800 steps (W1a); also A0 with the 16-group protocol (W1b) | A100 / L4 | ~8 (incl. a restart) | done (R030); seeds 1-2 **held** (needed only by M1's gate or a new tier-L comparison) |
+| `w1_L_ts_ctrl` | tier L control (paper recipe, continued), 1800 steps (W1a); also A0 with the 16-group protocol (W1b) | A100 / L4 | ~8 (incl. a restart) | done (R030); seeds 1-2 **held** (user, R033: until M1's gate or a new tier-L comparison needs them) |
 | `w1_L_ts_onpol` | B1a: on-policy corruption, 1350 steps | A100 / L4 | ~9 (incl. restarts) | done (R030: collapsed); no further seeds |
-| `w1_L_ts_onpol2` | B1a-2: two-pass on-policy corruption, 1080 steps | A100 / L4 | ~6.6 | done (R030: collapsed; nominally advances vs A3) -> seeds **dropped** (recommended; user decides) |
-| `w1_L_ts_b1` | B1: on-policy + re-quantized labels, 1350 steps | A100 / L4 | ~9.7 (incl. restarts) | done (R030: collapsed; nominally advances vs A3) -> seeds **dropped** (recommended; user decides) |
+| `w1_L_ts_onpol2` | B1a-2: two-pass on-policy corruption, 1080 steps | A100 / L4 | ~6.6 | done (R030: collapsed; nominally advances vs A3) -> seeds **dropped** (user, R033) |
+| `w1_L_ts_b1` | B1: on-policy + re-quantized labels, 1350 steps | A100 / L4 | ~9.7 (incl. restarts) | done (R030: collapsed; nominally advances vs A3) -> seeds **dropped** (user, R033) |
 | `w1_L_ts_requant` | B1b: re-quantized labels, 1800 steps | A100 / L4 | ~6.5 | done (R030: 0.31 below A1, bar 0.35) |
 | `w1_L_ts_soft` | B7: soft labels, 1800 steps | A100 / L4 | ~6.5 | done (R030: 0.85 worse than A1) |
 | `w2b_L_sdk_ctrl` | Sudoku tier L control (+ released reference A0), S1 | A100 / L4 | ~2.5 | **hold** (after WMT14; R031) |

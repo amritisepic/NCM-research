@@ -644,3 +644,10 @@ codes replaced in both arms; labels canonical. Only the wrong code differs: unif
   committed verbatim, then ported: 97 tests pass on torch 2.11.0+cpu and on 2.6. On torch 2.6 the old on-policy step
   leaves the Linear weights without gradients (`test_all_trainable_parameters_receive_onpolicy_gradients` fails on
   `d501333`); with `fp32_eval` it passes on both versions.
+
+## R033 — decision: wave-1 seeds (user, 2026-10-24)
+- A3, A4 and A5 get no seeds 1-2. A4 and A5 nominally advance under W1b (against the collapsed A3, R030), but those
+  comparisons sit inside a collapsed regime and serve no success criterion; the registered selection consequence is not
+  followed, by the user's decision. Saves ~39 CU (~52 with A3 as their comparator).
+- A1's seeds 1-2 (registered: "A1 always gets seeds 1-2") are held until M1's gate or a new tier-L comparison needs the
+  training-seed SD (~13 CU).

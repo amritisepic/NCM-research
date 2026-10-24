@@ -12,7 +12,7 @@ on-policy arm collapsed (Gen-PPL 32-41 vs 16.6); two independent defect hunts (C
 that explains it. Leading explanation: corruption by the model's own plausible codes is undetectable, so the model
 learns to discount its own coarse codes (Huszár's scheduled-sampling improperness, made visible by residual
 quantization); a CPU test on Sudoku supports the hedging step (R031), not yet the link to the text collapse. As registered, A4 and A5 nominally advance against the
-collapsed A3; seeds for them are not recommended (user decides). Next: WMT14 J1/J2 (criterion d, text), blocked until
+collapsed A3; the user dropped their seeds and holds A1's (R033). Next: WMT14 J1/J2 (criterion d, text), blocked until
 deep audit 4 can run (Codex usage limit).
 
 ## Environment
