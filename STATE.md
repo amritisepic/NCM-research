@@ -1,6 +1,6 @@
 # STATE — read this first
 
-_Last updated: 2026-10-24, session 4. Branches: `claude/ncm-research` (notebooks clone it) and
+_Last updated: 2026-10-24, session 4 (continued). Branches: `claude/ncm-research` (notebooks clone it) and
 `claude/ncm-phase2-analysis-finetune-pkh64d` (older mirror). Repo is PUBLIC: commit nothing identifying (no
 personal names/emails, no absolute local paths, no session links, no credentials). Goals, success bar and rules:
 `docs/brief.md`._
@@ -12,13 +12,18 @@ on-policy arm collapsed (Gen-PPL 32-41 vs 16.6); two independent defect hunts (C
 that explains it. Leading explanation: corruption by the model's own plausible codes is undetectable, so the model
 learns to discount its own coarse codes (Huszár's scheduled-sampling improperness, made visible by residual
 quantization); a CPU test on Sudoku supports the hedging step (R031), not yet the link to the text collapse. As registered, A4 and A5 nominally advance against the
-collapsed A3; the user dropped their seeds and holds A1's (R033). Next: WMT14 J1/J2 (criterion d, text), blocked until
-deep audit 4 can run (Codex usage limit).
+collapsed A3; the user dropped their seeds and holds A1's (R033). Since then (R034): deep audits 3 (completed), 4 (WMT14
+trainer: three P1s, fixed in PR 8, amendment J1c) and 5 (the W1d diagnostic: no P0/P1) and Codex's adversarial review of
+the mechanism ((b') survives, not established; a used-parent mismatch at L0/L1 is a live competitor). Next launches:
+`w1d_requant_diag` (after PR 7 merges) and the WMT14 pair (after PR 8 merges).
 
 ## Environment
-- **Codex:** reviews PRs (bot `chatgpt-codex-connector`; ~2-3 min per review). **Usage limit reached on 2026-10-24
-  ~02:35 UTC**: no review or audit until it resets. Waiting: PR 4 (deep-audit-4 brief, WMT14 trainer), PR 5 (audit-3
-  fixes), PR 6 (exploratory analysis scripts). No gated code merges and no notebook is "ready" until Codex responds.
+- **Codex:** reviews PRs (bot `chatgpt-codex-connector`; 2-15 min per review); a review triggered only by opening a PR may
+  leave no receipt the gate counts, so request one explicitly. Deep audits requested as PR comments need a Codex cloud
+  environment for the repo, which does not exist: run audits locally (`scripts/review/codex_local.sh` with the Codex
+  desktop CLI, or Codex desktop). The usage limit hit 2026-10-24 ~02:35 UTC reset at ~06:52 UTC. Open: PR 4 (audit-4
+  brief, superseded by the local audit), PR 5 (audit-3 fixes), PR 6 (exploratory scripts; needs ADV-1's fix), PR 7 (W1d),
+  PR 8 (audit-4 fixes).
 - `scripts/review/codex_pr.py wait` on this Windows laptop: crashes decoding the bot's emoji (cp1252) unless run with
   `PYTHONUTF8=1`, and returns early (gate FAIL) when Codex posts its "review running" status comment. Workaround used:
   poll the `codex-review-state` comment, then `codex_pr.py status`. `scripts/review/` is edit-protected: the user fixes.
@@ -59,10 +64,12 @@ deep audit 4 can run (Codex usage limit).
    is met training-free (exact Jacobi + verifier), pending batch-1 wall-clock. J2 trains on the model's own Jacobi
    states too, but decodes greedily, which hid the hedging in the Sudoku test (R031); J1/J1a's BLEU checks are the guard.
    Blocked on deep audit 4.
-2. **Mechanism of the on-policy collapse (candidate for criterion c):** undetectable corruption -> the model hedges
-   on its own coarse codes. Sudoku CPU (R031, matched slots and rates): plausible wrong codes raise predictive entropy
-   on clean contexts by 74% (uniform: 5%) and clean NLL by 32 nats (2.7); greedy hides it, sampling exposes part of
-   it; no Sudoku collapse. Suggestive. Next: four short tier-L arms (~12 CU): on-policy + a "replaced" flag,
+2. **Mechanism of the on-policy collapse (candidate for criterion c):** undetectable corruption -> the model discounts
+   its own coarse codes. Sudoku CPU (R031, matched slots and rates): plausible wrong codes raise predictive entropy on
+   clean contexts by 74% (uniform: 5%) and clean NLL by 32 nats (2.7), and cut reliance on the true L6 code by 76% (R034,
+   Codex's adversarial test); greedy hides it, sampling exposes part of it; no Sudoku collapse. Suggestive; competitors
+   open (used-parent mismatch at L0/L1, lost denoising coverage, feedback), and R031's Sudoku contrast has a dropout-RNG
+   confound (ADV-1) until rerun. Next: four short tier-L arms (~12 CU): on-policy + a "replaced" flag,
    plausible-wrong codes at uniform rates, uniform at A3's rates (A1m), A3 replicate; plus an eval-only check of the
    W1 checkpoints at lower temperature (hedging predicts A3's gap to A1 shrinks).
 3. **Clean code NLL is not a quality proxy (candidate for criterion c):** four observations; make it rigorous with an
@@ -93,5 +100,6 @@ deep audit 4 can run (Codex usage limit).
    the user to launch `w2c_L_wmt_ctrl` and `w2c_L_wmt_consist`; get Codex reviews for PR 5 and PR 6 and merge them.
 2. Analyse J1/J2 strictly against J1 + J1a + J1b; if J2 looks like it meets criterion (d), stop and ask the user before
    spending more compute (brief rule).
-3. Build the flag / plausible-wrong corruption modes (on PR 5's trainer) and an eval-only temperature check of the W1
-   checkpoints (on Drive); register the four short tier-L arms; deep-audit; then ask the user to launch (~13 CU).
+3. After W1d reports: apply W1d's registered reading (confirm A2 or not). Then build the tier-L mechanism arms on PR 5's
+   trainer (flag from the mask, plausible-wrong at uniform rates, lower-rate uniform under a new name, used-parent L1
+   proposals, A3 replicate), register them with each arm's overturning result, deep-audit, then ask the user (~15 CU).

@@ -651,3 +651,45 @@ codes replaced in both arms; labels canonical. Only the wrong code differs: unif
   followed, by the user's decision. Saves ~39 CU (~52 with A3 as their comparator).
 - A1's seeds 1-2 (registered: "A1 always gets seeds 1-2") are held until M1's gate or a new tier-L comparison needs the
   training-seed SD (~13 CU).
+
+## R034 — W1d diagnostic built; audits 3 (completed), 4 and 5; MAUVE precision correction (2026-10-24)
+- **W1d** (registered before any run; `docs/preregistration.md`): eval-only temperature frontier (T = 0.8 / 0.9 / 1.0,
+  8 x 256 samples) and oracle-intervention curve (j = -1 / 3 / 5 / 7, 1024 val windows) for A0 / A1 / A2, to decide
+  whether A2 (re-quantized labels) earns a confirmation. `scripts/diag_w1_frontier.py`, notebook `w1d_requant_diag`
+  (A100, ~2.5 CU; the ~1 CU first estimate was too low for this precision). Its sampler is tested equal to
+  `train_gen.py`'s; at T = 1 every group must reproduce wave 1's group for the same seed within 0.01 Gen-PPL or the run
+  stops before anything else. PR 7: Codex round 1 raised four P1s (reproduction only reported, MAUVE features in bf16,
+  notebook provenance publishing absolute Drive paths, registration not on the PR branch), all fixed or answered with
+  mutation-checked tests (`docs/reviews/triage_pr7.md`); round 2 clean. Deep audit 5 (local Codex CLI; its sandbox could
+  not run Python, so its tests were run here): no P0/P1; one P2 (A5-1, the reproduction helper could drop or collapse
+  groups) reproduced and fixed (`docs/reviews/triage_audit5_2026-10-24.md`).
+- **Correction to R030 (precision label):** wave 1's Gen-PPL scorers ran in fp32, but its MAUVE features were computed
+  under bf16 autocast (the default of `mauve_features`), identically for every arm. "fp32 sampling and
+  scoring" in the result files covers sampling and Gen-PPL only. W1d featurizes MAUVE in fp32 (new opt-in flag; default
+  unchanged so later W1 / M1 runs stay comparable with wave 1).
+- **Audit 3 completed** (Codex desktop, `codex/audit3-onpolicy` `1697171`): its CPU diagnostic (51 small-batch steps,
+  greedy on-policy vs uniform on the released Sudoku model) found no rapid collapse, an inconclusive negative consistent
+  with R031; final verification 18 passed / 8 strict xfails on `1bd3816` (A3-1..A3-3 open until PR 5 merges). The
+  report and numbers on the branch were updated verbatim; PR 5 was reconciled with the completed tests (97 -> 98 pass,
+  torch 2.11 and 2.6) and now also writes the run's name, not its absolute path, into `samples_final.json`.
+- **Audit 4** (Codex desktop on `c91126a`, `codex/audit4` `665c24b`): "hold launch" for three P1s in the WMT14 trainer:
+  validation NLL under the training autocast, base checkpoint identified by size, and dropped degenerate sources still
+  charged at the full FLOP proxy (576 - 12d rows executed vs 576 reported); two P2s (an initial fixed point charged two
+  passes; curve evaluations discarding per-sentence records). Suite reproduced (18 passed, 7 strict xfails); all five
+  fixed in PR 8 with the audit's patches, plus checkpointed run-level degenerate totals (from the audit's draft); 103
+  tests pass on torch 2.11 and 2.6 (`docs/reviews/triage_audit4_2026-10-24.md`). Registered as J1c before any J1 run.
+- **Codex channels:** pull-request reviews work; deep audits requested as PR comments need a Codex cloud environment for
+  the repository ("create an environment"), so audits run locally (`scripts/review/codex_local.sh`, or Codex desktop).
+- Launch state at the time of writing: nothing is cleared yet. W1d waits for PR 7's last review and merge; the WMT14 pair
+  waits for PR 8's review and merge.
+- **Adversarial analysis of the on-policy explanation** (Codex desktop, run by the user; `docs/reviews/
+  codex_adversarial_onpolicy.md`, triage `docs/reviews/triage_adversarial_onpolicy_2026-10-24.md`): (b') survives but is
+  not established. New direct evidence on R031's saved Sudoku checkpoints: plausible-wrong training cuts the model's
+  reliance on its true L6 code by 76% (finer-target NLL advantage) and 81% (normalized logit response) relative to
+  uniform-wrong training. Accepted: ADV-1 (P1, a dropout-RNG confound in `scripts/onpolicy_repro.py`, same class as A3-2;
+  fix in PR 6, paired rerun needed before calling R031's Sudoku contrast controlled); a competing explanation R031 missed
+  (L1 proposals are sampled under the canonical L0 while 75% of windows then carry a unigram L0, so about half the L1
+  positions condition on a parent the proposal never saw; inference has no such mismatch); and a wording correction to
+  R031: the corrupted-context posterior depends on the clean and replaced joint-context densities, not on the nominal
+  corruption rate. The tier-L mechanism arms will add a used-parent proposal ablation and follow the review's design
+  notes (flag from the mask, not from correctness; the lower-rate uniform arm registered under its own name).
