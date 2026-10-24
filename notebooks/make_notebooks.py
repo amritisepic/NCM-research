@@ -185,7 +185,28 @@ else:
     subprocess.run(f'cd /content/NCM-research && git fetch origin {BRANCH} && git checkout {BRANCH} && git reset --hard origin/{BRANCH}', shell=True, check=True)
 os.chdir('/content/NCM-research')
 print(subprocess.run(['git', 'log', '-1', '--oneline'], capture_output=True, text=True).stdout)
+GIT_SHA = subprocess.run(['git', 'rev-parse', 'HEAD'], capture_output=True, text=True, check=True).stdout.strip()
 subprocess.run([sys.executable, '-m', 'pip', 'install', '-q', 'omegaconf', 'hydra-core', 'regex', 'mauve-text', 'faiss-cpu'], check=True)
+utc = lambda: time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+
+def provenance(rd, rec):   # one line per session and command: which code ran, when, on what, from which state
+    os.makedirs(rd, exist_ok=True)
+    with open(f'{rd}/provenance.jsonl', 'a') as f:
+        f.write(json.dumps(rec) + '\n')
+
+def history(rd):
+    p = f'{rd}/provenance.jsonl'
+    return [json.loads(l) for l in open(p)] if os.path.exists(p) else []
+
+def last_step(rd):
+    p, s = f'{rd}/metrics.jsonl', None
+    if os.path.exists(p):
+        for l in open(p):
+            try:
+                s = json.loads(l).get('step', s)
+            except ValueError:
+                pass
+    return s
 '''
 
 DATA = r'''
@@ -224,6 +245,9 @@ import torch; print('GPU:', torch.cuda.get_device_name(0) if torch.cuda.is_avail
 '''
 
 RUN = r'''
+ALLOW_CODE_CHANGE = False   # True only on purpose: lets a run directory resume under different code than it started with
+CODE_PATHS = ['src', 'scripts', 'configs', 'assets']
+GPU = torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'cpu'
 CMDS_RAW = list(CMDS)
 for seed in SEEDS:
     for i, c in enumerate(CMDS):
@@ -235,31 +259,57 @@ for seed in SEEDS:
             c += ' --micro_batch 64'   # 40-80 GB GPUs: same optimizer step, fewer accumulation chunks (13.7 GB at 32)
         if '{S}' not in CMDS_RAW[i] and seed != SEEDS[0]:
             continue   # seed-independent command: run once
+        rd = c.split('--run_dir ')[1].split()[0] if '--run_dir ' in c else None
+        if rd:
+            started = [h['git_sha'] for h in history(rd) if h.get('event') == 'start']
+            if not started and os.path.exists(f'{rd}/ckpt.pt') and not ALLOW_CODE_CHANGE:
+                raise SystemExit(f'{rd} holds a checkpoint written before provenance was recorded, so the code that trained '
+                                 'it is unknown. Rename the run directory to start fresh, or set ALLOW_CODE_CHANGE = True '
+                                 'only after checking which commit trained it.')
+            # any earlier session may have written the checkpoint: every one of them must have run today's code
+            for old in dict.fromkeys(s for s in started if s != GIT_SHA):
+                if ALLOW_CODE_CHANGE:
+                    break
+                if subprocess.run(['git', 'diff', '--quiet', old, GIT_SHA, '--'] + CODE_PATHS).returncode != 0:
+                    raise SystemExit(f'{rd} was trained in a session at commit {old[:9]}; the code under {CODE_PATHS} differs '
+                                     f'from now ({GIT_SHA[:9]}). Resuming would mix code versions: rename the run directory '
+                                     'to start fresh, or set ALLOW_CODE_CHANGE = True only if you mean it.')
+            provenance(rd, {'event': 'start', 'git_sha': GIT_SHA, 'utc': utc(), 'gpu': GPU, 'cmd': c,
+                            'had_ckpt': os.path.exists(f'{rd}/ckpt.pt'), 'last_logged_step': last_step(rd)})
         print('>>>', c, flush=True)
         t = time.time()
         p = subprocess.run(c, shell=True)
         print(f'<<< exit {p.returncode} after {(time.time()-t)/60:.1f} min', flush=True)
+        if rd:
+            provenance(rd, {'event': 'end', 'git_sha': GIT_SHA, 'utc': utc(), 'exit': p.returncode,
+                            'minutes': round((time.time() - t) / 60, 2), 'last_logged_step': last_step(rd)})
         if p.returncode != 0:
             raise SystemExit('command failed; fix and re-run this cell (it resumes)')
 '''
 
 COLLECT = r'''
 out = f'{DRIVE}/results/__NAME__'; os.makedirs(out, exist_ok=True)
+sessions = {}
 for seed in SEEDS:
     for c in CMDS:
         if '--run_dir ' not in c:
             continue
         rd = c.split('--run_dir ')[1].split()[0].format(R=R, S=seed)
         name = os.path.basename(rd)
-        for f in ['result.json', 'metrics.jsonl', 'config.yaml', 'calib.json', 'hyp_test.json', 'hyp_val.json', 'run_manifest.json', 'eval_final.json', 'eval_6000.json', 'eval_20500.json', 'samples_final.json']:
+        sessions[name] = history(rd)
+        for f in ['result.json', 'metrics.jsonl', 'config.yaml', 'calib.json', 'hyp_test.json', 'hyp_val.json', 'run_manifest.json', 'eval_final.json', 'eval_6000.json', 'eval_20500.json', 'samples_final.json', 'provenance.jsonl']:
             if os.path.exists(f'{rd}/{f}'):
                 shutil.copy(f'{rd}/{f}', f'{out}/{name}__{f}')
 for f in os.listdir('results'):   # diagnostics write straight into the repo's results/
     if f.startswith(('diag_', 'b2_jacobi_', 'sudoku_', 'wmt14_')) and os.path.getmtime(f'results/{f}') > T_START:
         shutil.copy(f'results/{f}', f'{out}/{f}')
 gpu = torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'cpu'
-json.dump({'run': '__NAME__', 'gpu': gpu, 'finished': time.ctime()}, open(f'{out}/_meta.json', 'w'))
+shas = sorted({h['git_sha'] for hs in sessions.values() for h in hs if h.get('git_sha')})
+json.dump({'run': '__NAME__', 'gpu': gpu, 'finished_utc': utc(), 'git_sha': GIT_SHA, 'git_shas_all_sessions': shas,
+           'sessions': sessions}, open(f'{out}/_meta.json', 'w'), indent=1)
 print('Results copied to', out, '-> please drop this folder into the repo under results/colab/')
+if len(shas) > 1:
+    print('NOTE: this run spans several commits:', shas)
 '''
 
 
