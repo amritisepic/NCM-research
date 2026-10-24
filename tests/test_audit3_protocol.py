@@ -388,3 +388,59 @@ def test_samples_file_carries_no_absolute_run_dir():
     payload = ast.unparse(dumps[0].args[0])
     assert "'run_dir'" not in payload and "os.path.basename" in payload
 
+
+
+def _text_manifest_ns(tmp_path):
+    art, data = tmp_path / "art", tmp_path / "data"
+    art.mkdir(); data.mkdir()
+    for n in ("config.yaml", "tokenizer.pt", "generator.pt", "bpe_vocab_8192.pickle", "bpe_merges_8192.pickle"):
+        (art / n).write_bytes(b"base " + n.encode())
+    for n in ("train_bpe_8192.bin", "train_bpe_8192_offsets.npy", "valid_bpe_8192.pickle"):
+        (data / n).write_bytes(b"data " + n.encode())
+    tree = ast.parse((ROOT / "scripts/train_gen.py").read_text())
+    node = next(n for n in tree.body if isinstance(n, ast.Assign)
+                and any(isinstance(t, ast.Name) and t.id == "manifest" for t in n.targets))
+    guard = next(n for n in tree.body if isinstance(n, ast.If) and "ckpt_path" in ast.unparse(n.test)
+                 and "manifest_path" in ast.unparse(n))
+    ns = definitions("scripts/train_gen.py", ["_digest"], dict(hashlib=hashlib))
+    ns.update(os=os, torch=torch, json=json, sys=__import__("sys"), _art=str(art), _data=str(data), DATA_DIR=str(data),
+              a=SimpleNamespace(calib_steps=0, run_dir="audit-run"))
+    run = lambda n: exec(compile(ast.Module(body=[n], type_ignores=[]), "scripts/train_gen.py", "exec"), ns)
+    return ns, node, guard, run, art
+
+
+# PR 5 review gap (R036): the text manifest identifies base bytes, data bytes and runtime, and a resume refuses a change
+@pytest.mark.parametrize("change", ["base", "runtime", "missing"])
+def test_text_resume_refuses_changed_or_missing_manifest(tmp_path, change):
+    ns, node, guard, run, art = _text_manifest_ns(tmp_path)
+    run(node)
+    ckpt, mpath = tmp_path / "ckpt.pt", tmp_path / "run_manifest.json"
+    ckpt.write_bytes(b"ckpt")
+    ns.update(ckpt_path=str(ckpt), manifest_path=str(mpath))
+    mpath.write_text(json.dumps(ns["manifest"]))
+    run(guard)                                   # identical manifest: resume allowed
+    if change == "base":
+        (art / "generator.pt").write_bytes(b"base generator.pX")   # same size, different bytes
+        run(node)
+    elif change == "runtime":
+        ns["torch"] = SimpleNamespace(__version__="0.0.0", version=torch.version)   # another torch runtime
+        run(node)
+    else:
+        mpath.unlink()
+    with pytest.raises(SystemExit):
+        run(guard)
+
+
+# PR 5 review gap (R036): an on-policy resume without the policy RNG fails closed; other arms do not need it
+@pytest.mark.parametrize("mode,refused", [("onpolicy", True), ("uniform", False)])
+def test_resume_without_policy_rng(mode, refused):
+    tree = ast.parse((ROOT / "scripts/train_gen.py").read_text())
+    node = next(n for n in tree.body if isinstance(n, ast.If) and ast.unparse(n.test) == "trainer.step")
+    ns = dict(trainer=SimpleNamespace(step=250), resume_extra={"corruption_rng": torch.Generator().get_state()},
+              gen=torch.Generator(), policy_gen=torch.Generator(), corr=SimpleNamespace(mode=mode), seed=0)
+    code = compile(ast.Module(body=[node], type_ignores=[]), "scripts/train_gen.py", "exec")
+    if refused:
+        with pytest.raises(RuntimeError):
+            exec(code, ns)
+    else:
+        exec(code, ns)
