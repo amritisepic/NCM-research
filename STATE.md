@@ -27,9 +27,8 @@ waits for PR 7 and J2-F for its code, review and deep audit; Codex is at its usa
   leave no receipt the gate counts, so request one explicitly. Deep audits requested as PR comments need a Codex cloud
   environment for the repo, which does not exist: run audits locally (`scripts/review/codex_local.sh` with the Codex
   desktop CLI, or Codex desktop). Usage limits: hit 2026-10-24 ~02:35 UTC, reset ~06:52 UTC; **hit again at 16:36 UTC**
-  (PR 7's re-request) and not reset at the time of writing: no gated merge until it resets. Open: PR 5 (audit-3 fixes;
-  head never reviewed), PR 6 (exploratory scripts; ADV-1 and Codex's P1 fixed, head `8516fea` needs a review), PR 7
-  (W1d; head `f087a48` needs a review), PR 9 (J1 analysis script, R036; never reviewed). Merged: PRs 2, 3, 4, 8.
+  (PR 7's re-request) and not reset at the time of writing: no gated merge until it resets. Open: PR 10 (J2-F;
+  round-2 review requested). Merged: PRs 2-9 (5, 6, 7, 9 in session 5, R037). Limit reset by 22:57 UTC 2026-10-24.
 - `scripts/review/codex_pr.py wait` on this Windows laptop: crashes decoding the bot's emoji (cp1252) unless run with
   `PYTHONUTF8=1`, and returns early (gate FAIL) when Codex posts its "review running" status comment. Workaround used:
   poll the `codex-review-state` comment, then `codex_pr.py status`. `scripts/review/` is edit-protected: the user fixes.
@@ -107,11 +106,11 @@ waits for PR 7 and J2-F for its code, review and deep audit; Codex is at its usa
 - CPU: ~13.5 CPU-h before session 5; session 5 ~1.2 h (Sudoku paired rerun, test suites).
 
 ## Next 3 actions
-1. User: check the Codex usage dashboard; when it has reset, request reviews of PR 7 (`f087a48`), PR 6 (`8516fea`), PR 9
-   (J1 analysis script) and PR 5 (add its two missing tests first, R036), triage, merge. PR 7's merge clears
-   `w1d_requant_diag` (~2.5 CU).
-2. Build J2-F (trainer option `consist_frozen`, config, notebook, the four registered tests plus A4-3's padding-invariance
-   test), PR, Codex review, deep audit (`codex_local.sh`); then `w2c_L_wmt_consist_frozen` (~6.5 CU) is cleared.
-3. Analyse W1d against its registered reading and J2-F against J1-J1c + J2-F (`scripts/analyze_j1.py` covers the
-   shared-output diagnostic). Then the tier-L mechanism arms: register with each arm's overturning result, deep-audit,
-   ask the user (~15 CU). Details: `docs/prompts/handoff_2026-10-24.md` and R036.
+1. **Resume point (session 5 checkpoint, R037):** PR 10 (J2-F, branch `claude/wip-j2f`, head `f50a27d`) has its round-2
+   Codex review requested (23:59 UTC). Run `PYTHONUTF8=1 python scripts/review/codex_pr.py status 10`; triage any P0/P1
+   in `docs/reviews/triage_pr10.md`, then `codex_pr.py merge 10`. After that `w2c_L_wmt_consist_frozen` (~6.5 CU, A100,
+   after `w2c_L_wmt_ctrl`'s J0 directory exists on Drive: it does) is cleared. Remove the worktree `runs/wt/ncm-codex-audit6`.
+2. User: launch `w1d_requant_diag` (A100, ~2.5 CU; cleared now) and, once PR 10 merges, `w2c_L_wmt_consist_frozen`.
+3. Analyse W1d against its registered reading and J2-F with `scripts/analyze_j1.py --candidate J2-F` against J1-J1c +
+   J2-F. Then the tier-L mechanism arms (register, deep-audit, ask; ~15 CU); fix A6-1's guard in `train_gen.py` /
+   `train_sudoku_L.py` and deep-audit PR 5's trainer before any text or Sudoku tier-L run.

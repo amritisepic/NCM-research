@@ -37,7 +37,7 @@ Final eval per W1 arm: 16 x 256 samples in fp32 (~5-10 min on an A100).
 | `w2b_L_sdk_repair` | Sudoku: board-feedback repair passes (B6/C5) | A100 / L4 | ~2.5 | **hold** (after WMT14; R031) |
 | `w2c_L_wmt_ctrl` | WMT14 control (+ released reference J0), J1 + J1c | A100 / L4 | ~4.6 | done (R036: J1 loses 0.8 BLEU, recipe OK); seeds 1-2 only if J2-F advances |
 | `w2c_L_wmt_consist` | WMT14 self-consistency fine-tune (criterion d, text); fp32 teacher (J1b), padded degenerate rows (J1c) | A100 / L4 | ~6.4 | done (R036: misses the screen; 16% of test sentences collapse onto two fixed strings); no further seeds |
-| `w2c_L_wmt_consist_frozen` | J2-F: J2 with a frozen released-model teacher (contingent arm, triggered by J2's miss) | A100 (as the pair) | ~6.5 | **registered, not built**: trainer option, Codex review and a deep audit first (Codex at its usage limit) |
+| `w2c_L_wmt_consist_frozen` | J2-F: J2 with a frozen released-model teacher (contingent arm, triggered by J2's miss) | A100 (as the pair) | ~6.5 | built and deep-audited (PR 10, R037); **waits for PR 10's round-2 review and merge** |
 | `p1b_tc_rerun` | P1b: within-level-AR TC probe | — | — | **withdrawn** (R023: false premise; notebook removed; P1c to come) |
 | `w2_Mc_ncm` | tier M design C (M1): NCM from scratch, d512 x 6, 6k steps, seed 0 | A100 / L4 | ~7.7 | **hold** (criterion b needs a candidate; wave 1 produced none) |
 | `w2_Mc_ar` | tier M design C (M1): AR, same body, FLOP-matched, seed 0 | A100 / L4 | ~4.3 | **hold** (as above) |

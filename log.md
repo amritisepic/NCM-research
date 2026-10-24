@@ -812,3 +812,20 @@ generator and share the dropout stream; the logged per-level corrupted fractions
 - The first attempt ran the two arms in parallel; the uniform process exited with status 1 and no traceback after
   start-up. Run again alone, it finished normally; the plausible run from the parallel attempt is the one reported.
 - CPU: ~1.0 h wall (two arms, 8 threads each), plus the two suite runs (~5 min).
+
+## R037 — Codex back: PRs 5, 6, 7, 9 merged; J2-F built and deep-audited (2026-10-24; process)
+- Codex's usage limit reset. Reviews: PR 7 (`f087a48`), PR 9 (`d2846c8`), PR 5 (`f007888`, after adding two tests for
+  the text run manifest and the on-policy policy-RNG resume guard, each mutation-checked) and PR 6 (`8516fea`; its first
+  request got no response, a second one was answered) all came back with no P0/P1; all four merged through the gate.
+  **`w1d_requant_diag` is cleared** (deep audit 5 done; PR 5 does not touch W1d's imports). PR 5's text-trainer changes
+  still need a deep audit before any text tier-L run uses them.
+- **J2-F built** (PR 10, `claude/wip-j2f`): arm `consist_frozen` in `scripts/train_wmt14_L.py`, config, notebook
+  `w2c_L_wmt_consist_frozen`, 13 code-gate tests (mutation-checked). Codex review of `3df998a`: no P0/P1.
+- **Deep audit 6** (local Codex CLI, `codex/audit6`, brief `docs/prompts/codex_audit6_j2f.md`): two P1s, both reproduced
+  (7 strict xfails) and fixed with the audit's patches: A6-1, a run directory without its first checkpoint accepted a
+  different arm or base (inherited by every trainer with the same guard; fixed here for WMT14, `train_gen.py` and
+  `train_sudoku_L.py` still have it); A6-2, the analysis could not select J2-F. Added a launch-time check that the frozen
+  teacher reproduces J0's first 128 saved exact hypotheses and pass counts (gate 1 on the released weights). Triage
+  `docs/reviews/triage_audit6_2026-10-24.md`. All R036 numbers recomputed by the audit without disagreement; one wording
+  correction to R036: its aggregates are over all sentences ("exact excludes them" applies to the exactness claim only).
+  Full suite 160 passed on torch 2.6 and 2.11. PR 10's round-2 review was requested at 23:59 UTC; merge pending.
