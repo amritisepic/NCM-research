@@ -296,3 +296,17 @@ Why: `docs/reviews/codex_audit2.md` (A2-3 to A2-8, A2-10).
   rendering) any later W2 arm targets.
 - **Cost:** ~2.5 CU (A100).
 
+## J1c — amendment to J1 / J1a / J1b after the fourth code audit (registered 2026-10-24, before any J1 run)
+Why: `docs/reviews/codex_audit4.md` (A4-1 to A4-5); triage `docs/reviews/triage_audit4_2026-10-24.md`.
+- **Degenerate consistency sources** (J1b): still dropped from the loss and counted. Their student rows now run as
+  zero-loss padding, so the executed generator proxy equals the registered one (J2: 2000 x 576 forward rows) in every
+  step, including a step whose sources are all degenerate. Run-level source and degenerate totals are checkpointed,
+  restored on resume and reported (`degenerate_pct`); J1b's 1% rule reads those totals.
+- **NFE:** with WMT's static source prefix, convergence may be detected on pass 1, so a sentence whose all-zero start is
+  already its fixed point costs 1 pass, not 2. This applies to J0, J1 and J2 alike. J0's sanity reference (11.07 passes,
+  R020) was measured with pass-1 detection off, so J0's re-evaluation may differ by at most 1 pass times the share of such
+  sentences; the difference is reported, not treated as a failed sanity check.
+- **Evaluation records:** validation NLL is scored in fp32; every curve evaluation keeps ordered exact and capped
+  hypotheses and per-sentence passes, and checks exact = sequential.
+- **Run identity:** the run manifest identifies the base tokenizer and generator by SHA-256, not by file size.
+
