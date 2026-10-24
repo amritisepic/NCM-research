@@ -693,3 +693,14 @@ codes replaced in both arms; labels canonical. Only the wrong code differs: unif
   R031: the corrupted-context posterior depends on the clean and replaced joint-context densities, not on the nominal
   corruption rate. The tier-L mechanism arms will add a used-parent proposal ablation and follow the review's design
   notes (flag from the mask, not from correctness; the lower-rate uniform arm registered under its own name).
+
+## Advisory literature report published (2026-10-24; documentation only)
+- Saved `docs/literature_advice_2026-10-24.md`: six-question primary-source review, paper/settings/effect-size
+  table, mechanism alternatives and discriminating tests, likelihood caveats, level interventions, Jacobi
+  consistency evidence, a proposed compute budget and explicit falsification thresholds.
+- Recomputed released TinyStories L8-L11 clean-NLL share (46.79%) and predicted-slot share (63.13%), and
+  WMT14's position-count proxy at 8.25 full Jacobi passes (2.46 times sequential). These are descriptive
+  calculations, not new model evaluations or attention-inclusive FLOP measurements.
+- Preserved the report's R030-R033 evidence scope and added a publication note pointing to R034's newer
+  Sudoku dropout-RNG confound, used-parent proposal mismatch, MAUVE precision correction and J1c amendment.
+- Experimental proposals remain speculation; no registrations, training code or launch decisions changed.
