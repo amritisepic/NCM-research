@@ -59,6 +59,8 @@ ap.add_argument("--model", default=os.path.join(ROOT, "artifacts", "sudoku", "ha
 ap.add_argument("--data", default=os.path.join(ROOT, "assets", "sudoku_train", "hard.npz"))
 ap.add_argument("--out", required=True)
 ap.add_argument("--threads", type=int, default=0)
+ap.add_argument("--sampled_eval", action="store_true", help="also decode at temperature 1 (seeded) and score it")
+ap.add_argument("--save", default="", help="save the final weights here (an ignored path, e.g. runs/...)")
 a = ap.parse_args()
 if a.threads:
     torch.set_num_threads(a.threads)
@@ -138,31 +140,43 @@ def loss_fn(p, s):
 @torch.no_grad()
 def evaluate():
     net.eval()
-    solved, nll, rt = [], torch.zeros(K), torch.zeros(K)
+    solved, solved_t1, ent, nll, rt = [], [], torch.zeros(K), torch.zeros(K), torch.zeros(K)
     for i in range(0, len(val_p), 100):
         p, s = val_p[i:i + 100], val_s[i:i + 100]
         g = net.generate(None, p, temperature=0.0, top_k=0, top_p=1.0, cfg_scale=0.0, cfg_null_eos=None)
         ids = tok.decoder(tok.vq.idx_to_z_q(g)).argmax(-1)
         solved += [cells(r) == cells(t) for r, t in zip(ids.tolist(), s.tolist())]
         rt += torch.tensor(per_level(canon(ids) == g)) * len(p)
+        if a.sampled_eval:   # temperature-1 sequential sampling (as W1's text samples), its own RNG stream
+            with torch.random.fork_rng():
+                torch.manual_seed(1234 + i)
+                g1 = net.generate(None, p, temperature=1.0, top_k=0, top_p=1.0, cfg_scale=0.0, cfg_null_eos=None)
+            ids1 = tok.decoder(tok.vq.idx_to_z_q(g1)).argmax(-1)
+            solved_t1 += [cells(r) == cells(t) for r, t in zip(ids1.tolist(), s.tolist())]
         c = canon(s)
         lg = parallel_logits(net, tok.encoder.wte(p), c).float()
         ce = F.cross_entropy(lg.reshape(-1, lg.shape[-1]), c.reshape(-1), reduction="none").view(c.shape)
         nll += torch.stack([x.sum(1) for x in torch.split(ce, levels, dim=1)], 1).sum(0)
+        h = -(lg.log_softmax(-1) * lg.softmax(-1)).sum(-1)   # predictive entropy on clean contexts (hedging)
+        ent += torch.stack([x.mean(1) for x in torch.split(h, levels, dim=1)], 1).sum(0)
     net.train()
     n = len(val_p)
-    return {"solved_pct": 100 * float(np.mean(solved)), "nll": float(nll.sum() / n),
-            "nll_per_level": (nll / n).round(decimals=3).tolist(), "roundtrip_per_level": (rt / n).round(decimals=4).tolist(),
-            "solved": [bool(v) for v in solved]}
+    out = {"solved_pct": 100 * float(np.mean(solved)), "nll": float(nll.sum() / n),
+           "nll_per_level": (nll / n).round(decimals=3).tolist(), "roundtrip_per_level": (rt / n).round(decimals=4).tolist(),
+           "entropy_per_code_per_level": (ent / n).round(decimals=4).tolist(), "solved": [bool(v) for v in solved]}
+    if solved_t1:
+        out.update(solved_t1_pct=100 * float(np.mean(solved_t1)), solved_t1=[bool(v) for v in solved_t1])
+    return out
 
 
-out = {"arm": a.arm, "args": {k: v for k, v in vars(a).items() if k not in ("model", "data", "out")}, "levels": levels,
+out = {"arm": a.arm, "args": {k: v for k, v in vars(a).items() if k not in ("model", "data", "out", "save")}, "levels": levels,
        "evals": [], "log": []}
 t0 = time.time()
 net.train()
 ev = evaluate()
 out["evals"].append({"step": 0, "wall_s": round(time.time() - t0, 1), **ev})
-print(json.dumps({"step": 0, "solved_pct": ev["solved_pct"], "nll": round(ev["nll"], 2)}), flush=True)
+print(json.dumps({"step": 0, "solved_pct": ev["solved_pct"], "solved_t1_pct": ev.get("solved_t1_pct"),
+                  "nll": round(ev["nll"], 2)}), flush=True)
 while trainer.step < a.steps:
     p, s = (torch.from_numpy(v) for v in data.batch(rng, a.batch))
     loss, st = loss_fn(p, s)
@@ -175,8 +189,12 @@ while trainer.step < a.steps:
     if trainer.step % a.eval_every == 0 or trainer.step == a.steps:
         ev = evaluate()
         out["evals"].append({"step": trainer.step, "wall_s": round(time.time() - t0, 1), **ev})
-        print(json.dumps({"step": trainer.step, "solved_pct": ev["solved_pct"], "nll": round(ev["nll"], 2),
+        print(json.dumps({"step": trainer.step, "solved_pct": ev["solved_pct"], "solved_t1_pct": ev.get("solved_t1_pct"),
+                          "nll": round(ev["nll"], 2),
                           "roundtrip": ev["roundtrip_per_level"]}), flush=True)
 os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True)
 json.dump(out, open(a.out, "w"), indent=1)
+if a.save:
+    os.makedirs(os.path.dirname(a.save) or ".", exist_ok=True)
+    torch.save(net.state_dict(), a.save)
 print("wrote", a.out)
