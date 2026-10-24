@@ -12,10 +12,29 @@ import json
 import math
 import os
 import time
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
 
 import numpy as np
 import torch
+
+
+@contextmanager
+def fp32_eval(net, device: str):
+    """Precision boundary for forwards that act as teachers or scores: every module in eval mode,
+    autocast off, TF32 off; each module's own mode and the TF32 flags are restored on exit, also after an exception
+    (codex audit 3, A3-1 / A3-2). With autocast off no weight cast is cached, so an enclosing training autocast region
+    cannot reuse casts made here (on torch < 2.11 such casts carried no autograd link)."""
+    modes = [(m, m.training) for m in net.modules()]
+    flags = torch.backends.cuda.matmul.allow_tf32, torch.backends.cudnn.allow_tf32
+    try:
+        net.eval()
+        torch.backends.cuda.matmul.allow_tf32 = torch.backends.cudnn.allow_tf32 = False
+        with torch.autocast(device_type=device, enabled=False):
+            yield
+    finally:
+        for m, training in modes:
+            m.training = training
+        torch.backends.cuda.matmul.allow_tf32, torch.backends.cudnn.allow_tf32 = flags
 
 
 def pick_device() -> str:
