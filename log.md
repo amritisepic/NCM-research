@@ -459,3 +459,195 @@ Compute units: CPU-h = wall-clock hours on the 4-core cloud container (Xeon w/ A
   the gate passed. Tests: `tests/test_review_gate.py` (12; 10 fail against the R029 scripts on this laptop).
 - Codex has not reacted to the review request on PR #1 (posted 21:17 UTC, checked 22:18 UTC): code review is
   probably not enabled for the repository in Codex settings. Until it is, no gated code can merge.
+
+## R030 — wave 1, registered analysis (W1 + W1a + W1b, seed 0; Colab A100-40GB; user-run)
+- Runs: `results/colab/w1_L_ts_{ctrl,requant,onpol,b1,onpol2,soft}/` (A0 = `L_ts_released16` in the ctrl folder).
+  Every number below is recomputed by `scripts/analyze_w1.py` -> `results/w1_analysis_s0.json` (PR 2, Codex-reviewed)
+  and independently by Codex audit 3 (`docs/reviews/codex_audit3_numbers.json`); all aggregates agree.
+- **Code version:** every training session of every arm (12 sessions) logs `corrupted_frac_per_level`, which the R024
+  fix commit introduced; from R024 to the last commit before the wave, the trainer's only change is the tier-M
+  level-0 branch, which W1 configs never enter. All W1 runs therefore trained with R024-equivalent code; none is void.
+  Exact SHAs were not recorded (notebooks record them from now on, PR 3). Runtime: torch 2.11.0+cu130.
+- Protocol: 16 x 256 samples (seeds 42, 0-14), sampling and scoring in fp32 with TF32 off; Gen-PPL = mean of the 16
+  group values (GPT-2 large), SE = group SD / 4; MAUVE = mean over 5 quantization seeds of 4096 samples vs 4096 human
+  val windows; clean val NLL in nats/window (computed under the training autocast in every arm; Codex audit 3, A3-1).
+
+| arm | steps | Gen-PPL ± SE | MAUVE | clean val NLL | entropy |
+|---|---|---|---|---|---|
+| A0 released | 0 | 16.16 ± 0.11 | 0.827 | 861.8 | 3.970 |
+| A1 control (uniform corruption) | 1800 | 16.60 ± 0.08 | 0.881 | 844.0 | 3.962 |
+| A2 uniform + re-quantized | 1800 | 16.29 ± 0.09 | 0.915 | 749.3 | 3.963 |
+| A3 one-step on-policy | 1350 | 41.44 ± 0.43 | 0.496 | 885.7 | 4.026 |
+| A4 on-policy + re-quantized | 1350 | 36.81 ± 0.26 | 0.673 | 707.4 | 4.037 |
+| A5 two-pass on-policy | 1080 | 32.17 ± 0.18 | 0.543 | 913.9 | 3.990 |
+| A6 soft labels | 1800 | 17.46 ± 0.10 | 0.832 | 888.9 | 3.958 |
+
+- **Sanity checks:** A0 NLL 861.8 (~870) and Gen-PPL 16.16 (~16.1): pass. A1 - A0 = +0.44 Gen-PPL, below the 1.0
+  recipe-damage limit: the recipe is not declared damaging.
+- **Screen** (gain = comparator minus arm; pass needs gain >= 0.35, |entropy gap| <= 0.05, MAUVE gap >= -0.01):
+  A2 vs A1 +0.31 (fails the 0.35 bar); A3 vs A1 -24.83; A4 vs A1 -20.20; A5 vs A1 -15.56; A6 vs A1 -0.85: all fail.
+  **A4 vs A3 +4.63** (entropy gap +0.011, MAUVE gap +0.177) and **A5 vs A3 +9.27** (-0.037, +0.047) **pass** when the
+  entropy and MAUVE conditions are read against the same comparator, which is how W1b's sentence reads ("below any of
+  its registered comparators, entropy within 0.05 nats and MAUVE not lower by > 0.01") and how Codex read it. Read
+  against A1 as in W1's original wording, both fail (A4: entropy +0.075, MAUVE -0.208; A5: MAUVE -0.338).
+- **Step-count confound:** A1's curve (256 samples, seed 10000) is 16.486 at 1080, 16.705 at 1350, 16.299 at 1800;
+  neither matched point is >= 0.5 better than 1800, so the rule does not fire.
+- **Conditional controls:** A1m (needs A3 to advance) and A6s (needs A6 to advance) are not triggered.
+- **Verdicts:** H6 (A3 < A1) not supported. H7: A2 < A1 not supported; A4 < A3 passes the screen. H8 (A5 < A3)
+  passes the screen. H9 (A6 < A1) not supported. Registered wording for the arms with no passing comparison: "B1a (A3),
+  B1b's uniform half (A2 vs A1) and B7 (A6) not supported at tier L (a sampling-noise-only gain of >= 0.7 Gen-PPL would
+  have passed with ~95% probability)"; they are deprioritized for wave 2, not declared false. The "no arm passes" clause
+  does not apply as written, because A4 and A5 pass against A3; both passes are comparisons inside a collapsed regime
+  (each arm is >= 15 Gen-PPL worse than A1).
+- **Registered consequences:** A1 gets seeds 1-2. A4 and A5 advance to seeds 1-2 (a Phase-3 claim for H7's second half
+  or H8 would also need A3 at seeds 1-2). Whether to spend that compute is put to the user (R031).
+- Training-seed variance is unmeasured (seed 0 only); per W1b the screen is a selection step, not a test.
+- **Compute (estimate from the logs):** surviving training 1080-1800 steps per arm at 2.1 s (uniform) / 3.0 s
+  (on-policy) / 3.7 s (two-pass) per step; restarts discarded ~0.25 h (A1), ~0.4 h (A3) and ~0.5 h (A4) of work,
+  ~6.5 CU in all. Total ~8.6 A100-hours incl. ~3 min setup per session and the evals, ~46 CU at w0's 5.4 CU/h
+  (6.5-9.7 per notebook; ~6.5 holds only for the notebooks without restarts). Spent to date ~58 CU of ~200.
+
+## R031 — wave 1, exploratory: integrity checks, what the collapse is, what is significant (2026-10-24)
+Everything here is exploratory and changes none of R030's verdicts.
+- **Defect hunt (two independent ones): no defect explains the on-policy collapse.** Codex audit 3 (run by the user in
+  Codex desktop on `d501333`; report `docs/reviews/codex_audit3.md`, triage `docs/reviews/triage_audit3_2026-10-24.md`):
+  the canonical-policy identity test passes bit for bit (released Sudoku tokenizer, clean and re-quantized labels); a
+  small text model with W1's level schedule matches forced sequential inference at every level; offsets, level 0,
+  prefix, temperature 1, `fnet is net` and no compile all as specified. My own reading of `policy_codes` ->
+  `build_hierarchy` -> `compute_loss` and of the generator's training forward vs `generate` (both block-diagonal: each
+  level attends to the prefix and its own input only) agrees. Same scoring path for every arm.
+- **Protocol defects (audit 3):** A3-1 the policy and val-NLL forwards run under the training autocast with TF32 on
+  (every arm alike, so it cannot make one arm collapse; the result field "fp32 sampling and scoring" is true for
+  samples only); A3-2 policy sampling draws from the global RNG that dropout uses, and only the root module's mode is
+  restored; A3-3 the resume key ignores `grad_accum` and a missing config or corruption RNG fails open; A3-4 the
+  notebooks recorded no provenance (fixed in PR 3, merged after three Codex rounds, `docs/reviews/triage_pr3.md`).
+  All four reproduce (the audit's 9 strict xfails fail on `d501333` with its own torch 2.11); A3-1..A3-3 are fixed in
+  PR 5 (97 tests pass on torch 2.11 and 2.6), which awaits Codex review and, before any run uses it, a deep audit.
+- **R014 corrections (audit 3, checked against `results/b1_repair_capacity.json`):** the sampled median ranks
+  1055/1118/454 are levels 0-2 (L1-L3: 1118/454/37); "58% of codes change" counts disagreement with the re-quantized
+  labels, and the canonical disagreement is ~41.6% of all slots (52.0% of the replaced coarse slots); recipe label
+  changes are 57.5% / 45.5%, and L8-L10 top-16 shares 88.3 / 80.8 / 80.5%. No conclusion of R014 changes.
+- **Latent hazard, verified not to affect W1:** on torch < 2.11 a no-grad forward inside an autocast region caches bf16
+  weight casts without their autograd link, and the training forward in the same region reuses them, so only weights
+  autocast does not cast (norms) get gradients. Audit 3 measured 24,832 of 25.5M parameters receiving gradients in an
+  on-policy Sudoku step on torch 2.6 (this laptop's environment). PyTorch fixed it in 2.11 (issue #158232; the fix is
+  in v2.11.0's `aten/src/ATen/autocast_mode.cpp` and absent from v2.6-v2.10). W1 ran torch 2.11.0+cu130, and its
+  on-policy steps took 1.40x the control's time (a full backward predicts 1.33x; one without weight gradients ~1.0x).
+  W1's on-policy arms therefore trained all parameters. Any future on-policy run must run the policy forward with
+  autocast disabled (A3-1's patch) so the result does not depend on the torch version.
+- **Resume traces:** A3 resumed once from step 250 (step-300 val NLL 912.50 before, 913.67 after); A4 resumed three
+  times (step 600: 731.48 vs 731.53; step 900: 716.50 vs 716.28); A1 restarted from initialization once. GPU kernels
+  are not bitwise deterministic and the on-policy arms amplify weight differences through their own samples. The
+  collapse is in both A3 trajectories and precedes the rollback.
+
+**What the data say that we did not expect** (W1b protocol unless stated; scripts `scripts/w1_sample_stats.py` and
+`scripts/onpolicy_repro.py`, in PR 6 awaiting Codex review; outputs in `results/`):
+1. On-policy training breaks sampling fast and then stops: A3's clean val NLL 861.8 -> 912.5 by step 300; its curve
+   Gen-PPL is 37.3 at step 600 and 37.0-37.2 afterwards. All three on-policy variants collapsed (32-41 vs 16.6).
+2. The corruption that was mildest in token terms was the most destructive in training: replacing coarse codes by the
+   generator's one-step samples keeps 98% of decoded tokens, by uniform codes 43% (R014; audit 3 notes these are decoder
+   ceilings with the finest level kept).
+3. The collapse is local, not global: the pooled vocabulary of A3 / A5 is as close to the human windows as A1's
+   (unigram Jensen-Shannon 0.0108 / 0.0073 vs 0.0094), but local order breaks: bigram gain over unigram (training-set
+   bigram model, 20M tokens) 2.13 (A1) -> 1.71 (A3) nats/token, adjacent duplicate tokens 6.9 -> 17.7 per 1k, the
+   deficit spread over the whole window (-0.33 to -0.45 in every position band). Reading 30 samples per arm (numpy
+   seed 2026, `results/w1_samples_read_s2026.md`): A3's stories keep their openings, characters and plot; the errors
+   are doubled, dropped, fused or garbled words ("faucet faucet", "OnceOnce was", "namedddy", "Whiskersrmometer").
+4. Clean-NLL gains sit where sample quality is not: A2's -113 nats vs A0 is 88% in L8-L11 and A4's -154 is 98% there;
+   R020's oracle curve gives those levels ~4-7% of the quality gap. A4 has the best clean NLL of all arms and the
+   second-worst samples. Fourth observation of this split (R008 / R016 vs R020).
+5. A3's clean-NLL damage is mid-level (L3-L6: +15 of +24 nats), while its training loss (2.16-2.20) and gradient norm
+   (0.33) are below the control's (2.45-2.53, 0.55): the arm does not take larger steps.
+6. A5 (two-pass) has the worst clean NLL (+52, mostly L8-L10) but better samples than A3 (32.2 vs 41.4).
+7. Paired by sample seed (the 16 groups share seeds), A2 - A1 = -0.31 ± 0.08 Gen-PPL from sampling noise alone;
+   training-seed variance is unmeasured. Suggestive, below the registered bar.
+8. MAUVE scale: A0 scores 0.827 at 4096 vs 4096 (W1b) and 0.888 at 1024 vs 1024 (w0). MAUVE's default quantization
+   uses ~n/10 clusters, so the two protocols are not on one scale; W1b's MAUVE SDs (0.006-0.031) are over quantization
+   seeds only, not sampling noise. Within W1b every arm shares the protocol, so arm differences are comparable, but
+   their sampling error is unknown. Cheapest check: four disjoint 1024-sample MAUVEs of an arm, in the next notebook.
+
+**Explanations for the collapse and the cheapest test that separates them**
+- (a) A code defect. None found in two hunts; the remaining GPU-only path (autocast cache) is excluded by version and
+  timing. Test if needed: 600 on-policy steps with an fp32 policy and a separate policy RNG (A3-1 / A3-2 patches).
+- (b) Clean labels that no longer fit the policy's coarse codes. A4's re-quantized labels do fit the used codes and
+  removed only ~19% of A3's damage (36.8 vs 41.4, control 16.6): at most a small part.
+- (b') **Undetectable corruption (leading).** Uniform random codes are easy to spot, so the model learns "repair codes
+  that look random, trust codes that look plausible". The policy's own samples look exactly like the codes it produces
+  at inference, so with targets the input does not determine (the canonical code of the true text, or the repair
+  toward it), the best it can do is discount every plausible coarse code by roughly the corruption rate. At inference
+  every coarse code is its own, so fine codes are drawn partly independently of the coarse plan. Fits items 3 (plan
+  kept, local detail broken), 5 (clean NLL hurt where codes depend most on their context), A4 (the repair target is
+  still unpredictable from a plausible-looking context) and A5 (second-pass replacements fit a wrong plan, so among
+  canonical neighbours they are partly detectable: less damage). This is Huszár's (2015) improperness of scheduled
+  sampling, made visible by residual quantization. Predictions: plausibility alone, at matched slots and rates, makes
+  the model hedge on clean contexts; greedy decoding hides the hedge and sampling at temperature 1 (as W1 does)
+  exposes it.
+- (c) A feedback loop (the policy drifts with the model): the damage appears by step 300 and stops growing.
+- (d) Milder corruption (0.18 vs 0.31 of codes) loses denoising robustness: would leave clean NLL intact; it rose by
+  50 nats at step 300.
+- Separating tests: (i) Sudoku on CPU (below): same slots and rates, the wrong code uniform vs drawn from the model's
+  own distribution with the right code excluded, decoded greedily and at temperature 1; (ii) text: on-policy plus a per-position "replaced" flag (corruption
+  made detectable) should not collapse; plausible-wrong codes at NCM's uniform rates should; uniform corruption at A3's
+  lower per-level rates (A1m) should not; a frozen-policy arm separates (c).
+
+**Sudoku CPU test of the mechanism (exploratory; `scripts/onpolicy_repro.py`, `results/onpolicy_repro/`).** Released
+Sudoku-hard model, fp32 on CPU, batch 16, lr 1e-4 after 20 warmup steps, 200 steps, seed 0; the same 300 held-out
+generated puzzles for every arm. Masks come from one generator: identical slots, NCM's rates (0.75 -> 0.25), 25.86% of
+codes replaced in both arms; labels canonical. Only the wrong code differs: uniform among the 15 other codes
+(`uniform_wrong`) or drawn from the model's own one-step distribution with the canonical code excluded
+(`plausible_wrong`).
+- Training loss per code 0.308 (uniform) vs 0.395 (plausible), mean over the run: the model undoes plausible wrong
+  codes less well, i.e. it cannot tell them from right ones as easily.
+- Clean teacher-forced NLL (nats per puzzle; 43.2 at step 0): 45.9 (uniform) vs 75.2 (plausible) at step 200; the
+  plausible arm's +32 sits in L8-L10 (+25.8). Same slots, rates and targets: only plausibility changed, and it made the
+  model spread probability off the canonical code on clean contexts (the "hedging" that (b') predicts).
+- Greedy solve rate (88.3% at step 0), paired on the same 300 puzzles, change by step 200: uniform -4.7 ± 1.5 points,
+  plausible -1.0 ± 1.5 (plausible minus uniform +3.7 ± 1.6). Argmax decoding hides the hedging entirely; uniform
+  corruption, which the released Sudoku model never saw in training, costs a few points.
+- Temperature-1 sequential sampling (seeded, same puzzles; 87.0% at step 0): uniform -4.3 ± 1.6, plausible -5.3 ± 1.7
+  (plausible minus uniform -1.0 ± 2.0). Sampling exposes part of the plausible arm's hedge (greedy -1.0 vs sampled
+  -5.3; uniform: -4.7 vs -4.3), but nothing collapses: the model stays confident (<= 0.51 nats per code). Predictive
+  entropy on clean contexts (nats per puzzle, 54.8 at step 0): 57.8 (uniform) vs 95.2 (plausible), the rise at L7-L11.
+- Re-quantized labels with plausible wrong codes (`plausible_wrong_requant`, W1 A4's analogue): clean NLL +6.7 (not
+  +32), predictive entropy +21% (not +74%), greedy -3.3 ± 1.6 and temperature-1 -4.3 ± 1.6 points (as uniform).
+  Re-quantization largely removes the hedge here, yet in text A4 still collapsed with the best clean NLL of all arms:
+  clean-context hedging does not account for A4. Open.
+- What this does and does not show: plausibility alone, at matched slots and rates, makes the model hedge on its own
+  context (predictive entropy +74% vs +5%), even though Sudoku's target is fixed by the puzzle; greedy decoding hides
+  the hedge and temperature-1 sampling exposes part of it. That is the first step of (b'), replicated across domains.
+  Not shown: a collapse (this confident model loses ~5 points, not half its quality), that the hedge is what broke the
+  text samples, any effect at tier L, or more than one seed. J2 decodes greedily, the regime in which the hedge was
+  harmless here. The released model fails on few-clue prompts (4% valid grids at 18 of 30 clues), so a Sudoku
+  setting whose targets the input does not determine was not testable. Verdict on (b'): suggestive, not established.
+
+## R032 — Codex review back, provenance in notebooks, audit-3 fixes, usage limit (2026-10-24)
+- **Codex code review works** (bot `chatgpt-codex-connector`, ~2-3 min per review). PR 2 (`scripts/analyze_w1.py`,
+  the R030 recomputation): no findings, merged. PR 3 (notebook provenance, Codex audit 3's A3-4): two P1s in two rounds,
+  both accepted with regression tests (`tests/test_notebook_provenance.py`; triage `docs/reviews/triage_pr3.md`), a
+  third round to verify the fixes found nothing; merged. Round 3 went one past CLAUDE.md's two-round cap, to review
+  accepted (not disputed) fixes on the new head; flagged to the user.
+- **Codex usage limit reached ~02:35 UTC.** Waiting for it: PR 4 (deep-audit-4 brief for the WMT14 trainer, required
+  before the J1 launch), PR 5 (fixes for audit 3's A3-1..A3-3; then a deep audit before any run uses them), PR 6
+  (exploratory scripts of R031). Nothing gated merged after that; no notebook is declared ready.
+- **Review tooling on this laptop** (edit-protected, for the user): `codex_pr.py wait` crashes decoding the bot's
+  emoji with Windows' cp1252 (works with `PYTHONUTF8=1`) and exits early with a gate FAIL as soon as Codex posts its
+  "review running" status comment; the gate itself (`status` / `merge`) reads the final "Didn't find any major issues"
+  receipt correctly.
+- **Notebook provenance (PR 3):** each command appends start / end records (git SHA, UTC time, GPU, checkpoint
+  present, last logged step, exit code) to `<run_dir>/provenance.jsonl`; `_meta.json` carries them. A run directory
+  started at another commit refuses to resume if `src/ scripts/ configs/ assets/` differ between any earlier session's
+  commit and now, and a checkpoint without provenance (every wave-1 directory) is refused; `ALLOW_CODE_CHANGE = True`
+  overrides on purpose.
+- **Audit-3 fixes (PR 5, not merged):** `fp32_eval` boundary for the text policy forward and `val_nll`; own
+  checkpointed RNG for on-policy draws; resume key includes `grad_accum`; missing config / RNG states fail closed; text
+  run manifest (bundle, BPE and data SHA-256, torch / CUDA) and hashed Sudoku base checkpoint. The audit's tests were
+  committed verbatim, then ported: 97 tests pass on torch 2.11.0+cpu and on 2.6. On torch 2.6 the old on-policy step
+  leaves the Linear weights without gradients (`test_all_trainable_parameters_receive_onpolicy_gradients` fails on
+  `d501333`); with `fp32_eval` it passes on both versions.
+
+## R033 — decision: wave-1 seeds (user, 2026-10-24)
+- A3, A4 and A5 get no seeds 1-2. A4 and A5 nominally advance under W1b (against the collapsed A3, R030), but those
+  comparisons sit inside a collapsed regime and serve no success criterion; the registered selection consequence is not
+  followed, by the user's decision. Saves ~39 CU (~52 with A3 as their comparator).
+- A1's seeds 1-2 (registered: "A1 always gets seeds 1-2") are held until M1's gate or a new tier-L comparison needs the
+  training-seed SD (~13 CU).
