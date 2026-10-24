@@ -16,32 +16,34 @@ If your plan allows several sessions at once, notebooks within the same wave can
 
 ## Queue
 Costs below are measured A100-40GB rates from wave 0 (5.4 CU/h); L4 costs about the same per FLOP and takes ~3x longer.
-**Wave 1 (`w1_*`) needs a bf16 GPU: A100 or L4, not T4** (W1b). Launch only notebooks pulled after the R024 fixes (and Sudoku / WMT14 only after the R028 fixes);
-a `w1_*` run started before them must be restarted in a fresh run directory (tell me, and I will rename it).
+**Wave 1 (`w1_*`) needs a bf16 GPU: A100 or L4, not T4** (W1b). A run directory that holds a checkpoint from before PR 3 (all wave-1 directories) is refused on resume; use a
+fresh directory (new seed) or set `ALLOW_CODE_CHANGE = True` only on purpose.
 Final eval per W1 arm: 16 x 256 samples in fp32 (~5-10 min on an A100).
 | Run | Purpose | GPU | Est. CU | Status |
 |---|---|---|---|---|
 | `p1_tc_pilot` | P1: TC decomposition of the NCM–AR gap (small models) + throughput calibration | T4 | ~3.5 + setup | done (R018) |
 | `c4_sudoku_pilot` | C4 kill experiment: Recurrent NCM vs NCM on Sudoku-hard (1 seed each) | T4 | ~5.7 + setup | done (R019) |
 | `w0_calib_diag` | reference, calibration, where quality is lost, exact Jacobi | A100 | ~2.5 | done (R020) |
-| `w1_L_ts_ctrl` | tier L control (paper recipe, continued), 1800 steps (W1a); also A0 with the 16-group protocol (W1b) | A100 / L4 | ~6 | **launch now** |
-| `w1_L_ts_onpol` | B1a: on-policy corruption, 1350 steps | A100 / L4 | ~6 | **launch now** |
-| `w1_L_ts_onpol2` | B1a-2: two-pass on-policy corruption, 1080 steps | A100 / L4 | ~6 | **launch now** |
-| `w1_L_ts_b1` | B1: on-policy + re-quantized labels, 1350 steps | A100 / L4 | ~6 | **launch now** |
-| `w1_L_ts_requant` | B1b: re-quantized labels, 1800 steps | A100 / L4 | ~6 | **launch now** |
-| `w1_L_ts_soft` | B7: soft labels, 1800 steps | A100 / L4 | ~6 | **launch now** |
-| `w2b_L_sdk_ctrl` | Sudoku tier L control (+ released reference A0), S1 | A100 / L4 | ~2.5 | **launch now** |
-| `w2b_L_sdk_uniform` | Sudoku: uniform corruption control | A100 / L4 | ~2.5 | **launch now** |
-| `w2b_L_sdk_onpolicy` | Sudoku: on-policy greedy corruption (B1a) | A100 / L4 | ~2.5 | **launch now** |
-| `w2b_L_sdk_repair` | Sudoku: board-feedback repair passes (B6/C5) | A100 / L4 | ~2.5 | **launch now** |
-| `w2c_L_wmt_ctrl` | WMT14 control (+ released reference J0), J1 | A100 / L4 | ~4 | **launch now** |
-| `w2c_L_wmt_consist` | WMT14 self-consistency fine-tune (criterion d, text); fp32 teacher (J1b) | A100 / L4 | ~5 | **launch now** |
+| `w1_L_ts_ctrl` | tier L control (paper recipe, continued), 1800 steps (W1a); also A0 with the 16-group protocol (W1b) | A100 / L4 | ~8 (incl. a restart) | done (R030); seeds 1-2 **held** (needed only by M1's gate or a new tier-L comparison) |
+| `w1_L_ts_onpol` | B1a: on-policy corruption, 1350 steps | A100 / L4 | ~9 (incl. restarts) | done (R030: collapsed); no further seeds |
+| `w1_L_ts_onpol2` | B1a-2: two-pass on-policy corruption, 1080 steps | A100 / L4 | ~6.6 | done (R030: collapsed; nominally advances vs A3) -> seeds **dropped** (recommended; user decides) |
+| `w1_L_ts_b1` | B1: on-policy + re-quantized labels, 1350 steps | A100 / L4 | ~9.7 (incl. restarts) | done (R030: collapsed; nominally advances vs A3) -> seeds **dropped** (recommended; user decides) |
+| `w1_L_ts_requant` | B1b: re-quantized labels, 1800 steps | A100 / L4 | ~6.5 | done (R030: 0.31 below A1, bar 0.35) |
+| `w1_L_ts_soft` | B7: soft labels, 1800 steps | A100 / L4 | ~6.5 | done (R030: 0.85 worse than A1) |
+| `w2b_L_sdk_ctrl` | Sudoku tier L control (+ released reference A0), S1 | A100 / L4 | ~2.5 | **hold** (after WMT14; R031) |
+| `w2b_L_sdk_uniform` | Sudoku: uniform corruption control | A100 / L4 | ~2.5 | **hold** (after WMT14; R031) |
+| `w2b_L_sdk_onpolicy` | Sudoku: on-policy greedy corruption (B1a) | A100 / L4 | ~2.5 | **drop** (recommended, R031: the greedy policy corrupts a few % of codes; the mechanism is tested on CPU instead) |
+| `w2b_L_sdk_repair` | Sudoku: board-feedback repair passes (B6/C5) | A100 / L4 | ~2.5 | **hold** (after WMT14; R031) |
+| `w2c_L_wmt_ctrl` | WMT14 control (+ released reference J0), J1 | A100 / L4 | ~4 | **next**, after deep audit 4 (PR 4; blocked by the Codex usage limit) |
+| `w2c_L_wmt_consist` | WMT14 self-consistency fine-tune (criterion d, text); fp32 teacher (J1b) | A100 / L4 | ~5 | **next**, after deep audit 4 (PR 4; blocked by the Codex usage limit) |
 | `p1b_tc_rerun` | P1b: within-level-AR TC probe | — | — | **withdrawn** (R023: false premise; notebook removed; P1c to come) |
-| `w2_Mc_ncm` | tier M design C (M1): NCM from scratch, d512 x 6, 6k steps, seed 0 | A100 / L4 | ~7.7 | **launch any time** (independent of wave 1) |
-| `w2_Mc_ar` | tier M design C (M1): AR, same body, FLOP-matched, seed 0 | A100 / L4 | ~4.3 | **launch any time** |
+| `w2_Mc_ncm` | tier M design C (M1): NCM from scratch, d512 x 6, 6k steps, seed 0 | A100 / L4 | ~7.7 | **hold** (criterion b needs a candidate; wave 1 produced none) |
+| `w2_Mc_ar` | tier M design C (M1): AR, same body, FLOP-matched, seed 0 | A100 / L4 | ~4.3 | **hold** (as above) |
 | `w2_Mc_ar15` | M1 conditional: AR at 1.5x steps, seed 0 | A100 / L4 | ~6.4 | only when asked (before a criterion-(b) claim) |
 | `calib_t4` | old calibration (superseded by w0) | T4 | 0.6 | skip |
 
-Budget: ~200 CU (raised 2026-10-23). Spent: ~12.5 CU (p1, c4, w0). Queued above: ~54 CU. Allocation and decision points:
-`docs/phase1b_scaleup.md`. Progress check: the notebook prints `{"step": ..., "steps_per_s": ...,
+Budget: ~200 CU (raised 2026-10-23). Spent: ~58 CU (p1, c4, w0 ~12.5; wave 1 ~46 incl. restarts, R030). Next: WMT14
+pair ~9 CU once deep audit 4 has run. Held: Sudoku 3 arms ~7.5, A1 seeds 1-2 ~13, M1 pair ~12. Reasons and
+ranking: `log.md` R031 and `STATE.md`. Every notebook now records the git SHA and each session's resume point
+(`_meta.json`, `<run>__provenance.jsonl`) and refuses to resume a run directory under changed code (PR 3). Progress check: the notebook prints `{"step": ..., "steps_per_s": ...,
 "tflops_eff": ...}`; remaining steps / steps_per_s = time left.
