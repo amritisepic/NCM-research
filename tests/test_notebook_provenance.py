@@ -24,12 +24,15 @@ def cells():
 
 
 class FakeSubprocess:
+    """diff_rc: `git diff --quiet` exit code, or a function (old_sha, new_sha) -> exit code."""
+
     def __init__(self, diff_rc=0):
         self.diff_rc, self.commands = diff_rc, []
 
     def run(self, cmd, shell=False, **kw):
         if isinstance(cmd, list) and cmd[:2] == ["git", "diff"]:
-            return SimpleNamespace(returncode=self.diff_rc)
+            rc = self.diff_rc(cmd[3], cmd[4]) if callable(self.diff_rc) else self.diff_rc
+            return SimpleNamespace(returncode=rc)
         self.commands.append(cmd)
         return SimpleNamespace(returncode=0)
 
@@ -76,8 +79,21 @@ def test_refuses_resume_when_code_changed(tmp_path):
     (rd / "provenance.jsonl").write_text(json.dumps({"event": "start", "git_sha": "a" * 40}) + "\n")
     (rd / "ckpt.pt").write_bytes(b"old")
     sub = FakeSubprocess(diff_rc=1)
-    with pytest.raises(SystemExit, match="has changed"):
+    with pytest.raises(SystemExit, match="differs"):
         run_cell(tmp_path, "b" * 40, sub)
+    assert sub.commands == []
+
+
+def test_refuses_return_to_first_commit_after_override(tmp_path):
+    """Codex PR 3 comment 4365642733: started at A, resumed under B (override), back at A: the B state must not resume."""
+    a, b = "a" * 40, "b" * 40
+    rd = tmp_path / "L_ts_ctrl_s0"
+    rd.mkdir()
+    (rd / "provenance.jsonl").write_text("".join(json.dumps({"event": "start", "git_sha": s}) + "\n" for s in (a, b)))
+    (rd / "ckpt.pt").write_bytes(b"trained under b")
+    sub = FakeSubprocess(diff_rc=lambda old, new: 0 if old == new else 1)
+    with pytest.raises(SystemExit, match="differs"):
+        run_cell(tmp_path, a, sub)
     assert sub.commands == []
 
 

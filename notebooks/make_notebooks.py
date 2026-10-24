@@ -266,11 +266,13 @@ for seed in SEEDS:
                 raise SystemExit(f'{rd} holds a checkpoint written before provenance was recorded, so the code that trained '
                                  'it is unknown. Rename the run directory to start fresh, or set ALLOW_CODE_CHANGE = True '
                                  'only after checking which commit trained it.')
-            if started and started[0] != GIT_SHA and not ALLOW_CODE_CHANGE:
-                same = subprocess.run(['git', 'diff', '--quiet', started[0], GIT_SHA, '--'] + CODE_PATHS).returncode == 0
-                if not same:
-                    raise SystemExit(f'{rd} was started at commit {started[0][:9]}; the code under {CODE_PATHS} has changed '
-                                     f'since (now {GIT_SHA[:9]}). Resuming would mix code versions: rename the run directory '
+            # any earlier session may have written the checkpoint: every one of them must have run today's code
+            for old in dict.fromkeys(s for s in started if s != GIT_SHA):
+                if ALLOW_CODE_CHANGE:
+                    break
+                if subprocess.run(['git', 'diff', '--quiet', old, GIT_SHA, '--'] + CODE_PATHS).returncode != 0:
+                    raise SystemExit(f'{rd} was trained in a session at commit {old[:9]}; the code under {CODE_PATHS} differs '
+                                     f'from now ({GIT_SHA[:9]}). Resuming would mix code versions: rename the run directory '
                                      'to start fresh, or set ALLOW_CODE_CHANGE = True only if you mean it.')
             provenance(rd, {'event': 'start', 'git_sha': GIT_SHA, 'utc': utc(), 'gpu': GPU, 'cmd': c,
                             'had_ckpt': os.path.exists(f'{rd}/ckpt.pt'), 'last_logged_step': last_step(rd)})
