@@ -90,8 +90,10 @@ def test_j1b_known_trajectory_indexing_uniform_support_fp32_and_full_budget(monk
     assert len(calls) == 13 and all(c["rows"] == 2 for c in calls[:12])
     assert all(not c["amp"] and not c["grad"] and not c["training"] for c in calls[:12])
     assert calls[-1]["amp"] and calls[-1]["training"]
-    assert {k: v for k, v in ns["traj_stats"].items() if k != "passes"} == dict(
+    # ported: the run-level totals (run_sources / run_degenerate, never reset) are additions; the interval stats are
+    assert {k: v for k, v in ns["traj_stats"].items() if k != "passes" and not k.startswith("run_")} == dict(
         n=2, states_before_fp=11., degenerate=1)
+    assert (ns["traj_stats"]["run_sources"], ns["traj_stats"]["run_degenerate"]) == (2, 1)
     assert not torch.is_autocast_enabled("cpu")
 
 
@@ -219,7 +221,7 @@ def test_j2_resume_preserves_weights_optimizer_data_sampling_and_dropout_rng(tmp
     assert_nested_equal(actual, expected)
 
 
-@pytest.mark.xfail(reason="A4-1: WMT val_nll uses the training autocast", **DEFECT)
+# fixed (was a strict xfail: A4-1: WMT val_nll uses the training autocast)
 def test_val_nll_generator_forwards_are_fp32(tmp_path):
     ns = tiny_wmt(tmp_path)
     observed = []
@@ -275,7 +277,7 @@ def test_manifest_refuses_changed_registered_inputs_and_eval_only(tmp_path, chan
 
 
 @pytest.mark.parametrize("name", ["tokenizer.pt", "generator.pt"])
-@pytest.mark.xfail(reason="A4-2: manifest compares checkpoint sizes, not contents", **DEFECT)
+# fixed (was a strict xfail: A4-2: manifest compares checkpoint sizes, not contents)
 def test_manifest_refuses_changed_same_size_base_weights(tmp_path, name):
     ns, program, base = manifest_case(tmp_path)
     path = base / name
@@ -295,8 +297,8 @@ def test_manifest_refuses_changed_same_size_base_weights(tmp_path, name):
 
 @pytest.mark.parametrize("degenerate", [
     0,
-    pytest.param(1, marks=pytest.mark.xfail(reason="A4-3: dropped rows still counted as backward work", **DEFECT)),
-    pytest.param(16, marks=pytest.mark.xfail(reason="A4-3: all-degenerate step claims unused work", **DEFECT)),
+    1,   # fixed (was a strict xfail: A4-3: dropped rows still counted as backward work)
+    16,   # fixed (was a strict xfail: A4-3: all-degenerate step claims unused work)
 ])
 def test_realized_generator_rows_match_registered_proxy(monkeypatch, degenerate):
     ns, calls, _ = known_trajectory(monkeypatch)
@@ -381,7 +383,7 @@ def test_j2_target_is_source_determined_at_every_code_position(tmp_path):
         assert torch.equal(jt.parallel_logits(ns["net"], z, target, pm).argmax(-1), target)
 
 
-@pytest.mark.xfail(reason="A4-4: first-pass fixed points are detected on pass two", **DEFECT)
+# fixed (was a strict xfail: A4-4: first-pass fixed points are detected on pass two)
 def test_initial_fixed_point_needs_one_detection_pass(monkeypatch):
     ns, calls, _ = known_trajectory(monkeypatch)
     loss, used = ns["consist_loss"](8, torch.zeros(2, 1, dtype=torch.long))
@@ -389,7 +391,7 @@ def test_initial_fixed_point_needs_one_detection_pass(monkeypatch):
     assert ns["traj_stats"]["passes"] == 2  # two sources, one detection pass each
 
 
-@pytest.mark.xfail(reason="A4-5: curve evaluations discard ordered hypotheses and pass counts", **DEFECT)
+# fixed (was a strict xfail: A4-5: curve evaluations discard ordered hypotheses and pass counts)
 def test_curve_evaluation_persists_ordered_comparator_inputs(tmp_path):
     tree = ast.parse(source(WMT))
     loop = next(n for n in tree.body if isinstance(n, ast.While))
@@ -422,7 +424,8 @@ def test_hash_pinned_asset_parallel_fp32_teacher_still_matches_sequential(releas
 
 def test_no_rng_draw_between_wmt_restore_and_first_training_step():
     tree = ast.parse(source(WMT))
-    start = next(i for i, n in enumerate(tree.body) if isinstance(n, ast.Expr) and
+    # ported: the restore's return value (the checkpoint's extra) is now kept, so the call may be an assignment
+    start = next(i for i, n in enumerate(tree.body) if isinstance(n, (ast.Expr, ast.Assign)) and
                  isinstance(n.value, ast.Call) and ast.unparse(n.value.func) == "trainer.maybe_resume")
     end = next(i for i, n in enumerate(tree.body) if isinstance(n, ast.While))
     executed = [n for n in tree.body[start + 1:end] if not isinstance(n, (ast.FunctionDef, ast.ClassDef))]

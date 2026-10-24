@@ -82,7 +82,7 @@ if a.eval_only and os.path.exists(ckpt_path):
 _base = os.path.join(ROOT, "artifacts", "wmt14")
 manifest = {"config": OmegaConf.to_container(cfg, resolve=True), "data_sha256": digest(a.data),
             "base_config_sha256": digest(os.path.join(_base, "config.yaml")),
-            "base_bytes": {n: os.path.getsize(os.path.join(_base, n)) for n in ("tokenizer.pt", "generator.pt")},
+            "base_sha256": {n: digest(os.path.join(_base, n)) for n in ("tokenizer.pt", "generator.pt")},   # audit 4, A4-2
             "device": dev}
 if os.path.exists(ckpt_path) and not a.calib_steps:
     if not os.path.exists(manifest_path) or json.load(open(manifest_path)) != manifest:
@@ -119,7 +119,7 @@ trainer = Trainer(a.run_dir, params, max_lr=float(tc.lr), total_steps=int(tc.ste
                   ckpt_every=int(tc.ckpt_every), device=dev, amp=bool(tc.get("amp", True)),
                   min_lr_frac=float(tc.get("min_lr_frac", 0.1)))
 modules = {"model": net}
-trainer.maybe_resume(modules, rng)
+resume_extra = trainer.maybe_resume(modules, rng)
 print(f"[wmt14-L] arm={arm} params {n_params(net) / 1e6:.2f}M | {fl_step / 1e12:.2f} TFLOP/step, "
       f"{fl_step * int(tc.steps) / 1e15:.1f} PFLOP total (generator proxy) | device {dev}", flush=True)
 
@@ -149,7 +149,14 @@ def tf_loss(src, tgt):
     return ce(parallel_logits(net, z, idx, pm), idx)
 
 
-traj_stats = {"passes": 0.0, "n": 0, "states_before_fp": 0.0, "degenerate": 0}
+_rs = resume_extra.get("run_stats", {})
+traj_stats = {"passes": 0.0, "n": 0, "states_before_fp": 0.0, "degenerate": 0,
+              # run-level totals for J1b's 1% degenerate-source rule: never reset by logging, checkpointed, restored
+              "run_sources": int(_rs.get("sources", 0)), "run_degenerate": int(_rs.get("degenerate", 0))}
+
+
+def run_stats():
+    return {"sources": traj_stats["run_sources"], "degenerate": traj_stats["run_degenerate"]}
 
 
 def consist_loss(n, sources):
@@ -161,7 +168,8 @@ def consist_loss(n, sources):
     net.eval()
     # the teacher is the fp32 greedy map that exact decoding evaluates, not the bf16 training map (codex audit2 A2-4)
     with torch.no_grad(), torch.autocast(device_type=dev, enabled=False):
-        out = jacobi_decode(net, lambda c, h: z.float(), g, S, dev, K + 1, pad_mask=pm, keep_history=True, full_budget=True)
+        out = jacobi_decode(net, lambda c, h: z.float(), g, S, dev, K + 1, pad_mask=pm, keep_history=True, full_budget=True,
+                            initial_fixed_ok=True)   # static prefix (codex audit 4, A4-4)
     net.train(was)
     if not bool(out["stop"].eq(1).all()):
         raise RuntimeError("consistency teacher did not reach a fixed point in K + 1 passes")
@@ -174,15 +182,24 @@ def consist_loss(n, sources):
     traj_stats["states_before_fp"] += float(first_fp.sum())
     traj_stats["n"] += g
     traj_stats["degenerate"] += int((~keep).sum())
+    traj_stats["run_sources"] = traj_stats.get("run_sources", 0) + g
+    traj_stats["run_degenerate"] = traj_stats.get("run_degenerate", 0) + int((~keep).sum())
+    # J1b drops degenerate sources from the loss; their student rows still run, as zero-loss padding, so the executed
+    # proxy equals the registered one (codex audit 4, A4-3)
+    pad_z = z[~keep].repeat_interleave(m_states, 0)
+    pad_pm = pm[~keep].repeat_interleave(m_states, 0)
+    pad_inp = torch.zeros(len(pad_z), S, dtype=torch.long, device=dev)
     if not bool(keep.any()):
-        return None, 0
+        lg = parallel_logits(net, pad_z, pad_inp, pad_pm)
+        return lg[..., 0].float().sum() * 0.0, 0
     hist, y, z, pm, first_fp = hist[keep], y[keep], z[keep], pm[keep], first_fp[keep]
     gk = len(y)
     t = (torch.rand(gk, m_states, device=dev) * first_fp[:, None]).long()   # uniform over states strictly before it
     inp = hist[torch.arange(gk, device=dev)[:, None], t].reshape(-1, S)
     tgt = y.repeat_interleave(m_states, 0)
     zz, pmm = z.repeat_interleave(m_states, 0), pm.repeat_interleave(m_states, 0)
-    return ce(parallel_logits(net, zz, inp, pmm), tgt), len(tgt)
+    lg = parallel_logits(net, torch.cat([zz, pad_z], 0), torch.cat([inp, pad_inp], 0), torch.cat([pmm, pad_pm], 0))
+    return ce(lg[:len(tgt)], tgt), len(tgt)
 
 
 def detok(ids):
@@ -208,7 +225,8 @@ def evaluate(srcs, refs, bs_=128, sequential=True, caps=None):
             ids = [(pt.encode(t)[:P] + [PAD] * P)[:P] for t in srcs[s:s + bs_]]
             x = torch.tensor(ids, device=dev)
             z, pm = prefix(x)
-            out = jacobi_decode(net, lambda c, h: z, len(x), S, dev, K + 1, pad_mask=pm, keep_history=True)
+            out = jacobi_decode(net, lambda c, h: z, len(x), S, dev, K + 1, pad_mask=pm, keep_history=True,
+                                initial_fixed_ok=True)   # static prefix (codex audit 4, A4-4)
             if sequential:   # disagreements are recorded per sentence (reported, not silently averaged)
                 seq = net.generate(None, x, temperature=0.0, top_k=0, top_p=1.0, cfg_scale=0.0, cfg_null_eos=EOS)
                 same += (seq == out["codes"]).all(1).tolist()
@@ -248,7 +266,7 @@ def val_nll(n=1000):
     for s in range(0, len(vs), 100):
         z, pm = prefix(vs[s:s + 100])
         idx = canon(vt[s:s + 100])
-        with trainer.ctx:
+        with torch.autocast(device_type=dev, enabled=False):   # fp32 scoring (codex audit 4, A4-1)
             lg = parallel_logits(net, z, idx, pm).float()
         tot += F.cross_entropy(lg.reshape(-1, lg.shape[-1]), idx.reshape(-1), reduction="sum").item()
     net.train()
@@ -285,14 +303,16 @@ while trainer.step < int(tc.steps):
             traj_stats.update(passes=0.0, n=0, states_before_fp=0.0, degenerate=0)
         print(json.dumps(trainer.log({"loss": round(loss.item(), 4), "gnorm": round(gn, 3), **logs})), flush=True)
     if trainer.step % int(tc.eval_every) == 0 or trainer.step == int(tc.steps):
-        ev, _, _ = evaluate(val_text["src"][:n_curve], val_text["ref"][:n_curve], sequential=False)
-        ev.pop("nfe_per_sentence")
+        # every evaluation keeps ordered hypotheses and per-sentence passes, and checks exact = sequential (J1b; audit 4, A4-5)
+        ev, curve_hyp, curve_cap = evaluate(val_text["src"][:n_curve], val_text["ref"][:n_curve], sequential=True)
+        json.dump({"hyp_val": curve_hyp, "hyp_val_capped": curve_cap, "nfe_val": ev.pop("nfe_per_sentence")},
+                  open(os.path.join(a.run_dir, f"hyp_val_step{trainer.step}.json"), "w"))
         ev["val_nll"] = val_nll()
         print(json.dumps(trainer.log({"eval": ev})), flush=True)
     if trainer.step % int(tc.ckpt_every) == 0:
-        trainer.save(modules, rng)
+        trainer.save(modules, rng, extra={"run_stats": run_stats()})
     if deadline and time.time() > deadline:
-        trainer.save(modules, rng)
+        trainer.save(modules, rng, extra={"run_stats": run_stats()})
         print("[stop] time budget reached; resume by re-running the same command", flush=True)
         sys.exit(0)
 
@@ -300,7 +320,7 @@ if calib:
     calib.report(trainer.step, {"arm": arm, "batch_size": bs})
     sys.exit(0)
 if not a.eval_only:
-    trainer.save(modules, rng)
+    trainer.save(modules, rng, extra={"run_stats": run_stats()})
     torch.save({"model": net.state_dict()}, os.path.join(a.run_dir, "final.pt"))
 nv = a.n_val or len(val_text["src"])
 final = {"val_nll": val_nll()}
@@ -317,6 +337,9 @@ json.dump({"hyp_val": hyp_val, "hyp_val_capped": hyp_val_cap, "nfe_val": final["
 res = {"run": os.path.basename(a.run_dir.rstrip("/")), "arm": arm, "config": OmegaConf.to_container(cfg),
        "params_total": n_params(net), "steps": trainer.step, "generator_flops_proxy_total": fl_step * trainer.step,
        "wall_s": trainer.wall_prev + time.time() - trainer.t_start, "device": dev,
-       "gpu": torch.cuda.get_device_name() if dev == "cuda" else None, "torch": torch.__version__, "final_eval": final}
+       "gpu": torch.cuda.get_device_name() if dev == "cuda" else None, "torch": torch.__version__, "final_eval": final,
+       # J1b: if more than 1% of trajectory sources over the run are degenerate, report it and do not read H12
+       "trajectory_sources": traj_stats["run_sources"], "degenerate_sources": traj_stats["run_degenerate"],
+       "degenerate_pct": 100 * traj_stats["run_degenerate"] / max(traj_stats["run_sources"], 1)}
 json.dump(res, open(os.path.join(a.run_dir, "result.json"), "w"), indent=1)
 print(json.dumps({k: v for k, v in res.items() if k != "config"}, indent=1))

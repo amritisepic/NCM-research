@@ -136,6 +136,10 @@ def cpu_evidence():
 def test_saved_history_numbers_recompute_exactly():
     expected = recompute()
     saved = json.loads(OUT.read_text(encoding="utf-8"))
+    # ported: the count of results/*.json describes the audited commit; later commits add result files, so it is not
+    # recomputable in the working tree (every number recomputed from a named file still is)
+    for d in (expected, saved):
+        d["history"]["R028"].pop("results_json_count", None)
     assert {k: saved[k] for k in expected} == expected
     assert not saved["history"]["disagreements"]
 
