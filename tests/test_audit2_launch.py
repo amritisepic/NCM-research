@@ -71,10 +71,12 @@ def test_consistency_target_is_the_fp32_fixed_point():
 
 
 def test_no_fixed_point_state_is_sampled_as_a_pre_fixed_point_state():
-    # adapted (R028 policy J1b): degenerate sources are dropped and counted, never trained on a fixed-point state
+    # adapted (R028 policy J1b; audit 4 A4-3): degenerate sources are dropped from the loss and counted, never trained on
+    # a fixed-point state; their student rows still run as zero-loss all-zero padding, so the executed proxy is registered
     ns, seen, _, _ = consistency_fixture("zero")
     loss, n_used = ns["consist_loss"](4, torch.zeros(1, 1, dtype=torch.long))
-    assert loss is None and n_used == 0 and not seen
+    assert float(loss) == 0.0 and n_used == 0
+    assert len(seen) == 1 and tuple(seen[0].shape) == (4, 2) and not seen[0].any()
     assert ns["traj_stats"]["degenerate"] == 1
 
 

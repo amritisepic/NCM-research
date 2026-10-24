@@ -268,3 +268,45 @@ Why: `docs/reviews/codex_audit2.md` (A2-3 to A2-8, A2-10).
   disagreements are recorded per sentence; any disagreement is reported, and "exact" applies only where they agree.
 - **Data:** `prep_wmt14.py` samples uniformly from the length-eligible pairs until exactly 400k are found, and reuses an
   archive only if its saved selection metadata matches. Run manifest and `--eval_only` guard as in S1c.
+
+## W1d — eval-only diagnostic of the re-quantized-label arm (registered 2026-10-24, before the run; exploratory)
+- **Why:** A2 (uniform corruption + re-quantized labels) is the only wave-1 arm better than the control on both registered
+  metrics at equal entropy (Gen-PPL -0.31 ± 0.08 paired by sample seed, sampling noise only; MAUVE +0.034), but it missed
+  W1b's screen (0.31 < 0.35) and is +0.13 ± 0.08 Gen-PPL worse than the released model (R030, R031). Before any
+  confirmation run, establish whether the gain holds across sampling temperatures and where in the hierarchy it arises.
+- **Setup:** no training. A0 (released), A1 (`L_ts_ctrl_s0/final.pt`), A2 (`L_ts_requant_s0/final.pt`): the seed-0 wave-1
+  checkpoints. `scripts/diag_w1_frontier.py`, notebook `w1d_requant_diag`, A100, fp32 sampling and scoring, TF32 off.
+  (1) Frontier: T in {0.8, 0.9, 1.0}, 8 groups x 256 unconditional samples per T (seeds 42, 0-6; W1b's sampler): Gen-PPL
+  (GPT-2 large, TinyStories-33M), entropy, repetition, MAUVE (2048 samples vs 2048 val windows, 5 quantization seeds).
+  (2) Oracle-intervention curve (R020's protocol): the canonical codes of levels 0..j of the first 1024 val windows are
+  supplied and the model samples the rest at T = 1, for j in {-1, 3, 5, 7}; Gen-PPL (GPT-2 large) in 4 groups of 256.
+  Windows and seeds are the same for every model, so model differences are paired.
+- **Integrity check:** at T = 1, every group must reproduce the wave-1 result's Gen-PPL for the same seed (max |diff| <=
+  0.01 on an A100). If it does not, the run is reported as not reproducing wave 1 and its numbers are not read.
+- **Reading** (paired differences A2 - A1, mean over groups ± SE; exploratory, no claim):
+  - Frontier: "A2 ahead" if A2's Gen-PPL point estimate is below A1's at every T, the mean of the three paired differences
+    is at least 2 SE below 0, A2's entropy is within 0.05 nats of A1's at each T, and A2's MAUVE is not lower by > 0.01
+    at any T. "Trade-off" if the Gen-PPL gain comes with lower entropy or reverses at some T. Otherwise "no difference".
+  - Oracle curve: if A2 - A1 shrinks by at least half from j = -1 to j = 5, the gain arises while the model samples its
+    own coarse levels; if at least half of it remains at j = 5 and j = 7, it is a fine-level effect, bounded by those
+    levels' ~7% share of the oracle quality gap (R020).
+- **Consequence:** only "A2 ahead" leads to registering a confirmation (W1c: A1 and A2 at fresh seeds, Phase-3 rule),
+  whose A1 runs are the held A1 seeds (R033). Otherwise A2 is reported as a likelihood / MAUVE shift without a Gen-PPL
+  gain and is not pursued. The oracle reading decides which magnification route (coarse-level repair vs fine-level
+  rendering) any later W2 arm targets.
+- **Cost:** ~2.5 CU (A100).
+
+## J1c — amendment to J1 / J1a / J1b after the fourth code audit (registered 2026-10-24, before any J1 run)
+Why: `docs/reviews/codex_audit4.md` (A4-1 to A4-5); triage `docs/reviews/triage_audit4_2026-10-24.md`.
+- **Degenerate consistency sources** (J1b): still dropped from the loss and counted. Their student rows now run as
+  zero-loss padding, so the executed generator proxy equals the registered one (J2: 2000 x 576 forward rows) in every
+  step, including a step whose sources are all degenerate. Run-level source and degenerate totals are checkpointed,
+  restored on resume and reported (`degenerate_pct`); J1b's 1% rule reads those totals.
+- **NFE:** with WMT's static source prefix, convergence may be detected on pass 1, so a sentence whose all-zero start is
+  already its fixed point costs 1 pass, not 2. This applies to J0, J1 and J2 alike. J0's sanity reference (11.07 passes,
+  R020) was measured with pass-1 detection off, so J0's re-evaluation may differ by at most 1 pass times the share of such
+  sentences; the difference is reported, not treated as a failed sanity check.
+- **Evaluation records:** validation NLL is scored in fp32; every curve evaluation keeps ordered exact and capped
+  hypotheses and per-sentence passes, and checks exact = sequential.
+- **Run identity:** the run manifest identifies the base tokenizer and generator by SHA-256, not by file size.
+
