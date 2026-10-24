@@ -1,0 +1,45 @@
+init: released
+corruption:
+  mode: uniform
+  mean_rate: 0.5
+  spread: 0.5
+  retarget: false
+  soft_tau: 0.25
+  soft_topm: 16
+train:
+  steps: 1800
+  batch_size: 256
+  grad_accum: 4
+  lr: 5.0e-05
+  warmup: 200
+  min_lr_frac: 0.1
+  weight_decay: 0.1
+  beta2: 0.95
+  ckpt_every: 250
+  eval_every: 300
+  eval_n: 1000
+  log_every: 25
+  compile: false
+  seed: 0
+sample_eval:
+  every: 600
+  'n': 256
+  final_seeds:
+  - 42
+  - 0
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 7
+  - 8
+  - 9
+  - 10
+  - 11
+  - 12
+  - 13
+  - 14
+  final_n: 256
+  mauve: true
