@@ -107,6 +107,23 @@ for arm, what in L_ARMS.items():
         "gpu": "A100 (measured 2.2 s/step, ~67 min + eval) or L4", "units": 6, "needs": ["ts", "ckpt"], "seeds": [0],
         "cmds": cmds,
     }
+RUNS["w1d_requant_diag"] = {
+    "desc": "Eval-only diagnostic W1d (exploratory; registered before launch; no training): the released model (A0), the "
+            "wave-1 control (A1) and the re-quantized-label arm (A2). (1) Temperature frontier at T = 0.8 / 0.9 / 1.0, "
+            "8 x 256 samples each: Gen-PPL, entropy, MAUVE. (2) Oracle-intervention curve (real levels 0..j, sampled "
+            "rest) at j = -1 / 3 / 5 / 7 on 1024 val windows. Reads the wave-1 checkpoints from Drive "
+            "(runs/L_ts_ctrl_s0/final.pt, runs/L_ts_requant_s0/final.pt). Use an A100: at T = 1 the samples must "
+            "reproduce wave 1's groups exactly, which another GPU type may not.",
+    "gpu": "A100 (the reproduction check needs the wave-1 GPU type)", "units": 2.5, "needs": ["ts", "ckpt"], "seeds": [0],
+    "cmds": [
+        "python scripts/diag_w1_frontier.py --name A0 --run_dir {R}/w1d_A0 "
+        "--expect results/colab/w1_L_ts_ctrl/L_ts_released16__result.json",
+        "python scripts/diag_w1_frontier.py --name A1 --ckpt {R}/L_ts_ctrl_s0/final.pt --run_dir {R}/w1d_A1 "
+        "--expect results/colab/w1_L_ts_ctrl/L_ts_ctrl_s0__result.json",
+        "python scripts/diag_w1_frontier.py --name A2 --ckpt {R}/L_ts_requant_s0/final.pt --run_dir {R}/w1d_A2 "
+        "--expect results/colab/w1_L_ts_requant/L_ts_requant_s0__result.json",
+    ],
+}
 # P1b withdrawn before launch (R023): its premise (AR probe = factorized probe at step 0) is false; see P1c in docs.
 SDK_ARMS = {
     "ctrl": "control: plain teacher forcing (also evaluates the released model once, A0)",
@@ -274,7 +291,11 @@ for seed in SEEDS:
                     raise SystemExit(f'{rd} was trained in a session at commit {old[:9]}; the code under {CODE_PATHS} differs '
                                      f'from now ({GIT_SHA[:9]}). Resuming would mix code versions: rename the run directory '
                                      'to start fresh, or set ALLOW_CODE_CHANGE = True only if you mean it.')
-            provenance(rd, {'event': 'start', 'git_sha': GIT_SHA, 'utc': utc(), 'gpu': GPU, 'cmd': c,
+            # the command as a template ({R} = the Drive run root) plus the flags this cell added: no absolute path is
+            # recorded, because provenance is published with the results (Codex PR 7)
+            provenance(rd, {'event': 'start', 'git_sha': GIT_SHA, 'utc': utc(), 'gpu': GPU, 'cmd': CMDS_RAW[i],
+                            'seed': seed, 'local_data_copy': ' --data_dir /content/ts' in c,
+                            'micro_batch_64': ' --micro_batch 64' in c,
                             'had_ckpt': os.path.exists(f'{rd}/ckpt.pt'), 'last_logged_step': last_step(rd)})
         print('>>>', c, flush=True)
         t = time.time()
