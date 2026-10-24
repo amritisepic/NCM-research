@@ -704,3 +704,12 @@ codes replaced in both arms; labels canonical. Only the wrong code differs: unif
 - Preserved the report's R030-R033 evidence scope and added a publication note pointing to R034's newer
   Sudoku dropout-RNG confound, used-parent proposal mismatch, MAUVE precision correction and J1c amendment.
 - Experimental proposals remain speculation; no registrations, training code or launch decisions changed.
+
+## R035 — Session close: Codex at its usage limit, PR 6's review finding fixed, handoff written (2026-10-24; process)
+- Codex's review of PR 7's head `f087a48` failed at the code-review usage limit (16:36 UTC). Per `CLAUDE.md`, no gated
+  merge until it resets: W1d (`w1d_requant_diag`) is not cleared; the WMT14 pair is (PR 8 merged before the limit).
+- PR 6: Codex's P1 (the exploratory scripts printed absolute output paths) accepted and fixed: a `shown()` helper prints
+  repo-relative paths or file names only; `tests/test_exploratory_print_paths.py`, each print site mutation-checked
+  (`docs/reviews/triage_pr6.md`). Its new head `8516fea` needs a review.
+- Handoff for the next session: `docs/prompts/handoff_2026-10-24.md` (re-check the Codex work, the open PRs, next
+  steps, and the literature report's frozen-teacher arm J2-F and mechanism 2x2 as decisions for the user).

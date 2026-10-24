@@ -1,6 +1,6 @@
 # STATE — read this first
 
-_Last updated: 2026-10-24, session 4 (continued). Branches: `claude/ncm-research` (notebooks clone it) and
+_Last updated: 2026-10-24, end of session 4 (handoff: `docs/prompts/handoff_2026-10-24.md`). Branches: `claude/ncm-research` (notebooks clone it) and
 `claude/ncm-phase2-analysis-finetune-pkh64d` (older mirror). Repo is PUBLIC: commit nothing identifying (no
 personal names/emails, no absolute local paths, no session links, no credentials). Goals, success bar and rules:
 `docs/brief.md`._
@@ -14,16 +14,19 @@ learns to discount its own coarse codes (Huszár's scheduled-sampling improperne
 quantization); a CPU test on Sudoku supports the hedging step (R031), not yet the link to the text collapse. As registered, A4 and A5 nominally advance against the
 collapsed A3; the user dropped their seeds and holds A1's (R033). Since then (R034): deep audits 3 (completed), 4 (WMT14
 trainer: three P1s, fixed in PR 8, amendment J1c) and 5 (the W1d diagnostic: no P0/P1) and Codex's adversarial review of
-the mechanism ((b') survives, not established; a used-parent mismatch at L0/L1 is a live competitor). Next launches:
-`w1d_requant_diag` (after PR 7 merges) and the WMT14 pair (after PR 8 merges).
+the mechanism ((b') survives, not established; a used-parent mismatch at L0/L1 is a live competitor). Cleared to launch:
+the WMT14 pair (`w2c_L_wmt_ctrl`, `w2c_L_wmt_consist`; PR 8 merged). `w1d_requant_diag` waits for PR 7, whose last
+review request hit Codex's usage limit (2026-10-24 16:36 UTC). Advisory, unregistered literature report:
+`docs/literature_advice_2026-10-24.md`.
 
 ## Environment
 - **Codex:** reviews PRs (bot `chatgpt-codex-connector`; 2-15 min per review); a review triggered only by opening a PR may
   leave no receipt the gate counts, so request one explicitly. Deep audits requested as PR comments need a Codex cloud
   environment for the repo, which does not exist: run audits locally (`scripts/review/codex_local.sh` with the Codex
-  desktop CLI, or Codex desktop). The usage limit hit 2026-10-24 ~02:35 UTC reset at ~06:52 UTC. Open: PR 4 (audit-4
-  brief, superseded by the local audit), PR 5 (audit-3 fixes), PR 6 (exploratory scripts; needs ADV-1's fix), PR 7 (W1d),
-  PR 8 (audit-4 fixes).
+  desktop CLI, or Codex desktop). Usage limits: hit 2026-10-24 ~02:35 UTC, reset ~06:52 UTC; **hit again at 16:36 UTC**
+  (PR 7's re-request) and not reset at the time of writing: no gated merge until it resets. Open: PR 5 (audit-3 fixes;
+  head never reviewed), PR 6 (exploratory scripts; ADV-1 and Codex's P1 fixed, head `8516fea` needs a review), PR 7
+  (W1d; head `f087a48` needs a review). Merged: PRs 2, 3, 4, 8.
 - `scripts/review/codex_pr.py wait` on this Windows laptop: crashes decoding the bot's emoji (cp1252) unless run with
   `PYTHONUTF8=1`, and returns early (gate FAIL) when Codex posts its "review running" status comment. Workaround used:
   poll the `codex-review-state` comment, then `codex_pr.py status`. `scripts/review/` is edit-protected: the user fixes.
@@ -60,18 +63,20 @@ the mechanism ((b') survives, not established; a used-parent mismatch at L0/L1 i
 - Throughput (A100): tier L 39-41 TFLOPS (2.1 s/step uniform, 3.0 on-policy, 3.7 two-pass), tier M NCM 24.7, AR 44.2.
 
 ## Live hypotheses / bets (ranked: significance x chance of a clean result / CU)
-1. **Criterion (d), text half: J2 self-consistency on WMT14** (J1/J1a/J1b registered; ~9 CU seed 0). The Sudoku half
+1. **Criterion (d), text half: J2 self-consistency on WMT14** (J1/J1a/J1b/J1c registered; ~9 CU seed 0). The Sudoku half
    is met training-free (exact Jacobi + verifier), pending batch-1 wall-clock. J2 trains on the model's own Jacobi
    states too, but decodes greedily, which hid the hedging in the Sudoku test (R031); J1/J1a's BLEU checks are the guard.
-   Blocked on deep audit 4.
+   Audit 4's fixes merged (PR 8, J1c): cleared. The literature report suggests a frozen-teacher arm (J2-F), to be
+   registered before J1/J2 results if wanted (the user's call).
 2. **Mechanism of the on-policy collapse (candidate for criterion c):** undetectable corruption -> the model discounts
    its own coarse codes. Sudoku CPU (R031, matched slots and rates): plausible wrong codes raise predictive entropy on
    clean contexts by 74% (uniform: 5%) and clean NLL by 32 nats (2.7), and cut reliance on the true L6 code by 76% (R034,
    Codex's adversarial test); greedy hides it, sampling exposes part of it; no Sudoku collapse. Suggestive; competitors
    open (used-parent mismatch at L0/L1, lost denoising coverage, feedback), and R031's Sudoku contrast has a dropout-RNG
-   confound (ADV-1) until rerun. Next: four short tier-L arms (~12 CU): on-policy + a "replaced" flag,
-   plausible-wrong codes at uniform rates, uniform at A3's rates (A1m), A3 replicate; plus an eval-only check of the
-   W1 checkpoints at lower temperature (hedging predicts A3's gap to A1 shrinks).
+   confound (ADV-1) until rerun. Next: short tier-L arms (~15 CU) designed from the adversarial review and the literature
+   report's 2x2 (plausible-wrong vs uniform-wrong replacements x truthful vs shuffled flags, common masks), plus a
+   used-parent L1 proposal ablation and an A3 replicate; measure dependence on coarse context, not only entropy. Also an
+   eval-only temperature check of A3 (W1d covers A0-A2 only; hedging predicts A3's gap to A1 shrinks at lower T).
 3. **Clean code NLL is not a quality proxy (candidate for criterion c):** four observations; make it rigorous with an
    equivalence-class / decoded-token NLL on the 7 W1 checkpoints (~1 CU, checkpoints on Drive) vs Gen-PPL.
 4. **A2 (Infinity-style re-quantized hierarchy):** -0.31 ± 0.08 (paired, sampling noise only) and MAUVE +0.034 at equal
@@ -91,15 +96,16 @@ the mechanism ((b') survives, not established; a used-parent mismatch at L0/L1 i
 
 ## Compute
 - Colab: ~58 CU spent (p1, c4, w0 ~12.5; wave 1 ~46 incl. ~6.5 lost to restarts, R030). Budget ~200: ~142 left.
-- Plan: WMT14 pair ~9 next; then J1/J2 seeds 1-2 (~18) if J2 passes its screen, batch-1 wall-clock ~1-2; mechanism
-  arms ~12 if registered; NLL-proxy eval ~1. Held: Sudoku 3 arms ~7.5, A1 seeds 1-2 ~13, M1 pair ~12. Reserve ~85.
+- Plan: WMT14 pair ~9 and W1d ~2.5 next; then J1/J2 seeds 1-2 (~18) if J2 passes its screen, batch-1 wall-clock ~1-2; mechanism
+  arms ~15 if registered; NLL-proxy eval ~1 (planned ~48). Held: Sudoku 3 arms ~7.5, A1 seeds 1-2 ~13, M1 pair ~12
+  (~32.5). ~62 unallocated if all of it runs.
 - CPU: ~10.5 CPU-h before this session; this session ~3 h of CPU (Sudoku mechanism arms, tests).
 
 ## Next 3 actions
-1. When Codex's limit resets: request deep audit 4 on PR 4 (`docs/prompts/codex_audit4_wmt.md`), triage it, then tell
-   the user to launch `w2c_L_wmt_ctrl` and `w2c_L_wmt_consist`; get Codex reviews for PR 5 and PR 6 and merge them.
-2. Analyse J1/J2 strictly against J1 + J1a + J1b; if J2 looks like it meets criterion (d), stop and ask the user before
-   spending more compute (brief rule).
-3. After W1d reports: apply W1d's registered reading (confirm A2 or not). Then build the tier-L mechanism arms on PR 5's
-   trainer (flag from the mask, plausible-wrong at uniform rates, lower-rate uniform under a new name, used-parent L1
-   proposals, A3 replicate), register them with each arm's overturning result, deep-audit, then ask the user (~15 CU).
+1. User: launch `w2c_L_wmt_ctrl` and `w2c_L_wmt_consist` (same GPU type, A100 preferred). Until PR 7 merges, their
+   provenance records expanded Drive paths: strip the `cmd` fields to templates before committing results.
+2. When Codex's limit resets: request reviews of PR 7 (`f087a48`), PR 6 (`8516fea`) and PR 5, triage, merge; then
+   `w1d_requant_diag` (~2.5 CU) is cleared. PR 5's trainer changes need a deep audit before any run uses them.
+3. Analyse J1/J2 strictly against J1 + J1a + J1b + J1c and W1d against its registered reading; if J2 looks like it meets
+   criterion (d), stop and ask before spending more. Then the tier-L mechanism arms: register with each arm's
+   overturning result, deep-audit, ask the user (~15 CU). Details: `docs/prompts/handoff_2026-10-24.md`.

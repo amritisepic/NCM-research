@@ -30,13 +30,13 @@ Final eval per W1 arm: 16 x 256 samples in fp32 (~5-10 min on an A100).
 | `w1_L_ts_b1` | B1: on-policy + re-quantized labels, 1350 steps | A100 / L4 | ~9.7 (incl. restarts) | done (R030: collapsed; nominally advances vs A3) -> seeds **dropped** (user, R033) |
 | `w1_L_ts_requant` | B1b: re-quantized labels, 1800 steps | A100 / L4 | ~6.5 | done (R030: 0.31 below A1, bar 0.35) |
 | `w1_L_ts_soft` | B7: soft labels, 1800 steps | A100 / L4 | ~6.5 | done (R030: 0.85 worse than A1) |
-| `w1d_requant_diag` | W1d (eval-only): temperature frontier and oracle curve for A0 / A1 / A2 from the wave-1 checkpoints on Drive | **A100** (exact reproduction gate) | ~2.5 | **next**, after PR 7 merges |
+| `w1d_requant_diag` | W1d (eval-only): temperature frontier and oracle curve for A0 / A1 / A2 from the wave-1 checkpoints on Drive | **A100** (exact reproduction gate) | ~2.5 | **blocked**: PR 7's head awaits a Codex review (usage limit hit 2026-10-24 16:36 UTC) |
 | `w2b_L_sdk_ctrl` | Sudoku tier L control (+ released reference A0), S1 | A100 / L4 | ~2.5 | **hold** (after WMT14; R031) |
 | `w2b_L_sdk_uniform` | Sudoku: uniform corruption control | A100 / L4 | ~2.5 | **hold** (after WMT14; R031) |
 | `w2b_L_sdk_onpolicy` | Sudoku: on-policy greedy corruption (B1a) | A100 / L4 | ~2.5 | **drop** (recommended, R031: the greedy policy corrupts a few % of codes; the mechanism is tested on CPU instead) |
 | `w2b_L_sdk_repair` | Sudoku: board-feedback repair passes (B6/C5) | A100 / L4 | ~2.5 | **hold** (after WMT14; R031) |
-| `w2c_L_wmt_ctrl` | WMT14 control (+ released reference J0), J1 + J1c | A100 / L4 | ~4 | **next**, after PR 8 (audit-4 fixes) merges |
-| `w2c_L_wmt_consist` | WMT14 self-consistency fine-tune (criterion d, text); fp32 teacher (J1b), padded degenerate rows (J1c) | A100 / L4 | ~5 | **next**, after PR 8 (audit-4 fixes) merges |
+| `w2c_L_wmt_ctrl` | WMT14 control (+ released reference J0), J1 + J1c | A100 / L4 | ~4 | **ready** (PR 8 merged); same GPU type as `w2c_L_wmt_consist` |
+| `w2c_L_wmt_consist` | WMT14 self-consistency fine-tune (criterion d, text); fp32 teacher (J1b), padded degenerate rows (J1c) | A100 / L4 | ~5 | **ready** (PR 8 merged); same GPU type as `w2c_L_wmt_ctrl` |
 | `p1b_tc_rerun` | P1b: within-level-AR TC probe | — | — | **withdrawn** (R023: false premise; notebook removed; P1c to come) |
 | `w2_Mc_ncm` | tier M design C (M1): NCM from scratch, d512 x 6, 6k steps, seed 0 | A100 / L4 | ~7.7 | **hold** (criterion b needs a candidate; wave 1 produced none) |
 | `w2_Mc_ar` | tier M design C (M1): AR, same body, FLOP-matched, seed 0 | A100 / L4 | ~4.3 | **hold** (as above) |
