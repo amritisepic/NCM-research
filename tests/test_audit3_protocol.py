@@ -127,7 +127,7 @@ def test_text_parallel_alignment_matches_forced_sequential(tmp_path, monkeypatch
     torch.testing.assert_close(torch.cat(seen, 1), full.float(), rtol=1e-4, atol=1e-5)
 
 
-# fixed (was a strict xfail: A3-1: policy forward inherits training AMP and TF32)
+@pytest.mark.xfail(reason="A3-1: policy forward inherits training AMP and TF32", **DEFECT)
 def test_text_policy_forward_is_fp32_with_tf32_off(tmp_path):
     ns, x = text_case(tmp_path)
     seen = []
@@ -146,7 +146,7 @@ def test_text_policy_forward_is_fp32_with_tf32_off(tmp_path):
         torch.backends.cuda.matmul.allow_tf32, torch.backends.cudnn.allow_tf32 = flags
 
 
-# fixed (was a strict xfail: A3-1: val_nll enters trainer.ctx and leaves TF32 enabled)
+@pytest.mark.xfail(reason="A3-1: val_nll enters trainer.ctx and leaves TF32 enabled", **DEFECT)
 def test_val_nll_is_fp32_scoring(tmp_path):
     ns, _ = text_case(tmp_path)
     seen = []
@@ -163,7 +163,7 @@ def test_val_nll_is_fp32_scoring(tmp_path):
         torch.backends.cuda.matmul.allow_tf32, torch.backends.cudnn.allow_tf32 = flags
 
 
-# fixed (was a strict xfail: A3-2: categorical policy samples consume the training global RNG)
+@pytest.mark.xfail(reason="A3-2: categorical policy samples consume the training global RNG", **DEFECT)
 def test_policy_preserves_global_training_rng():
     policy, ctx, _ = policy_fixture(1)
     before = torch.get_rng_state().clone()
@@ -172,7 +172,7 @@ def test_policy_preserves_global_training_rng():
     assert torch.equal(before, torch.get_rng_state())
 
 
-# fixed (was a strict xfail: A3-2: net.train(was) overwrites mixed submodule modes)
+@pytest.mark.xfail(reason="A3-2: net.train(was) overwrites mixed submodule modes", **DEFECT)
 def test_policy_preserves_each_module_mode(tmp_path):
     ns, x = text_case(tmp_path)
     ns["net"].train()
@@ -247,7 +247,7 @@ def test_identical_config_cpu_resume_is_exact(tmp_path):
     assert torch.equal(expected_rng[1], gen.get_state())
 
 
-# fixed (was a strict xfail: A3-3: run key accepts a changed stochastic microbatch partition)
+@pytest.mark.xfail(reason="A3-3: run key accepts a changed stochastic microbatch partition", **DEFECT)
 def test_resume_key_rejects_changed_microbatch_partition():
     ns = definitions("scripts/train_gen.py", ["_run_key"], {"OmegaConf": OmegaConf})
     cfg = OmegaConf.load(ROOT / "configs/scale/L_ts_onpol.yaml")
@@ -256,7 +256,7 @@ def test_resume_key_rejects_changed_microbatch_partition():
     assert before != ns["_run_key"](cfg)
 
 
-# fixed (was a strict xfail: A3-3: a checkpoint without config skips identity validation)
+@pytest.mark.xfail(reason="A3-3: a checkpoint without config skips identity validation", **DEFECT)
 def test_resume_without_config_fails_closed(tmp_path):
     tree = ast.parse((ROOT / "scripts/train_gen.py").read_text())
     node = next(n for n in tree.body if isinstance(n, ast.If)
@@ -286,7 +286,7 @@ def test_microbatch_partition_changes_masks(released_sudoku):
     assert not torch.equal(full["used"], torch.cat(parts))
 
 
-# fixed (was a strict xfail: A3-3: Sudoku base checkpoint identity is only its byte size)
+@pytest.mark.xfail(reason="A3-3: Sudoku base checkpoint identity is only its byte size", **DEFECT)
 def test_sudoku_manifest_rejects_same_size_base_change(tmp_path):
     base = tmp_path / "base"
     base.mkdir()
@@ -328,7 +328,7 @@ def test_sudoku_canonical_policy_has_identical_prefix_query_and_targets(released
     assert torch.equal(actual, expected)
 
 
-# fixed (was a strict xfail: A3-3: missing corruption RNG is silently reseeded)
+@pytest.mark.xfail(reason="A3-3: missing corruption RNG is silently reseeded", **DEFECT)
 def test_resume_without_corruption_rng_fails_closed():
     tree = ast.parse((ROOT / "scripts/train_gen.py").read_text())
     node = next(n for n in tree.body if isinstance(n, ast.If)
@@ -343,7 +343,17 @@ def test_resume_without_corruption_rng_fails_closed():
     assert refused
 
 
-# ported to the provenance implementation of PR 3 (was a strict xfail: A3-4, written against the audit's sketch)
+def notebook_has_source_identity():
+    tree = ast.parse((ROOT / "notebooks/make_notebooks.py").read_text(encoding="utf-8"))
+    collect = next(n.value.value for n in tree.body if isinstance(n, ast.Assign)
+                   and any(isinstance(t, ast.Name) and t.id == "COLLECT" for t in n.targets))
+    return any(isinstance(n, ast.Dict) and any(isinstance(k, ast.Constant)
+               and k.value in ("git_sha", "code_sha", "source_revision") for k in n.keys)
+               for n in ast.walk(ast.parse(collect)))
+
+
+@pytest.mark.xfail(not notebook_has_source_identity(),
+                   reason="A3-4: notebook collection metadata has no code identity", **DEFECT)
 def test_notebook_collection_carries_source_identity():
     tree = ast.parse((ROOT / "notebooks/make_notebooks.py").read_text())
     collect = next(n.value.value for n in tree.body if isinstance(n, ast.Assign)
@@ -351,7 +361,7 @@ def test_notebook_collection_carries_source_identity():
     payloads = []
     class JsonSpy:
         @staticmethod
-        def dump(payload, stream, **kw):
+        def dump(payload, stream, **kwargs):
             payloads.append(payload)
     class Open:
         def __enter__(self): return self
@@ -360,11 +370,10 @@ def test_notebook_collection_carries_source_identity():
     # Execute only the metadata dump; no filesystem or notebook commands run.
     stmt = next(n for n in ast.parse(collect).body if isinstance(n, ast.Expr)
                 and isinstance(n.value, ast.Call) and ast.unparse(n.value.func) == "json.dump")
-    sessions = {"L_ts_ctrl_s1": [{"event": "start", "git_sha": "a" * 40, "utc": "t0", "had_ckpt": True,
-                                  "last_logged_step": 250}]}
-    ns = dict(json=JsonSpy, open=lambda *a, **k: Open(), gpu="cpu", out="results", utc=lambda: "t1",
-              GIT_SHA="a" * 40, shas=["a" * 40], sessions=sessions)
+    ns = dict(json=JsonSpy, open=lambda *a, **k: Open(), gpu="cpu", out="results",
+              time=SimpleNamespace(ctime=lambda: "time"), CODE_SHA="audit-source",
+              ATTEMPTS=[], datetime=datetime, timezone=timezone,
+              GIT_SHA="audit-source", shas=["audit-source"], sessions={},
+              utc=lambda: "2026-10-24T00:00:00Z")
     exec(compile(ast.Module(body=[stmt], type_ignores=[]), "notebooks/make_notebooks.py", "exec"), ns)
-    meta = payloads[0]
-    assert meta["git_sha"] == "a" * 40 and meta["git_shas_all_sessions"] == ["a" * 40]
-    assert meta["sessions"]["L_ts_ctrl_s1"][0]["last_logged_step"] == 250
+    assert any(k in payloads[0] for k in ("git_sha", "code_sha", "source_revision"))

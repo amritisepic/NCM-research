@@ -1,7 +1,8 @@
 """Recompute saved W1 aggregates: python -B tests/test_audit3_numbers.py --write.
 
-No scorer is rerun. Entropy/NLL are readbacks; group and MAUVE aggregates,
+No neural scorer is rerun. NLL is a readback; group and MAUVE aggregates,
 comparisons, screens, rollback traces and log arithmetic are recomputed.
+Use --sample-statistics to independently check entropy and other sample metrics.
 """
 import argparse
 from collections import Counter, defaultdict
@@ -12,6 +13,7 @@ import math
 from pathlib import Path
 import statistics as st
 import subprocess
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "docs/reviews/codex_audit3_numbers.json"
@@ -22,12 +24,47 @@ COMPARATORS = {"A2": ["A1"], "A3": ["A1"], "A4": ["A1", "A3"],
                "A5": ["A1", "A3"], "A6": ["A1"]}
 
 
-def compute():
+def recompute_sample_statistics(samples, hashes):
+    """Use the actual BPE and pure metric definitions, without loading neural models."""
+    import math
+    import pickle
+    import re
+    from audit2_support import definitions
+
+    sys.path.insert(0, str(ROOT / "src/ncmr/ncm_ref"))
+    from tokenization.bpe_tokenizer import BPETokenizer
+
+    loader = definitions("src/ncmr/ncm_ref_loader.py",
+                         ["_NoCodeUnpickler", "safe_pickle_load"], {"pickle": pickle})
+    paths = {name: ROOT / "data/tinystories" / name for name in
+             ["bpe_vocab_8192.pickle", "bpe_merges_8192.pickle"]}
+    for path in paths.values():
+        hashes[path.relative_to(ROOT).as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
+    bpe = BPETokenizer(loader["safe_pickle_load"](paths["bpe_vocab_8192.pickle"]),
+                       loader["safe_pickle_load"](paths["bpe_merges_8192.pickle"]),
+                       {"eos_token": "<|endoftext|>", "pad_token": "<|pad|>"})
+    ns = definitions("src/ncmr/eval_text.py", ["unigram_entropy", "rep_n", "distinct_n", "word_dups"],
+                     {"math": math, "Counter": Counter, "_WORD": re.compile(r"[a-z']+")})
+    ids = [bpe.encode(bpe.decode(row)) for row in samples["ids"]]
+    entropy = [ns["unigram_entropy"](row) for row in ids if row]
+    values = {"entropy": st.mean(entropy), "len_tokens": st.mean(map(len, ids)),
+              **ns["word_dups"]([bpe.decode(row) for row in ids])}
+    for n in [2, 3, 4]:
+        values["rep_" + str(n)] = st.mean(ns["rep_n"](row, n) for row in ids)
+    for n in [2, 3]:
+        values["distinct_" + str(n)] = ns["distinct_n"](ids, n)
+    return values
+
+
+def compute(sample_statistics=False):
     hashes, discrepancies, arms, traces, provenance = {}, [], {}, {}, {}
     subject_paths = ["scripts/train_gen.py", "scripts/train_sudoku_L.py", "src/ncmr/train.py",
                      "src/ncmr/corruption.py", "notebooks/make_notebooks.py", "docs/preregistration.md"]
+    baseline_hashes = {}
     for path in subject_paths:
         hashes[path] = hashlib.sha256((ROOT / path).read_bytes()).hexdigest()
+        baseline_hashes[path] = hashlib.sha256(subprocess.check_output(
+            ["git", "show", "d501333:" + path], cwd=ROOT)).hexdigest()
     history = subprocess.check_output(["git", "log", "--format=%h %cI", "d501333"], cwd=ROOT, text=True)
     revisions = [(line.split()[0], datetime.fromisoformat(line.split()[1])) for line in history.splitlines()]
     def read(path):
@@ -54,6 +91,12 @@ def compute():
                    "clean_val_nll_readback": ev["val_nll"],
                    "clean_val_nll_per_level_rounded_readback": ev["val_nll_per_level"],
                    "entropy_readback": ev["entropy"], "nfe_per_sample": ev["nfe_per_sample"]}
+        if sample_statistics:
+            values = recompute_sample_statistics(samples, hashes)
+            summary["sample_statistics_recomputed"] = values
+            for key, value in values.items():
+                check(arm + "/recomputed_" + key, value, ev[key])
+            print("recomputed sample statistics", arm, flush=True)
         for metric, suffix in [("genppl_gpt2-large", "per_group"),
                                ("genppl_TinyStories-33M", "per_group"), ("mauve", "per_seed")]:
             values = ev[metric + "_" + suffix]
@@ -157,8 +200,13 @@ def compute():
     screen_noise = dict(assumed_group_sd=.59, groups=16, unpaired_difference_se=se,
                         probability_pass={str(g):1-normal.cdf((.35-g)/se) for g in [0,.5,.7]},
                         interpretation="Sampling-only normal approximation; no training-seed uncertainty.")
-    summary = dict(audit_ref="d501333", method="stdlib means/sample SDs from saved group scores, five-seed MAUVE means/SDs; not a neural scorer rerun",
-        limitations=["Saved samples are pre-re-encoding IDs. Entropy is read back after the evaluation BPE decode/re-encode; tokenizer assets are absent locally.",
+    summary = dict(audit_ref="d501333",
+        original_subject_git_blob_sha256=baseline_hashes,
+        recomputation_checkout_ref=subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
+        method="stdlib means/sample SDs from saved group scores, five-seed MAUVE means/SDs; not a neural scorer rerun",
+        limitations=[("Sample entropy, length, repetitions, distinct n-grams and word duplicates are independently recomputed after BPE decode/re-encode."
+                      if sample_statistics else "Sample statistics are saved readbacks; use --sample-statistics with the BPE assets to independently recompute them."),
                      "NLL is read back, not rescored: W1 weights/checkpoints are absent. Per-level entries are rounded to .01.",
                      "MAUVE SD is quantization-seed variability, not uncertainty across independent datasets.",
                      "The group's sorted seed order differs from generation order [42,0,...,14]."],
@@ -185,8 +233,9 @@ def test_saved_w1_aggregates_recompute():
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--write", action="store_true")
+    ap.add_argument("--sample-statistics", action="store_true")
     args = ap.parse_args()
-    data = compute()
+    data = compute(sample_statistics=args.sample_statistics)
     if args.write:
         old = json.loads(OUT.read_text()) if OUT.exists() else {}
         for key in ["cpu_experiment", "verification"]:
