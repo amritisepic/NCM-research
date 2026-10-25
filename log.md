@@ -829,3 +829,13 @@ generator and share the dropout stream; the logged per-level corrupted fractions
   `docs/reviews/triage_audit6_2026-10-24.md`. All R036 numbers recomputed by the audit without disagreement; one wording
   correction to R036: its aggregates are over all sentences ("exact excludes them" applies to the exactness claim only).
   Full suite 160 passed on torch 2.6 and 2.11. PR 10's round-2 review was requested at 23:59 UTC; merge pending.
+
+## R038 — J2-F cleared: PR 10 merged, deep audit 7 clean; A6-1 guard for the other trainers in PR 11 (2026-10-25; process)
+- PR 10 round 2 (`f50a27d`: audit 6's fixes, the launch-time teacher check, ported tests): Codex, no P0/P1; merged.
+- The launch check changed `evaluate()` after audit 6, so the delta got its own deep audit (7, local Codex CLI,
+  `codex/audit7`, brief `docs/prompts/codex_audit7_j2f_delta.md`): no P0/P1. Its sandbox could not run Python; its five
+  regression probes and the WMT14 suites were run here: 72 passed on torch 2.6 and 2.11. Full suite 208 passed (torch
+  2.6). Triage `docs/reviews/triage_audit7_2026-10-25.md`. **`w2c_L_wmt_consist_frozen` is cleared** (A100).
+- The A6-1 guard (run identity checked only once a checkpoint exists) also sat in `scripts/train_gen.py` and
+  `scripts/train_sudoku_L.py`; fixed with tests in PR 11 (review requested). No queued notebook uses those trainers.
+- The user launched `w1d_requant_diag`.
