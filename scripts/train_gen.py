@@ -85,9 +85,12 @@ def _run_key(c):
     return [c.get("init"), c.get("model"), c.get("corruption"), c.get("level0"), t]
 
 
-if os.path.exists(ckpt_path) and not a.calib_steps:
+# a recorded run is identified even before its first checkpoint (codex audit 6, A6-1: a run interrupted before step
+# ckpt_every leaves its manifest and metrics, and must not be continued under another identity)
+_recorded = os.path.exists(ckpt_path) or os.path.exists(os.path.join(a.run_dir, "run_manifest.json"))
+if _recorded and not a.calib_steps:
     if not os.path.exists(cfg_path):   # codex audit 3, A3-3: a checkpoint whose run cannot be identified fails closed
-        sys.exit(f"{a.run_dir} holds a checkpoint without its config.yaml: the run cannot be verified; use a fresh run directory")
+        sys.exit(f"{a.run_dir} holds a recorded run without its config.yaml: the run cannot be verified; use a fresh run directory")
     if _run_key(OmegaConf.load(cfg_path)) != _run_key(cfg):   # codex audit F5
         sys.exit(f"{a.run_dir} holds a checkpoint of a different run (init / model / corruption / train differ)")
 
@@ -107,9 +110,9 @@ manifest = {"base_sha256": {n: _digest(os.path.join(_art, n)) for n in ("config.
                                                                        (DATA_DIR, "valid_bpe_8192.pickle"))},
             "torch": torch.__version__, "cuda": torch.version.cuda}
 manifest_path = os.path.join(a.run_dir, "run_manifest.json")
-if os.path.exists(ckpt_path) and not a.calib_steps:
+if _recorded and not a.calib_steps:
     if not os.path.exists(manifest_path) or json.load(open(manifest_path)) != manifest:
-        sys.exit(f"{a.run_dir} holds a checkpoint whose base checkpoint, data or torch runtime differs from now (or was "
+        sys.exit(f"{a.run_dir} holds a run whose base checkpoint, data or torch runtime differs from now (or was "
                  "not recorded): use a fresh run directory")
 OmegaConf.save(cfg, cfg_path)
 if not a.calib_steps:

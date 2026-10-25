@@ -91,9 +91,10 @@ manifest = {"config": OmegaConf.to_container(cfg, resolve=True), "data_sha256": 
             "base_config_sha256": digest(os.path.join(_base, "config.yaml")),
             "base_sha256": {n: digest(os.path.join(_base, n)) for n in ("tokenizer.pt", "generator.pt")},   # audit 3, A3-3
             "device": pick_device()}
-if os.path.exists(ckpt_path) and not a.calib_steps:
+# codex audit 6, A6-1: a run interrupted before its first checkpoint is identified by its manifest
+if not a.calib_steps and (os.path.exists(ckpt_path) or os.path.exists(manifest_path)):
     if not os.path.exists(manifest_path) or json.load(open(manifest_path)) != manifest:
-        sys.exit(f"{a.run_dir} holds a checkpoint of a different (or unrecorded) run: use a fresh run directory")
+        sys.exit(f"{a.run_dir} holds a different (or unrecorded) run: use a fresh run directory")
 if not a.calib_steps:
     json.dump(manifest, open(manifest_path, "w"), indent=1)
 OmegaConf.save(cfg, os.path.join(a.run_dir, "config.yaml"))
