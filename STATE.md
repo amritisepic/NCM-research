@@ -27,8 +27,8 @@ waits for PR 7 and J2-F for its code, review and deep audit; Codex is at its usa
   leave no receipt the gate counts, so request one explicitly. Deep audits requested as PR comments need a Codex cloud
   environment for the repo, which does not exist: run audits locally (`scripts/review/codex_local.sh` with the Codex
   desktop CLI, or Codex desktop). Usage limits: hit 2026-10-24 ~02:35 UTC, reset ~06:52 UTC; **hit again at 16:36 UTC**
-  (PR 7's re-request) and not reset at the time of writing: no gated merge until it resets. Open: PR 11 (A6-1
-  guard in the text / Sudoku trainers). Merged: PRs 2-10 (5, 6, 7, 9, 10 in session 5, R037-R038). Limit reset by 22:57 UTC 2026-10-24.
+  (PR 7's re-request) and not reset at the time of writing: no gated merge until it resets. Open: none (W2M
+  in progress). Merged: PRs 2-11 (5, 6, 7, 9, 10, 11 in session 5, R037-R038). Limit reset by 22:57 UTC 2026-10-24.
 - `scripts/review/codex_pr.py wait` on this Windows laptop: crashes decoding the bot's emoji (cp1252) unless run with
   `PYTHONUTF8=1`, and returns early (gate FAIL) when Codex posts its "review running" status comment. Workaround used:
   poll the `codex-review-state` comment, then `codex_pr.py status`. `scripts/review/` is edit-protected: the user fixes.
@@ -109,6 +109,6 @@ waits for PR 7 and J2-F for its code, review and deep audit; Codex is at its usa
 1. User: `w1d_requant_diag` is running (A100). Launch `w2c_L_wmt_consist_frozen` (J2-F, A100, ~6.5 CU): cleared (R038).
 2. When results arrive: W1d against its registered reading (T = 1 reproduction gate first); J2-F with
    `scripts/analyze_j1.py --candidate J2-F` against J1-J1c + J2-F; if J2-F looks like it meets criterion (d), stop and ask.
-3. PR 11 (A6-1 guard in `train_gen.py` / `train_sudoku_L.py`): review, triage, merge. Then draft the tier-L mechanism-arm
-   registration (adversarial review's arms + the literature 2x2, A3 replicate with fp32 policy), deep-audit PR 5's
-   text trainer with it, and ask the user (~15 CU).
+3. W2M (registered 2026-10-25; the user chose all 8 arms, ~27 CU, and the flag input): being implemented on
+   `claude/wip-w2m`; then PR, Codex review, deep audit (it also covers PR 5's text-trainer changes), notebooks
+   `w2m_L_ts_m0..m7` + `w2m_mech_eval`. PR 11 merged.
