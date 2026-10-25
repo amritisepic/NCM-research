@@ -348,3 +348,73 @@ Why: `docs/reviews/codex_audit4.md` (A4-1 to A4-5); triage `docs/reviews/triage_
   (3) the executed proxy equals J2's, (4) the arm is in the run manifest and a run directory refuses a different arm.
   Review by PR (Codex) and a deep audit before launch (`CLAUDE.md`, tier 2).
 - **Cost:** ~6.5 CU seed 0 (J2 took 70.6 A100-minutes); seeds 1-2 of J2-F and J1 ~22 CU if it advances (J1 took 51.5 A100-minutes).
+
+## W2M — tier-L mechanism arms for the on-policy collapse (registered 2026-10-25, before any code or run; exploratory, criterion c candidate)
+- **Why:** wave 1's on-policy arms collapsed (A3 / A4 / A5 Gen-PPL 41.4 / 36.8 / 32.2 vs A1 16.6; R030, R031). Leading
+  account (b'): replacements drawn from the model's own distribution are plausible, hence undetectable, so the model
+  learns to discount its own coarse codes. Competitors: (i) lost denoising coverage at A3's lower realized corruption
+  rate, (ii) used-parent mismatch (proposals sampled under the canonical L0 while ~75% of windows then carry a unigram
+  L0; R034), (iii) moving-policy feedback, (iv) the bf16 policy forward that only the on-policy arms had (R036). Design
+  reconciled from `docs/reviews/codex_adversarial_onpolicy.md` and `docs/literature_advice_2026-10-24.md`; draft
+  `docs/mechanism_arms_draft_2026-10-25.md`. Arm set and the flag input chosen by the user (all 8 arms, ~27 CU).
+- **Common protocol:** released TinyStories NCM (generator and tokenizer, tokenizer frozen), `scripts/train_gen.py` as of
+  PR 5 (fp32 policy forward with TF32 off; policy RNG separate from the training RNG), seed 0, W1's recipe (batch 256,
+  lr 5e-5, 200 warmup, cosine to 5e-6, AdamW 0.9 / 0.95, weight decay 0.1, dropout 0.1, same data order) for **600
+  steps in every arm** (equal updates; proposal forwards are reported separately, not matched). Canonical (clean)
+  labels in every arm. Corruption rates as W1's A1 (mean 0.5, linear 0.75 -> 0.25 over levels 0..K-2, finest level
+  never corrupted) unless stated. **25% of the rows of every batch are left clean** (chosen per row from the mask
+  stream) in every arm, so that all-zero flags are trained. **Masks come from one stream** (their own generator,
+  separate from replacement draws), so every arm with W1's rates corrupts exactly the same slots. Proposals and
+  replacements draw from their own generator.
+- **Arms** (`configs/scale/L_ts_m{0..7}_*.yaml`):
+  - **M0 uniform:** NCM's uniform random replacement at the masked slots (control).
+  - **M1 current policy:** A3's policy (the current model's one-step samples at T = 1 given the clean coarser levels,
+    level 0 from the unigram) at the masked slots, fp32 policy forward.
+  - **M2 frozen plausible-wrong:** at every masked slot a code sampled at T = 1 from a frozen copy of the released
+    generator's one-step distribution given the clean coarser levels, **with the canonical code excluded** (level 0:
+    the unigram with the canonical code excluded). Every masked slot is therefore wrong.
+  - **M3 uniform-wrong:** every masked slot replaced by a uniformly random code different from the canonical one.
+  - **M4 M2 + truthful flags:** as M2, plus a per-position flag on the generator's inputs: for the level-k input at
+    position q, the share of the full-length span of q whose cumulative reconstruction contains a replaced ancestor
+    (the mask propagated with the tokenizer's own up-sampling and the area down-sampling that builds the inputs).
+    Flags signal the sampled mask, never `used != canonical`. The flag enters as `f * w` added to the code input
+    vector, `w` a learned vector initialised to zero (step 0 equals the released model). Inference and every
+    evaluation use all-zero flags.
+  - **M5 M2 + shuffled flags:** as M4, but each row's flags are permuted within each level by an independent RNG (same
+    count and level distribution, no positional information).
+  - **M6 used-parent:** as M1, but the policy's proposals for levels >= 1 are sampled given the **level-0 codes actually
+    used** (canonical or unigram per the mask) and the clean levels 1.., not given the canonical level 0.
+  - **M7 uniform at A3's realized rates:** uniform replacement with per-level probability d_k / (1 - 1/V_k) on the
+    corrupted rows, d_k = A3's mean logged per-level disagreement over its logged steps <= 600
+    (`results/colab/w1_L_ts_onpol/L_ts_onpol_s0__metrics.jsonl`: 0.735, 0.691, 0.601, 0.505, 0.398, 0.304, 0.239, 0.103,
+    0.171, 0.167, 0.145, 0), V_k the level's codebook size. Its masks differ from the others' by construction.
+- **Evaluation:** curve at steps 100 / 300 / 600 (256 samples, val NLL); final at 600 with W1b's protocol (16 x 256 fp32
+  samples, seeds 42 and 0-14; Gen-PPL under GPT-2 large (primary) and TinyStories-33M, entropy, MAUVE in fp32, bigram
+  gain and adjacent duplicates per 1k as R031, clean val NLL per level in fp32). Every arm logs its realized per-level
+  disagreement. Eval-only mechanism measures on the eight final checkpoints and the released model, same windows and
+  seeds for every model (`scripts/mech_eval_w2m.py`): (a) coarse-context dependence: on 512 clean val windows, one
+  code at level j (j = 1..6) changed to a uniformly random different code at a fixed random position, finer inputs
+  rebuilt; mean KL(clean || perturbed) of the predictive distributions of levels > j, per j; (b) replacement
+  detectability: a logistic probe on the generator's last hidden states separating contaminated from clean input
+  positions, inputs corrupted plausible-wrong (as M2) and uniform-wrong (as M3) at W1's rates with zero flags, trained on
+  384 windows, AUC on 128 held-out windows; (c) flag use (M4, M5): clean-label NLL per window on corrupted held-out
+  windows with the true flags minus with zero flags.
+- **Readings** (seed 0; D(X) = Gen-PPL(X) - Gen-PPL(M0), GPT-2 large, paired over the 16 sample seeds, ± SE):
+  - Sanity: M0 within 1.0 of A0 (16.16). **Validity:** the mechanism readings below are made only if D(M1) >= 5.0; if
+    not, it is reported that the collapse did not reproduce under this protocol (fp32 policy, 600 steps, clean rows)
+    and the arms are read descriptively only.
+  - Let D1 = D(M1). "Damaging" = D >= 0.5 D1; "healthy" = D <= 0.2 D1.
+  - (b') predicts: M2 damaging, M3 healthy, M4 rescues (R4 = 1 - D(M4)/D(M2) >= 0.8, with flag use (c) <= -1 nat per
+    window), M5 damaging (R5 = 1 - D(M5)/D(M2) < 0.5), M6 damaging, M7 healthy.
+  - Overturned / weakened: M2 healthy while M1 damaging -> feedback (iii) or used-parent (ii) favoured over
+    plausibility; M3 damaging -> plausibility not needed; R4 < 0.2 with flag use demonstrated -> detectability is not a
+    sufficient remedy; R5 >= 0.8 -> a flag rescue is regime separation, not detection; M6 healthy -> the used-parent
+    mismatch is sufficient; M7 damaging -> lost coverage is sufficient. Exploratory, not a criterion: probe AUC >= 0.90
+    on plausible-wrong contexts would contradict "undetectable".
+  - Anything else is reported as mixed. One seed: no reading establishes a mechanism; criterion (c) needs the deciding
+    arms at seeds 1-2 under a new registration, which goes to the user first.
+- **Code gate:** implementation on a `claude/wip-` branch with tests (mask stream identical across arms, 25% clean rows,
+  replacements always wrong in M2 / M3 / M4 / M5, flags equal the propagated mask and are zero at inference, zero-init
+  flag vector gives the released model's logits, shuffled flags preserve per-level counts, M6 conditions on the used
+  L0, M7's rates, resume equals an uninterrupted run), Codex review and a deep audit before launch.
+- **Cost:** ~27 CU (M0 / M3 / M7 ~2.9 each, M1 / M2 / M4 / M5 / M6 ~3.7 each, mechanism eval ~1); each run < 15 CU.
