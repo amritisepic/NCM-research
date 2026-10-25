@@ -24,6 +24,7 @@ ARMS = {   # arm -> (run directory, result prefix, steps)
     "J1": ("w2c_L_wmt_ctrl", "L_wmt_ctrl_s0", 3000),
     "J2": ("w2c_L_wmt_consist", "L_wmt_consist_s0", 2000),
 }
+FROZEN_ARM = ("w2c_L_wmt_consist_frozen", "L_wmt_consist_frozen_s0", 2000)
 SEQ = 11                          # sequential NFE (11 levels)
 H12_PASSES, BLEU_LOSS = 8.25, 1.0   # J1 H12: <= 8.25 mean exact passes on test, BLEU >= J0 - 1
 SCREEN_PASSES = 9.0               # J1 screen (val): passes <= 9.0 and BLEU >= J0 val - 1
@@ -35,7 +36,7 @@ SHARED_MIN = 5                    # exploratory: a hypothesis string emitted for
 
 
 def load_arm(root, arm):
-    d, prefix, steps = ARMS[arm]
+    d, prefix, steps = FROZEN_ARM if arm == "J2-F" else ARMS[arm]
     r = json.load(open(os.path.join(root, d, f"{prefix}__result.json"), encoding="utf-8"))
     assert r["steps"] == steps, f"{arm}: {r['steps']} steps, registered {steps}"
     out = {"run": r["run"], "steps": r["steps"], "gpu": r.get("gpu"), "torch": r.get("torch"),
@@ -87,12 +88,18 @@ def paired_bootstrap(hyp_a, hyp_b, refs, n=1000, seed=0):
     return {"diff": bleu(hyp_a, refs) - bleu(hyp_b, refs), "ci95": [float(lo), float(hi)], "n_resamples": n}
 
 
-def analyse(root, refs=None):
+def analyse(root, refs=None, candidate="J2"):
+    if candidate not in ("J2", "J2-F"):
+        raise ValueError(f"unknown candidate {candidate!r}")
     A = {a: load_arm(root, a) for a in ARMS}
-    J0, J1, J2 = A["J0"], A["J1"], A["J2"]
+    if candidate == "J2-F":
+        A[candidate] = load_arm(root, candidate)
+    J0, J1, J2 = A["J0"], A["J1"], A[candidate]
     res = {"arms": {a: {k: v for k, v in x.items() if k not in ("val", "test")} |
                     {s: {k: v for k, v in x[s].items() if not k.startswith("_")} for s in ("val", "test")}
                     for a, x in A.items()}}
+    if candidate != "J2":
+        res["candidate"] = candidate
 
     # registered: J1 sanity checks
     res["sanity"] = {
@@ -100,7 +107,7 @@ def analyse(root, refs=None):
                             "pass1_share_pct": 100.0 * J0["test"]["hist"][1] / J0["test"]["n"]},
         "J1_bleu_loss_vs_J0": {s: J0[s]["bleu"] - J1[s]["bleu"] for s in ("val", "test")},
         "J1_recipe_ok": all(J0[s]["bleu"] - J1[s]["bleu"] <= BLEU_LOSS for s in ("val", "test")),
-        "degenerate_pct_J2": J2["degenerate_pct"], "degenerate_ok": J2["degenerate_pct"] <= DEGEN_LIMIT,
+        f"degenerate_pct_{candidate}": J2["degenerate_pct"], "degenerate_ok": J2["degenerate_pct"] <= DEGEN_LIMIT,
         "flop_proxy_equal": J1["generator_flops_proxy_total"] == J2["generator_flops_proxy_total"],
         "exact_ne_sequential": {a: {s: A[a][s]["exact_ne_sequential_idx"] for s in ("val", "test")} for a in A},
     }
@@ -121,41 +128,52 @@ def analyse(root, refs=None):
     res["h12_test"]["kill"] = not (saving >= 25.0 and res["h12_test"]["bleu_ok"]) or not res["h12_test"]["below_J1_ok"]
     # registered: J1a comparators at the cap ceil(J2's mean exact passes)
     cap = math.ceil(t["passes"])
-    res["j1a"] = {"cap": cap, "J2_bleu": t["bleu"],
+    res["j1a"] = {"cap": cap, f"{candidate}_bleu": t["bleu"],
                   "J0_at_cap": J0["test"]["capped"][cap], "J1_at_cap": J1["test"]["capped"][cap],
-                  "J2_minus_J0_at_cap": t["bleu"] - J0["test"]["capped"][cap]["bleu"],
-                  "J2_minus_J1_at_cap": t["bleu"] - J1["test"]["capped"][cap]["bleu"],
+                  f"{candidate}_minus_J0_at_cap": t["bleu"] - J0["test"]["capped"][cap]["bleu"],
+                  f"{candidate}_minus_J1_at_cap": t["bleu"] - J1["test"]["capped"][cap]["bleu"],
                   "len_ratio_diff_vs_J0": t["len_ratio"] - J0["test"]["len_ratio"],
                   "len_ok": abs(t["len_ratio"] - J0["test"]["len_ratio"]) <= LEN_TOL,
                   "J0_cap8_bleu_loss": J0["test"]["bleu"] - J0["test"]["capped"][8]["bleu"],
                   "J0_cap8_within_1": J0["test"]["bleu"] - J0["test"]["capped"][8]["bleu"] <= BLEU_LOSS}
     if refs and refs.get("test"):
         hc = {a: A[a]["test"]["_cap"][str(cap)] for a in ("J0", "J1")}
-        res["j1a"]["bootstrap"] = {f"J2_vs_{a}": paired_bootstrap(t["_hyp"], hc[a], refs["test"]) for a in hc}
+        res["j1a"]["bootstrap"] = {f"{candidate}_vs_{a}": paired_bootstrap(t["_hyp"], hc[a], refs["test"]) for a in hc}
     else:
         res["j1a"]["bootstrap"] = "not computed: reference translations not supplied"
 
     # exploratory: input-independent outputs, length, duplication, passes on the remaining sentences
     ex = {}
     for s in ("val", "test"):
-        mask, top = shared_outputs(J2[s]["_hyp"])
+        mask, top = shared_outputs(A["J2"][s]["_hyp"])
         words = {a: np.array([len(h.split()) for h in A[a][s]["_hyp"]]) for a in A}
         ex[s] = {"shared_output_pct": {a: 100.0 * shared_outputs(A[a][s]["_hyp"])[0].mean() for a in A},
                  "J2_top_shared": top,
-                 "J2_passes_on_shared": float(J2[s]["_nfe"][mask].mean()) if mask.any() else None,
+                 "J2_passes_on_shared": float(A["J2"][s]["_nfe"][mask].mean()) if mask.any() else None,
                  "passes_on_rest": {a: float(A[a][s]["_nfe"][~mask].mean()) for a in A},
                  "words_mean": {a: float(w.mean()) for a, w in words.items()},
                  "words_ratio_vs_J0_on_rest": {a: float(words[a][~mask].sum() / words["J0"][~mask].sum()) for a in A},
                  "dup_adjacent_per_1k_words": {a: dup_per_1k(A[a][s]["_hyp"]) for a in A},
                  "identical_to_J0_pct": {a: 100.0 * np.mean([x == y for x, y in zip(A[a][s]["_hyp"], J0[s]["_hyp"])])
-                                         for a in ("J1", "J2")}}
-        ex[s]["saving_on_rest_pct"] = {a: 100.0 * (1 - p / SEQ) for a, p in ex[s]["passes_on_rest"].items()}
+                                         for a in (("J1", "J2", "J2-F") if candidate == "J2-F" else ("J1", "J2"))}}
+        if candidate == "J2-F":
+            frozen = A[candidate][s]
+            frozen_mask, frozen_top = shared_outputs(frozen["_hyp"])
+            ex[s][f"{candidate}_top_shared"] = frozen_top
+            ex[s][f"{candidate}_passes_on_shared"] = (
+                float(frozen["_nfe"][frozen_mask].mean()) if frozen_mask.any() else None)
+            ex[s]["passes_on_rest"][candidate] = (
+                float(frozen["_nfe"][~frozen_mask].mean()) if (~frozen_mask).any() else None)
+            denominator = words["J0"][~frozen_mask].sum()
+            ex[s]["words_ratio_vs_J0_on_rest"][candidate] = (
+                float(words[candidate][~frozen_mask].sum() / denominator) if denominator else None)
+        ex[s]["saving_on_rest_pct"] = {a: 100.0 * (1 - p / SEQ) if p is not None else None for a, p in ex[s]["passes_on_rest"].items()}
     # exploratory: does the 500-sentence curve subset of J2's last curve point equal the final eval's first 500?
     d, prefix, steps = ARMS["J2"]
     cv = json.load(open(os.path.join(root, d, f"{prefix}__hyp_val_step{steps}.json"), encoding="utf-8"))
     n = len(cv["hyp_val"])
-    ex["curve_subset_matches_final"] = (cv["hyp_val"] == J2["val"]["_hyp"][:n]
-                                        and list(cv["nfe_val"]) == J2["val"]["_nfe"][:n].tolist())
+    ex["curve_subset_matches_final"] = (cv["hyp_val"] == A["J2"]["val"]["_hyp"][:n]
+                                        and list(cv["nfe_val"]) == A["J2"]["val"]["_nfe"][:n].tolist())
     res["exploratory"] = ex
     return res
 
@@ -164,11 +182,12 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", default="results/colab")
     ap.add_argument("--out", default="results/j1_analysis_s0.json")
+    ap.add_argument("--candidate", choices=("J2", "J2-F"), default="J2")
     ap.add_argument("--val_refs")
     ap.add_argument("--test_refs")
     a = ap.parse_args()
     rd = lambda f: [l.rstrip("\n") for l in open(f, encoding="utf-8")] if f else None
-    res = analyse(a.root, {"val": rd(a.val_refs), "test": rd(a.test_refs)})
+    res = analyse(a.root, {"val": rd(a.val_refs), "test": rd(a.test_refs)}, candidate=a.candidate)
     os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True)
     json.dump(res, open(a.out, "w", encoding="utf-8"), indent=1, default=float)
     sc, h, j = res["screen"], res["h12_test"], res["j1a"]
@@ -176,7 +195,7 @@ def main():
           f"BLEU {sc['val_bleu']:.2f} (>= {sc['bleu_floor']:.2f}: {sc['bleu_ok']}) -> advance {sc['advance']}")
     print(f"H12 (test): passes {h['passes']:.3f}, saving {h['nfe_saving_pct']:.1f}%, BLEU loss {h['bleu_loss_vs_J0']:.2f}, "
           f"below J1 by {h['passes_below_J1']:.2f} -> kill {h['kill']}")
-    print(f"J1a cap {j['cap']}: J2 - J0 {j['J2_minus_J0_at_cap']:.2f}, J2 - J1 {j['J2_minus_J1_at_cap']:.2f}, "
+    print(f"J1a cap {j['cap']}: {a.candidate} - J0 {j[f'{a.candidate}_minus_J0_at_cap']:.2f}, {a.candidate} - J1 {j[f'{a.candidate}_minus_J1_at_cap']:.2f}, "
           f"len diff {j['len_ratio_diff_vs_J0']:.3f}")
     ex = res["exploratory"]["test"]
     print(f"exploratory (test): shared outputs {ex['shared_output_pct']}, passes on rest {ex['passes_on_rest']}")

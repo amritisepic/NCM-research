@@ -145,19 +145,24 @@ for arm, what in SDK_ARMS.items():
 WMT_PREP = ("python scripts/prep_wmt14.py --n 400000 --cache {R}/../data/wmt14_hf "
             "--out {R}/../data/wmt14_train_pairs.npz")
 for arm, what in {"ctrl": "control: teacher forcing on reference translations (also re-evaluates the released model once, J0)",
-                  "consist": "B2-trained: self-consistency on the model's own Jacobi trajectories"}.items():
+                  "consist": "B2-trained: self-consistency on the model's own Jacobi trajectories",
+                  "consist_frozen": "J2-F: self-consistency on a frozen copy of the released model's Jacobi trajectories "
+                                    "(contingent arm, registered after J2 missed its screen)"}.items():
     cmds = [WMT_PREP]
     if arm == "ctrl":
         cmds.append("python scripts/train_wmt14_L.py --config configs/scale/L_wmt_ctrl.yaml --run_dir {R}/L_wmt_released "
                     "--data {R}/../data/wmt14_train_pairs.npz --eval_only")
     cmds.append(f"python scripts/train_wmt14_L.py --config configs/scale/L_wmt_{arm}.yaml --run_dir {{R}}/L_wmt_{arm}_s{{S}} "
-                f"--seed {{S}} --data {{R}}/../data/wmt14_train_pairs.npz")
+                f"--seed {{S}} --data {{R}}/../data/wmt14_train_pairs.npz"
+                # J2-F gate 1 on the released weights: J0's saved exact decoding from w2c_L_wmt_ctrl (same Drive root)
+                + (" --teacher_check {R}/L_wmt_released/hyp_val.json" if arm == "consist_frozen" else ""))
     RUNS[f"w2c_L_wmt_{arm}"] = {
         "desc": f"Wave 2c, tier L WMT14 De-En (pre-registered J1): fine-tune the released 120M NCM; arm = {what}. "
                 "Goal (criterion d, text): exact Jacobi decoding converges in <= 8.25 of 11 passes at < 1 BLEU loss. "
                 "First run downloads ~0.8 GB of WMT14 training data to Drive and tokenizes 400k pairs (~10 min). "
                 "Run seed 0 first.",
-        "gpu": "A100 or L4", "units": 4, "needs": ["ckpt", "wmt14"], "seeds": [0], "cmds": cmds,
+        "gpu": "A100 or L4", "units": 6.5 if arm == "consist_frozen" else 4, "needs": ["ckpt", "wmt14"], "seeds": [0],
+        "cmds": cmds,
     }
 RUNS["w2_Mc_ncm"] = {
     "desc": "Wave 2, tier M design C (pre-registered M1): NCM generator from scratch, d512 x 6 (~18.9M body), on the "
