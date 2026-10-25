@@ -267,7 +267,7 @@ def test_resume_without_config_fails_closed(tmp_path):
         OmegaConf=OmegaConf, os=os, sys=__import__("sys"), ckpt_path=str(ckpt),
         cfg_path=str(tmp_path / "config.yaml"),
         cfg=OmegaConf.load(ROOT / "configs/scale/L_ts_onpol.yaml"),
-        a=SimpleNamespace(calib_steps=0, run_dir="audit-run")))
+        a=SimpleNamespace(calib_steps=0, run_dir="audit-run"), _recorded=True))
     refused = False
     try:
         exec(compile(ast.Module(body=[node], type_ignores=[]), "scripts/train_gen.py", "exec"), ns)
@@ -400,25 +400,26 @@ def _text_manifest_ns(tmp_path):
     tree = ast.parse((ROOT / "scripts/train_gen.py").read_text())
     node = next(n for n in tree.body if isinstance(n, ast.Assign)
                 and any(isinstance(t, ast.Name) and t.id == "manifest" for t in n.targets))
-    guard = next(n for n in tree.body if isinstance(n, ast.If) and "ckpt_path" in ast.unparse(n.test)
+    guard = next(n for n in tree.body if isinstance(n, ast.If) and "_recorded" in ast.unparse(n.test)
                  and "manifest_path" in ast.unparse(n))
+    recorded = next(n for n in tree.body if isinstance(n, ast.Assign) and ast.unparse(n.targets[0]) == "_recorded")
     ns = definitions("scripts/train_gen.py", ["_digest"], dict(hashlib=hashlib))
     ns.update(os=os, torch=torch, json=json, sys=__import__("sys"), _art=str(art), _data=str(data), DATA_DIR=str(data),
-              a=SimpleNamespace(calib_steps=0, run_dir="audit-run"))
+              a=SimpleNamespace(calib_steps=0, run_dir=str(tmp_path)))
     run = lambda n: exec(compile(ast.Module(body=[n], type_ignores=[]), "scripts/train_gen.py", "exec"), ns)
-    return ns, node, guard, run, art
+    return ns, node, lambda: (run(recorded), run(guard)), run, art
 
 
 # PR 5 review gap (R036): the text manifest identifies base bytes, data bytes and runtime, and a resume refuses a change
 @pytest.mark.parametrize("change", ["base", "runtime", "missing"])
 def test_text_resume_refuses_changed_or_missing_manifest(tmp_path, change):
-    ns, node, guard, run, art = _text_manifest_ns(tmp_path)
+    ns, node, run_guard, run, art = _text_manifest_ns(tmp_path)
     run(node)
     ckpt, mpath = tmp_path / "ckpt.pt", tmp_path / "run_manifest.json"
     ckpt.write_bytes(b"ckpt")
     ns.update(ckpt_path=str(ckpt), manifest_path=str(mpath))
     mpath.write_text(json.dumps(ns["manifest"]))
-    run(guard)                                   # identical manifest: resume allowed
+    run_guard()                                  # identical manifest: resume allowed
     if change == "base":
         (art / "generator.pt").write_bytes(b"base generator.pX")   # same size, different bytes
         run(node)
@@ -428,7 +429,66 @@ def test_text_resume_refuses_changed_or_missing_manifest(tmp_path, change):
     else:
         mpath.unlink()
     with pytest.raises(SystemExit):
-        run(guard)
+        run_guard()
+
+
+# codex audit 6, A6-1 (same guard in the text trainer): a run interrupted before its first checkpoint is identified
+@pytest.mark.parametrize("change", ["none", "runtime"])
+def test_text_run_without_checkpoint_is_identified_by_its_manifest(tmp_path, change):
+    ns, node, run_guard, run, art = _text_manifest_ns(tmp_path)
+    run(node)
+    mpath = tmp_path / "run_manifest.json"
+    ns.update(ckpt_path=str(tmp_path / "ckpt.pt"), manifest_path=str(mpath))   # no checkpoint written yet
+    mpath.write_text(json.dumps(ns["manifest"]))
+    if change == "none":
+        run_guard()
+        return
+    ns["torch"] = SimpleNamespace(__version__="0.0.0", version=torch.version)
+    run(node)
+    with pytest.raises(SystemExit):
+        run_guard()
+
+
+def test_text_run_without_checkpoint_refuses_another_config(tmp_path):
+    tree = ast.parse((ROOT / "scripts/train_gen.py").read_text())
+    recorded = next(n for n in tree.body if isinstance(n, ast.Assign) and ast.unparse(n.targets[0]) == "_recorded")
+    node = next(n for n in tree.body if isinstance(n, ast.If) and "_run_key(" in ast.unparse(n))
+    cfg_path = tmp_path / "config.yaml"
+    OmegaConf.save(OmegaConf.load(ROOT / "configs/scale/L_ts_onpol.yaml"), cfg_path)
+    (tmp_path / "run_manifest.json").write_text("{}")         # recorded run, no checkpoint yet
+    ns = definitions("scripts/train_gen.py", ["_run_key"], dict(
+        OmegaConf=OmegaConf, os=os, sys=__import__("sys"), ckpt_path=str(tmp_path / "ckpt.pt"),
+        cfg_path=str(cfg_path), cfg=OmegaConf.load(ROOT / "configs/scale/L_ts_ctrl.yaml"),
+        a=SimpleNamespace(calib_steps=0, run_dir=str(tmp_path))))
+    with pytest.raises(SystemExit):
+        exec(compile(ast.Module(body=[recorded, node], type_ignores=[]), "scripts/train_gen.py", "exec"), ns)
+
+
+# codex audit 6, A6-1 (same guard in the Sudoku trainer)
+@pytest.mark.parametrize("ckpt", [False, True])
+def test_sudoku_recorded_run_refuses_another_arm_with_or_without_checkpoint(tmp_path, ckpt):
+    base, run = tmp_path / "base", tmp_path / "run"
+    base.mkdir(); run.mkdir()
+    for name in ["config.yaml", "tokenizer.pt", "generator.pt"]:
+        (base / name).write_bytes(b"base")
+    data = tmp_path / "data.npz"
+    data.write_bytes(b"data")
+    tree = ast.parse((ROOT / "scripts/train_sudoku_L.py").read_text())
+    start = next(i for i, n in enumerate(tree.body) if isinstance(n, ast.Assign)
+                 and any(isinstance(t, ast.Name) and t.id == "manifest" for t in n.targets))
+    guard = next(i for i, n in enumerate(tree.body) if isinstance(n, ast.If) and "manifest_path" in ast.unparse(n.test))
+    program = compile(ast.Module(body=tree.body[start:guard + 2], type_ignores=[]), "scripts/train_sudoku_L.py", "exec")
+    ns = dict(OmegaConf=OmegaConf, cfg=OmegaConf.create({"arm": "uniform"}), json=json, sys=__import__("sys"),
+              a=SimpleNamespace(data=str(data), calib_steps=0, run_dir=str(run)), _base=str(base), os=os,
+              digest=lambda p: hashlib.sha256(Path(p).read_bytes()).hexdigest(), pick_device=lambda: "cpu",
+              ckpt_path=str(run / "ckpt.pt"), manifest_path=str(run / "run_manifest.json"))
+    exec(program, ns)                                          # first start writes the manifest
+    if ckpt:
+        (run / "ckpt.pt").write_bytes(b"ckpt")
+    exec(program, ns)                                          # same run: allowed
+    ns["cfg"] = OmegaConf.create({"arm": "repair"})
+    with pytest.raises(SystemExit):
+        exec(program, ns)
 
 
 # PR 5 review gap (R036): an on-policy resume without the policy RNG fails closed; other arms do not need it
