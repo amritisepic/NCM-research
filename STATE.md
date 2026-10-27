@@ -1,6 +1,6 @@
 # STATE — read this first
 
-_Last updated: 2026-10-27, session 8 (R042-R043; plan `docs/plan_2026-10-27.md`; previous handoff: `docs/prompts/handoff_2026-10-24.md`). Branches: `claude/ncm-research` (notebooks clone it) and
+_Last updated: 2026-10-27, session 8 (R042-R046; plan `docs/plan_2026-10-27.md`; previous handoff: `docs/prompts/handoff_2026-10-24.md`). Branches: `claude/ncm-research` (notebooks clone it) and
 `claude/ncm-phase2-analysis-finetune-pkh64d` (older mirror). Repo is PUBLIC: commit nothing identifying (no
 personal names/emails, no absolute local paths, no session links, no credentials). Goals, success bar and rules:
 `docs/brief.md`._
@@ -28,18 +28,25 @@ output-stability stop at 7.80 passes (29% below 11) and BLEU -0.54 vs J0, inside
 passes; not a claim (one seed, post-hoc rule, no timing; ~2.3x the positions). Flagged to the user; D1 decides. **W2M pre-reading (R043):**
 flags saturate at W1's rates (M5 is a near-replicate of M4) and probe (b) is confounded by level identity (AUC 0.95
 from the level alone); amendment **W2Ma** (readings only). Astra review triaged; re-plan proposed in
-`docs/plan_2026-10-27.md` (primary target criterion (c); (d) gets one wall-clock gate), **awaiting the user**.
+`docs/plan_2026-10-27.md` (primary target criterion (c); (d) gets one wall-clock gate): **approved** (R043-R044; (d) keeps
+the wall-clock rule). **S0 (R045):** the left-neighbour code adds 6.2 nats/window over levels 1-5 (1.7%; gate needs >= 10
+and >= 5%): Astra's coupled sampler is dropped, E2 not run. **Registered before any run (R046):** D1, J1d (contingent),
+E1. Their code (+ the W2Ma probe fix, flag-power script) is PR 14, **blocked on Codex** (usage limit again, 2026-10-27
+06:23 UTC) and on deep audit 9 (brief `docs/prompts/codex_audit9_d1e1.md`; no Codex CLI on the laptop: run it in
+Codex desktop).
 
 ## Environment
 - **Codex:** reviews PRs (bot `chatgpt-codex-connector`; 2-15 min per review); a review triggered only by opening a PR may
   leave no receipt the gate counts, so request one explicitly. Deep audits requested as PR comments need a Codex cloud
   environment for the repo, which does not exist: run audits locally (`scripts/review/codex_local.sh` with the Codex
   desktop CLI, or Codex desktop). Usage limits: hit 2026-10-24 ~02:35 UTC, reset ~06:52 UTC; **hit again at 16:36 UTC**
-  (PR 7's re-request) and not reset at the time of writing: no gated merge until it resets. Open: none. PR 12 (W2M) merged 2026-10-27 (R040). Merged: PRs 2-11 (5, 6, 7, 9, 10, 11 in session 5, R037-R038). Limit reset by 22:57 UTC 2026-10-24.
+  (PR 7's re-request) and not reset at the time of writing: no gated merge until it resets. Open: PR 14 (D1 / E1 / W2Ma eval code; review requested 06:23 UTC 2026-10-27, Codex at its limit). PR 12 (W2M) merged 2026-10-27 (R040). Merged: PRs 2-11 (5, 6, 7, 9, 10, 11 in session 5, R037-R038). Limit reset by 22:57 UTC 2026-10-24.
 - `scripts/review/codex_pr.py wait` on this Windows laptop: crashes decoding the bot's emoji (cp1252) unless run with
   `PYTHONUTF8=1`, and returns early (gate FAIL) when Codex posts its "review running" status comment. Workaround used:
   poll the `codex-review-state` comment, then `codex_pr.py status`. `scripts/review/` is edit-protected: the user fixes.
-- Laptop: no GPU access from the shell (blocked); `.venv` has torch 2.6 CPU, which has the no-grad/autocast
+- Laptop: an RTX 4050 (6 GB) is reachable from the shell now (S0 ran on it, R045), but it dropped off the bus during
+  the E1 prototype ("GPU is lost"): reboot before using it again; keep sampling batches small (it spills to host RAM).
+  Earlier note: no GPU access from the shell (blocked); `.venv` has torch 2.6 CPU, which has the no-grad/autocast
   weight-cache bug (R031): never train on-policy under autocast with it. Codex's audit installed torch 2.11.0+cpu in a
   temp folder (usable via PYTHONPATH). Tests: `PYTHONPATH=tests/_deps;tests;src python -m pytest tests --ignore=tests/_deps`
   (97 pass with PR 5, on torch 2.11 and 2.6).
@@ -72,10 +79,10 @@ from the level alone); amendment **W2Ma** (readings only). Astra review triaged;
 - Throughput (A100): tier L 39-41 TFLOPS (2.1 s/step uniform, 3.0 on-policy, 3.7 two-pass), tier M NCM 24.7, AR 44.2.
 
 ## Live hypotheses / bets (ranked: significance x chance of a clean result / CU; plan `docs/plan_2026-10-27.md`)
-0. **Proposed (not registered), awaiting the user:** E1, how much of the code NLL is representation choice (codes
-   that decode to the same text): `R_k = N_k + log rho_k` at fine cuts, released + W1 + WMT14 checkpoints, ~2 CU,
-   eval-only; primary criterion-(c) candidate (it would explain A1 / A2 / A4 / J1's NLL-quality dissociation). D1,
-   batch-1 wall-clock gate for (d) (~1.5 CU; text prior ~20%). S0, CPU gate for Astra's coupled sampler.
+0. **Registered, code in PR 14 (R046):** E1, how much of the code NLL is representation choice (codes that decode to
+   the same text): `R_k = N_k - T_k` at cuts >= 8 (cuts 5-7 rarely hit: prototype), released TinyStories / WMT14 /
+   Sudoku + A1 / A2 / A4 / J1 / J2-F, ~2-3 CU, primary criterion-(c) candidate. D1, batch-1 wall-clock gate for (d)
+   (~1.5 CU; text prior ~20%). S0 failed (R045): coupled sampler dropped.
 1. ~~Criterion (d), text half: J2-F~~ — done (R042): no collapse, 5.6% saving, misses the screen. (d)'s text half has
    no registered candidate; the Sudoku half (verifier stop) still lacks batch-1 wall-clock.
 2. **Mechanism of the on-policy collapse (candidate for criterion c):** undetectable corruption -> the model discounts
@@ -122,5 +129,7 @@ from the level alone); amendment **W2Ma** (readings only). Astra review triaged;
 2. W2M: `w2m_L_ts_m0`..`m7` cleared (A100 or L4; R041). **Hold `w2m_mech_eval`** until the probe fix (W2Ma) is
    reviewed and audited, or run it and report (b) as uninformative. Read W2M with W2M + W2Ma; then CPU
    `scripts/w1_sample_stats.py --set w2m`.
-3. If the plan is approved: one PR (E1/E2 eval, D1 benchmark, mech-eval probe fix, flag-power script), Codex review,
-   deep audit 9; register E1 and D1 before their runs; CPU: J1a bootstrap, the stability rule's val BLEU, S0.
+3. PR 14 (D1 benchmark, E1 estimator, W2Ma probe fix, flag-power script; registrations D1 / J1d / E1 pushed): when
+   Codex resets, `codex_pr.py request 14`, triage `docs/reviews/triage_pr14.md`; deep audit 9 from
+   `docs/prompts/codex_audit9_d1e1.md` (Codex desktop); port its tests; merge only when no W2M arm is mid-run (ask the
+   user). Then the user launches `d1_batch1_wallclock` (A100), `e1_equivalence`, and `w2m_mech_eval`.
