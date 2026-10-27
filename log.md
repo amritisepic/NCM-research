@@ -891,3 +891,4 @@ generator and share the dropout stream; the logged per-level corrupted fractions
 - No wave-1 or WMT14 code path changed (`tests/test_w2m_old_arms.py`). **W2M notebooks are not cleared**: deep audit 8
   (brief `docs/prompts/codex_audit8_w2m.md`, audited `2ede453`, also covers PR 5's text-trainer changes) comes first.
   The Codex CLI is not installed on the laptop, so the audit runs in Codex desktop from that brief.
+- The user launched `w2c_L_wmt_consist_frozen` (J2-F, A100) and is running deep audit 8 in Codex desktop.

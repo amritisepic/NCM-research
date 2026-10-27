@@ -106,7 +106,7 @@ waits for PR 7 and J2-F for its code, review and deep audit; Codex is at its usa
 - CPU: ~13.5 CPU-h before session 5; session 5 ~1.2 h (Sudoku paired rerun, test suites).
 
 ## Next 3 actions
-1. User: launch (or report) `w2c_L_wmt_consist_frozen` (J2-F, A100, ~6.5 CU; cleared R038). When it arrives: analyse with
+1. J2-F (`w2c_L_wmt_consist_frozen`, A100, ~6.5 CU) launched by the user 2026-10-27; audit 8 running in Codex desktop. When it arrives: analyse with
    `scripts/analyze_j1.py --candidate J2-F` against J1-J1c + J2-F; if it looks like it meets criterion (d), stop and ask.
 2. W2M (registered 2026-10-25, all 8 arms, ~27 CU): built (`claude/wip-w2m`; full suite 290 pass on CPU). PR 12: Codex round 1
    found two P1s (flag footprint missed the quant_resi conv; measure (a) out of GPU memory), both accepted and fixed in
