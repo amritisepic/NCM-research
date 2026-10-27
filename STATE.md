@@ -42,7 +42,7 @@ nats), so the damage lives in generation-time contexts. J1a bootstrap and the WM
 verifier stop 0.44x): criterion (d) is closed on text, J1d is not run. **Mechanism eval (R053):** M4 uses its flags
 (-35 nats/window), so W2M's registered reading is final: mixed; plausible-wrong windows are detectable at the row level
 by every model (AUC >= 0.92 from level 2); the collapsed arms are not less coarse-context dependent on clean contexts.
-**E1 (R054, analysis on PR 15 in review):** at cut 8 most code NLL is representation choice in released TinyStories
+**E1 (R054; analysis merged, PR 15, Codex clean):** at cut 8 most code NLL is representation choice in released TinyStories
 (lower bound 0.875) and Sudoku (0.993) but not established in WMT14 (0.763: 18 censored pairs hold 21% of N_8):
 prediction 1 holds in 2 of 3 domains, E1 misses its (c) bar; prediction 2 unreadable (censoring). **Astra round 3**
 (R051) triaged in R055 / `docs/plan_2026-10-27.md` section 10: W2C stage 1 (M2 / M3, seeds 1-3, 21.9 CU), the M3
@@ -54,7 +54,7 @@ reassignment kill gated on W2M-G, E1b (continue sampling on censored items, ~1.5
   leave no receipt the gate counts, so request one explicitly. Deep audits requested as PR comments need a Codex cloud
   environment for the repo, which does not exist: run audits locally (`scripts/review/codex_local.sh` with the Codex
   desktop CLI, or Codex desktop). Usage limits: hit 2026-10-24 ~02:35 UTC, reset ~06:52 UTC; **hit again at 16:36 UTC**
-  (PR 7's re-request) and not reset at the time of writing: no gated merge until it resets. PR 14 (D1 / E1 / W2Ma eval code) merged 2026-10-27 (R048). PR 12 (W2M) merged 2026-10-27 (R040). Merged: PRs 2-11 (5, 6, 7, 9, 10, 11 in session 5, R037-R038). Limit reset by 22:57 UTC 2026-10-24.
+  (PR 7's re-request) and not reset at the time of writing: no gated merge until it resets. PR 15 (E1 analysis) merged 2026-10-27 (R054). PR 14 (D1 / E1 / W2Ma eval code) merged 2026-10-27 (R048). PR 12 (W2M) merged 2026-10-27 (R040). Merged: PRs 2-11 (5, 6, 7, 9, 10, 11 in session 5, R037-R038). Limit reset by 22:57 UTC 2026-10-24.
 - `scripts/review/codex_pr.py wait` on this Windows laptop: crashes decoding the bot's emoji (cp1252) unless run with
   `PYTHONUTF8=1`, and returns early (gate FAIL) when Codex posts its "review running" status comment. Workaround used:
   poll the `codex-review-state` comment, then `codex_pr.py status`. `scripts/review/` is edit-protected: the user fixes.
@@ -144,7 +144,7 @@ reassignment kill gated on W2M-G, E1b (continue sampling on censored items, ~1.5
 ## Next 3 actions
 1. **User:** choose the package in `docs/plan_2026-10-27.md` section 10 (recommended ~40 CU: W2M-G, M3 no-clean pilot,
    W2C stage 1, E1b, the gated direction-1 kill) and report this month's Colab balance.
-2. PR 15 (`scripts/analyze_e1.py`): Codex review, triage, merge; then R054 stops being provisional. A deep audit before
-   any (c) claim rests on E1 (needed only if E1b runs).
+2. PR 15 (`scripts/analyze_e1.py`) merged 2026-10-27 (Codex: no findings). A deep audit is due before any (c) claim
+   rests on E1 (only if E1b runs).
 3. After the user's choice: register (W2C, M3 no-clean, W2M-G, E1b, direction 1's CPU gate), then one build PR from a
    fresh session (Codex review, delta audit); merge only when no Colab run is mid-flight; tell the user what to launch.
