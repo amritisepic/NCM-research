@@ -297,9 +297,10 @@ def linear_support(lj, L):
     return sup
 
 
-def oracle_flags(levels, replaced, L=128):
+def oracle_flags(levels, replaced, L=128, halo=1):
     """replaced: list of (level, position). Returns (S - l0,) flags by hand: contamination of the cumulative
-    reconstruction, area-averaged over the span of every input position."""
+    reconstruction, area-averaged over the span of every input position. `halo`: the kernel-3 residual convolution
+    (quant_resi) applied after the up-sampling spreads each code's support by one position on each side (Codex PR 12)."""
     out = []
     for k in range(1, len(levels)):
         cont = np.zeros(L, bool)
@@ -309,7 +310,8 @@ def oracle_flags(levels, replaced, L=128):
             if j == 0:
                 cont[:] = True                                    # one code spans the whole window
             else:
-                cont[list(linear_support(levels[j], L)[p])] = True
+                for t in linear_support(levels[j], L)[p]:
+                    cont[max(t - halo, 0):t + halo + 1] = True
         lk = levels[k]
         for q in range(lk):
             lo, hi = (q * L) // lk, -(-((q + 1) * L) // lk)       # adaptive average pooling bin

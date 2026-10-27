@@ -64,17 +64,32 @@ class FlagVector(nn.Module):
         return inputs + flags[..., None].to(inputs.dtype) * self.w.to(inputs.dtype)
 
 
+def _resi_halo(vq, k: int) -> int:
+    """Half-width of level k's residual convolution (quant_resi, applied after the up-sampling in idx_to_ncm_input):
+    it spreads a replaced code's footprint by this many full-length positions on each side (Codex PR 12)."""
+    if not vq.quant_resi_enabled:
+        return 0
+    conv = vq.quant_resi[k / max(vq._qr_num_levels - 1, 1)]
+    return int(conv.kernel_size[0]) // 2
+
+
 def _footprint(vq, m: torch.Tensor, k: int, L: int) -> torch.Tensor:
     """(B, l_k) bool replaced-code mask of level k -> (B, L) bool: positions of the full-length reconstruction that
-    receive a contribution from a replaced code, under the tokenizer's own up-sampling of level k."""
+    receive a contribution from a replaced code, under the tokenizer's own up-sampling of level k followed by its
+    residual convolution."""
     lk = m.shape[1]
     mf = m.float()
     if k == 0 and vq.learned_l1_sampling:
         # learned level-0 up-sampler (initialised as nearest-repeat): the code's own block
-        return mf.repeat_interleave(L // lk, dim=1) > 0
-    if vq.learned_all_sampling:
+        fp = mf.repeat_interleave(L // lk, dim=1) > 0
+    elif vq.learned_all_sampling:
         raise NotImplementedError("learned_all_sampling has no scalar footprint")
-    return vq._up_to_full(mf[..., None], k, L)[..., 0] > 0
+    else:
+        fp = vq._up_to_full(mf[..., None], k, L)[..., 0] > 0
+    r = _resi_halo(vq, k)
+    if r:
+        fp = F.max_pool1d(fp.float()[:, None], kernel_size=2 * r + 1, stride=1, padding=r)[:, 0] > 0
+    return fp
 
 
 @torch.no_grad()
@@ -261,9 +276,10 @@ def input_nll(logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
 
 @torch.no_grad()
 def forward_logits(net, prefix_emb, inputs, device: str, flag: FlagVector | None = None, flags=None, bs: int = 64,
-                   hidden: bool = False):
+                   hidden: bool = False, keep_logits: bool = True):
     """fp32, TF32 off, eval mode. Returns logits (and the last hidden states after ln_f at the target positions if
-    `hidden`), in batches of `bs`. `flag`/`flags` add f * w to the inputs; omitted = all-zero flags."""
+    `hidden`), in batches of `bs`. `flag`/`flags` add f * w to the inputs; omitted = all-zero flags. keep_logits=False
+    (hidden only) returns None for the logits, so a hidden-state pass over many windows does not hold them."""
     outs, hids = [], []
     cap = {}
     h = net.transformer.ln_f.register_forward_hook(lambda m, i, o: cap.__setitem__("h", o)) if hidden else None
@@ -273,13 +289,16 @@ def forward_logits(net, prefix_emb, inputs, device: str, flag: FlagVector | None
                 inp = inputs[s:s + bs]
                 if flag is not None and flags is not None:
                     inp = flag(inp, flags[s:s + bs])
-                outs.append(net(torch.cat([prefix_emb(inp.shape[0]), inp], 1)).float())
+                lg = net(torch.cat([prefix_emb(inp.shape[0]), inp], 1))
+                if keep_logits:
+                    outs.append(lg.float())
                 if hidden:
                     hids.append(cap["h"][:, net.prefix_len:].float())
     finally:
         if h is not None:
             h.remove()
-    return (torch.cat(outs), torch.cat(hids)) if hidden else torch.cat(outs)
+    lg = torch.cat(outs) if keep_logits else None
+    return (lg, torch.cat(hids)) if hidden else lg
 
 
 def make_perturbations(canon: torch.Tensor, levels: list, vocab: list, js, seed: int) -> dict:
@@ -298,25 +317,31 @@ def make_perturbations(canon: torch.Tensor, levels: list, vocab: list, js, seed:
 @torch.no_grad()
 def context_dependence_kl(net, tok, prefix_emb, canon, perturb: dict, device: str, bs: int = 64) -> dict:
     """(a) mean KL(clean || perturbed) of the predictive distributions of the levels finer than j, when one code at
-    level j is changed (the finer inputs are rebuilt from the changed codes; finer codes stay canonical)."""
+    level j is changed (the finer inputs are rebuilt from the changed codes; finer codes stay canonical). Computed and
+    summed over window batches of `bs`, so no full-vocabulary tensor spans more than `bs` windows (Codex PR 12)."""
     levels = [int(l) for l in tok.vq.levels]
     vocab = [int(v) for v in tok.vq.vqvae_vocab_sizes]
-    clean_in = tok.vq.idx_to_ncm_input(canon)
-    clean = forward_logits(net, prefix_emb, clean_in, device, bs=bs)
-    res = {}
-    for j, (pos, shift) in perturb.items():
-        c = canon.clone()
-        idx = sum(levels[:j]) + pos.to(canon.device)
-        rows = torch.arange(canon.shape[0], device=canon.device)
-        c[rows, idx] = (c[rows, idx] + shift.to(canon.device)) % vocab[j]
-        assert bool((c != canon).sum(1).eq(1).all())
-        pert = forward_logits(net, prefix_emb, tok.vq.idx_to_ncm_input(c), device, bs=bs)
-        lo = sum(levels[1:j + 1])                                        # first logit position of a level > j
-        lp_c, lp_p = clean[:, lo:].log_softmax(-1), pert[:, lo:].log_softmax(-1)
-        p_c = lp_c.exp()
-        kl = torch.where(p_c > 0, p_c * (lp_c - lp_p), torch.zeros_like(p_c)).sum(-1)
-        res[int(j)] = float(kl.mean())
-    return res
+    tot = {int(j): 0.0 for j in perturb}
+    cnt = {int(j): 0 for j in perturb}
+    for s in range(0, canon.shape[0], bs):
+        cb = canon[s:s + bs]
+        clean = forward_logits(net, prefix_emb, tok.vq.idx_to_ncm_input(cb), device, bs=bs)
+        rows = torch.arange(cb.shape[0], device=canon.device)
+        for j, (pos, shift) in perturb.items():
+            c = cb.clone()
+            idx = sum(levels[:j]) + pos[s:s + bs].to(canon.device)
+            c[rows, idx] = (c[rows, idx] + shift[s:s + bs].to(canon.device)) % vocab[j]
+            assert bool((c != cb).sum(1).eq(1).all())
+            pert = forward_logits(net, prefix_emb, tok.vq.idx_to_ncm_input(c), device, bs=bs)
+            lo = sum(levels[1:j + 1])                                    # first logit position of a level > j
+            lp_c, lp_p = clean[:, lo:].log_softmax(-1), pert[:, lo:].log_softmax(-1)
+            p_c = lp_c.exp()
+            kl = torch.where(p_c > 0, p_c * (lp_c - lp_p), torch.zeros_like(p_c)).sum(-1)
+            tot[int(j)] += float(kl.double().sum())
+            cnt[int(j)] += kl.numel()
+            del pert, lp_c, lp_p, p_c, kl
+        del clean
+    return {j: tot[j] / cnt[j] for j in tot}
 
 
 def auc_score(scores: torch.Tensor, y: torch.Tensor):

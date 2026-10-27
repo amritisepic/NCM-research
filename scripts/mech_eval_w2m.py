@@ -41,7 +41,7 @@ def evaluate_model(net, flag, tok, prefix_emb, canon, perturb, ctxs, n_train, de
     out = {"context_dependence_kl": W.context_dependence_kl(net, tok, prefix_emb, canon, perturb, device)}
     probe = {}
     for kind, ctx in ctxs.items():
-        _, hid = W.forward_logits(net, prefix_emb, ctx["inputs"], device, hidden=True)
+        _, hid = W.forward_logits(net, prefix_emb, ctx["inputs"], device, hidden=True, keep_logits=False)
         y = ctx["contaminated"]
         probe[kind] = W.fit_probe_auc(hid[:n_train], y[:n_train], hid[n_train:], y[n_train:])
         c0 = ~ctx["masks"][0].any(1)            # exploratory: held-out windows whose level-0 code is NOT replaced
