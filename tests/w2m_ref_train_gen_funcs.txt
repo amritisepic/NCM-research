@@ -1,0 +1,168 @@
+"""Verbatim copies of the pre-W2M (commit 38a08fa) scripts/train_gen.py code that every existing arm runs: the step /
+loss / checkpoint functions and the training loop (the `while`). tests/test_w2m_old_arms.py asserts the working tree's
+functions have the same syntax trees and that the old loop and the current loop give identical runs for old arms."""
+def _run_key(c):
+    """What defines a training run. Eval / log / checkpoint cadence do not change it; the micro-batch partition does
+    (dropout, corruption and policy draws and float reductions follow it; codex audit 3, A3-3)."""
+    c = OmegaConf.to_container(c, resolve=True)
+    t = {k: v for k, v in c.get("train", {}).items() if k not in ("eval_every", "ckpt_every", "log_every")}
+    return [c.get("init"), c.get("model"), c.get("corruption"), c.get("level0"), t]
+
+
+def _digest(path):
+    with open(path, "rb") as f:
+        return hashlib.file_digest(f, "sha256").hexdigest()
+
+
+def prefix_emb(b):
+    return tok.encoder.wte(torch.full((b, 1), EOS, dtype=torch.long, device=device))
+
+
+@torch.no_grad()
+def policy_codes(x, gen):
+    """The generator's own samples at every level (level 0: unigram, as at inference). Pass 1 samples each level
+    given the clean coarser levels (one-step errors); pass t samples given pass t-1's codes (t-step errors:
+    t = K-1 would be full sequential sampling given the true level 0). fp32, TF32 off, every module in eval mode
+    and all draws from `gen`, the policy's own checkpointed RNG (codex audit 3, A3-1 / A3-2)."""
+    with fp32_eval(net, device):
+        codes = tok.vq.z_to_idx(tok._encode_pre_quant(x))
+        # inference level 0 (unigram), drawn once: pass 1 sees the clean levels, pass t > 1 sees pass t-1's hierarchy
+        # including this level 0 (codex audit F3)
+        lv0 = torch.multinomial(L0, x.shape[0] * l0, replacement=True, generator=gen).view(x.shape[0], l0)
+        for _ in range(policy_passes):
+            z_in = tok.vq.idx_to_ncm_input(codes)
+            logits = fnet(torch.cat([prefix_emb(x.shape[0]), z_in], 1)).float()
+            probs = torch.softmax(logits / policy_temp, -1)
+            samp = torch.multinomial(probs.flatten(0, 1), 1, generator=gen).view(logits.shape[:-1])
+            codes = torch.cat([lv0, samp], 1)
+    return codes
+
+
+def compute_loss(x, gen):
+    pol = policy_codes(x, policy_gen) if corr.mode == "onpolicy" else None
+    h = build_hierarchy(tok, x, corr, policy_codes=pol, generator=gen)
+    logits = fnet(torch.cat([prefix_emb(x.shape[0]), h["inputs"]], 1))
+    tgt = h["targets"][:, l0:]
+    V = logits.shape[-1]
+    if corr.soft_tau > 0:
+        loss = soft_ce(logits.reshape(-1, V), h["soft_idx"][:, l0:].reshape(-1, corr.soft_topm),
+                       h["soft_w"][:, l0:].reshape(-1, corr.soft_topm))
+    else:
+        loss = F.cross_entropy(logits.float().reshape(-1, V), tgt.reshape(-1))
+    with torch.no_grad():
+        agree = (logits.argmax(-1) == h["canonical"][:, l0:]).float().mean().item()
+    return loss, {"corrupted_frac": round(h["corrupted_frac"], 4),
+                  "corrupted_frac_per_level": [round(f, 4) for f in h["corrupted_frac_per_level"]],
+                  "argmax_eq_canonical": round(agree, 4),
+                  "labels_changed": round((h["targets"] != h["canonical"]).float().mean().item(), 4)}
+
+
+@torch.no_grad()
+def val_nll():
+    """Teacher-forced NLL of the canonical codes given the clean hierarchy (nats/window, per level); fp32, TF32 off,
+    caller's module modes restored (codex audit 3, A3-1; wave 1 scored this under the training autocast)."""
+    tot, per = 0.0, torch.zeros(K - 1)
+    with fp32_eval(net, device):
+        for s in range(0, len(val_x), 100):
+            x = val_x[s:s + 100].to(device)
+            z_in, tgt = tok.get_ncm_inputs(x)
+            logits = fnet(torch.cat([prefix_emb(x.shape[0]), z_in], 1)).float()
+            nll = F.cross_entropy(logits.reshape(-1, logits.shape[-1]), tgt.reshape(-1), reduction="none").view(tgt.shape)
+            tot += nll.sum().item()
+            per += torch.stack([c.sum(1) for c in torch.split(nll, levels[1:], dim=1)], 1).sum(0).cpu()
+    n = len(val_x)
+    return {"val_nll": tot / n, "val_nll_per_level": (per / n).round(decimals=2).tolist()}
+
+
+@torch.no_grad()
+def draw_samples(n, seed_, bs=256):
+    """Unconditional samples with the paper protocol (level 0 ~ unigram, temperature 1, eager, 11 NFE)."""
+    net.eval()
+    g = torch.Generator(device=device).manual_seed(seed_)
+    torch.manual_seed(seed_)
+    out, nfe, t0 = [], ForwardCounter(net), time.time()
+    for s in range(0, n, bs):
+        b = min(bs, n - s)
+        lv0 = torch.multinomial(L0, b * l0, replacement=True, generator=g).view(b, l0)
+        with torch.autocast(device_type=device, enabled=False):   # fp32 sampling incl. tokenizer (codex audit F8)
+            codes = net.generate(lv0, torch.full((b, 1), EOS, device=device), temperature=1.0, top_k=0, top_p=1.0,
+                                 cfg_scale=0.0, cfg_null_eos=EOS)
+        with torch.autocast(device_type=device, enabled=False):
+            ids = tok.decoder(tok.vq.idx_to_z_q(codes)).argmax(-1)
+        out += [[t for t in cut_at_eos(r) if t != PAD] for r in ids.tolist()]
+    calls = nfe.n
+    nfe.close()
+    net.train()
+    return out, calls / max(1, -(-n // bs)), time.time() - t0
+
+
+def sample_metrics(n, seeds, mauve=False):
+    """Isolated from the training RNG streams (codex audit F6), with TF32 off (F8)."""
+    devices = [torch.cuda.current_device()] if device == "cuda" else []
+    tf32 = (torch.backends.cuda.matmul.allow_tf32, torch.backends.cudnn.allow_tf32)
+    torch.backends.cuda.matmul.allow_tf32 = torch.backends.cudnn.allow_tf32 = False
+    try:
+        with torch.random.fork_rng(devices=devices):
+            return _sample_metrics(n, seeds, mauve)
+    finally:
+        torch.backends.cuda.matmul.allow_tf32, torch.backends.cudnn.allow_tf32 = tf32
+
+
+def _sample_metrics(n, seeds, mauve=False):
+    from ncmr.eval_text import evaluate_samples, mauve_features
+    ids, groups, nfe, wall = [], [], 0.0, 0.0
+    for sd in seeds:
+        o, nfe, w = draw_samples(n, sd)
+        ids += o
+        groups += [sd] * len(o)
+        wall += w
+    reenc = [bpe.encode(bpe.decode(s)) for s in ids]    # token statistics on the re-encoding, as upstream
+    ref = None
+    if mauve:
+        cache = os.path.join(ROOT, "runs", "cache", f"mauve_ref_val_{len(ids)}.npy")
+        if os.path.exists(cache):
+            ref = np.load(cache)
+        else:
+            ref = mauve_features([bpe.decode(cut_at_eos(r)) for r in examples("val", len(ids))], device)
+            os.makedirs(os.path.dirname(cache), exist_ok=True)
+            np.save(cache, ref)
+    scorers = ("gpt2-large", "roneneldan/TinyStories-33M") if mauve else ("gpt2-large",)
+    res = evaluate_samples(reenc, bpe.decode, groups, scorers=scorers, ref_feats=ref, device=device)
+    res.update({"nfe_per_sample": nfe, "gen_wall_s": wall})
+    return res, ids, groups
+
+
+def save_ckpt():
+    trainer.save(modules, data_rng, extra={"corruption_rng": gen.get_state(), "policy_rng": policy_gen.get_state()})
+
+
+while trainer.step < int(tc.steps):
+    xb_full = torch.from_numpy(stream.batch(data_rng, int(tc.batch_size))).to(device)
+    loss_sum, logs = 0.0, {}
+    for xb in torch.chunk(xb_full, accum):
+        with trainer.ctx:
+            loss, logs = compute_loss(xb, gen)
+        trainer.backward(loss / accum)
+        loss_sum += loss.item() / accum
+    gn = trainer.step_opt(params)
+    if calib:
+        calib.tick(trainer.step)
+        continue
+    if trainer.step % int(tc.get("log_every", 50)) == 0 or trainer.step == 1:
+        sps = (trainer.step - s_last) / max(time.time() - t_last, 1e-9)
+        t_last, s_last = time.time(), trainer.step
+        rec = trainer.log({"loss": round(loss_sum, 4), "gnorm": round(gn, 3), "steps_per_s": round(sps, 3),
+                           "tflops_eff": round(sps * fl_step / 1e12, 1), **logs})
+        print(json.dumps(rec), flush=True)
+    if trainer.step % int(tc.eval_every) == 0 or trainer.step == int(tc.steps):
+        ev = val_nll()
+        if every_s and (trainer.step % every_s == 0 or trainer.step == int(tc.steps)):
+            sm, _, _ = sample_metrics(int(sc.get("n", 256)), [seed + 10_000])
+            ev.update({k: v for k, v in sm.items() if not k.endswith(("per_group", "per_seed"))})
+        print(json.dumps(trainer.log({"eval": ev})), flush=True)
+    if trainer.step % int(tc.ckpt_every) == 0:
+        save_ckpt()
+    if deadline and time.time() > deadline:
+        save_ckpt()
+        print("[stop] time budget reached; resume by re-running the same command", flush=True)
+        sys.exit(0)
