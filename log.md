@@ -892,3 +892,12 @@ generator and share the dropout stream; the logged per-level corrupted fractions
   (brief `docs/prompts/codex_audit8_w2m.md`, audited `2ede453`, also covers PR 5's text-trainer changes) comes first.
   The Codex CLI is not installed on the laptop, so the audit runs in Codex desktop from that brief.
 - The user launched `w2c_L_wmt_consist_frozen` (J2-F, A100) and is running deep audit 8 in Codex desktop.
+
+## Independent research review published (2026-10-26; documentation only)
+- Saved the complete advisory review in `docs/research_review_2026-10-26.md`, preserving the original response,
+  derivations, evidence labels, primary-source citations, candidate ideas, kill tests, and shared 90-CU budget.
+- The assessment reads project records through R040. It proposes marginal-preserving joint sampling of residual
+  codes and a causal study of corruption ambiguity amplified by parallel sampling; these are hypotheses and plans,
+  not new measurements, registered amendments, or launch approvals.
+- Verified the export against the original response and checked its completeness and publication hygiene.
+  No production code, experimental configuration, registration, or unrelated local work is included.
