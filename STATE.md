@@ -28,8 +28,7 @@ waits for PR 7 and J2-F for its code, review and deep audit; Codex is at its usa
   leave no receipt the gate counts, so request one explicitly. Deep audits requested as PR comments need a Codex cloud
   environment for the repo, which does not exist: run audits locally (`scripts/review/codex_local.sh` with the Codex
   desktop CLI, or Codex desktop). Usage limits: hit 2026-10-24 ~02:35 UTC, reset ~06:52 UTC; **hit again at 16:36 UTC**
-  (PR 7's re-request) and not reset at the time of writing: no gated merge until it resets. Open: none (W2M
-  in progress). Merged: PRs 2-11 (5, 6, 7, 9, 10, 11 in session 5, R037-R038). Limit reset by 22:57 UTC 2026-10-24.
+  (PR 7's re-request) and not reset at the time of writing: no gated merge until it resets. Open: PR 12 (W2M). Merged: PRs 2-11 (5, 6, 7, 9, 10, 11 in session 5, R037-R038). Limit reset by 22:57 UTC 2026-10-24.
 - `scripts/review/codex_pr.py wait` on this Windows laptop: crashes decoding the bot's emoji (cp1252) unless run with
   `PYTHONUTF8=1`, and returns early (gate FAIL) when Codex posts its "review running" status comment. Workaround used:
   poll the `codex-review-state` comment, then `codex_pr.py status`. `scripts/review/` is edit-protected: the user fixes.
@@ -109,9 +108,9 @@ waits for PR 7 and J2-F for its code, review and deep audit; Codex is at its usa
 ## Next 3 actions
 1. User: launch (or report) `w2c_L_wmt_consist_frozen` (J2-F, A100, ~6.5 CU; cleared R038). When it arrives: analyse with
    `scripts/analyze_j1.py --candidate J2-F` against J1-J1c + J2-F; if it looks like it meets criterion (d), stop and ask.
-2. W2M (registered 2026-10-25, all 8 arms, ~27 CU): implementation uncommitted in the `claude/wip-w2m` worktree
-   (trainer, corruption, `src/ncmr/w2m.py`, mech eval, 9 notebooks, 3 test files). Finish, commit, PR, Codex review,
-   then a deep audit (also covers PR 5's text-trainer changes) before any launch. Offload prompt:
-   `docs/prompts/codex_w2m_offload.md`.
+2. W2M (registered 2026-10-25, all 8 arms, ~27 CU): built and committed (`8b82b9c` on `claude/wip-w2m`; 72 W2M tests,
+   full suite 285 pass on CPU). PR 12 open, Codex review requested 2026-10-27 01:52 UTC. Deep audit 8 (also covers
+   PR 5's text-trainer changes) to run in Codex desktop from the brief below; not cleared to launch until both are triaged. Offload prompt:
+   `docs/prompts/codex_audit8_w2m.md` (deep audit 8).
 3. After J2-F and W2M: decide with the user between J2-F/J1 seeds 1-2 (if J2-F passes), the clean-NLL-vs-quality
    eval (~1 CU), and the held Sudoku / M1 runs.
