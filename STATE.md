@@ -1,6 +1,6 @@
 # STATE — read this first
 
-_Last updated: 2026-10-27, session 8 (R042-R046; plan `docs/plan_2026-10-27.md`; previous handoff: `docs/prompts/handoff_2026-10-24.md`). Branches: `claude/ncm-research` (notebooks clone it) and
+_Last updated: 2026-10-27, session 8 (R042-R046; plan `docs/plan_2026-10-27.md`; **next session: `docs/prompts/handoff_2026-10-27.md`**). Branches: `claude/ncm-research` (notebooks clone it) and
 `claude/ncm-phase2-analysis-finetune-pkh64d` (older mirror). Repo is PUBLIC: commit nothing identifying (no
 personal names/emails, no absolute local paths, no session links, no credentials). Goals, success bar and rules:
 `docs/brief.md`._
