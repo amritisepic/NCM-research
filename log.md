@@ -1356,3 +1356,20 @@ Cut 8, every item; R share = mean R_8 / mean N_8, bounds from the per-item beta-
   ten ideas.
 - Budget: D1 (~5.6), the mech eval (~0.5) and E1 (~4.3) cost ~10.4 CU against 7 allocated; ~66 CU left this month
   (estimate). Proposed package ~40 CU (plan section 10). Nothing is registered or built; the user decides first.
+
+## R056 — decisions (user, 2026-10-27): the core package with the gated direction-1 kill; balance 27.93 CU, and our CU estimates ran ~2x low (process)
+- **Package approved** (plan section 10, "core + gated kill"): W2M-G (eval-only), M3 without clean rows (seed 0 pilot),
+  W2C stage 1 (M2 / M3, 25% clean rows, fresh seeds 1-3), E1b (continued sampling on E1's censored and wide items), and
+  the direction-1 L1 target-reassignment kill, gated on W2M-G's crossed replay. Register before any code or run.
+- **Balance: 27.93 CU** (Colab panel), not the ~66 estimated. Since the 103.56 reading, 75.6 CU were used; logged run
+  time accounts for 36.9 at the third-party rates the repo uses (A100-40GB 5.4 CU/h, L4 1.71 CU/h): W2M 243 A100-min +
+  158 L4-min, D1 62 A100-min, mech eval 19 L4-min, E1 156 L4-min. The other ~39 CU (51%) is setup, runtimes left
+  connected after a run, other Colab use, or a rate change; unresolved. Until it is, plan costs are doubled (the
+  package: ~40 -> ~80 CU), and kill caps are stated in run time (A100-minutes), not CU.
+- Proposed for the build PR: a last notebook cell that releases the runtime after results are copied
+  (`google.colab.runtime.unassign()`), so a finished run stops consuming units.
+- The project total logged as ~116 CU is probably low too; the brief's ~200-CU budget may already be reached. Buying
+  compute raises that budget, which is the user's decision. Asked whether 500 CU for $50 is worth it: recommended 100 CU
+  (~$10; same price per unit, no bulk discount) when W2C needs it, more only when a follow-on gate passes.
+- Staging under the current balance: W2M-G, the M3 pilot and E1b first (~16 CU at the corrected burn), which also
+  decides the kill; W2C stage 1 (~44) and the kill (~10) when more compute is available.

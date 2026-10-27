@@ -134,17 +134,19 @@ reassignment kill gated on W2M-G, E1b (continue sampling on censored items, ~1.5
 
 ## Compute
 - Colab: ~116 CU spent (p1, c4, w0 ~12.5; wave 1 ~46 incl. ~6.5 lost to restarts, R030; WMT14 pair ~11.9, R036;
-  W1d ~3, R039; J2-F ~6.5, R042; W2M ~26, R049; D1 ~5.6, mech eval ~0.5, E1 ~4.3, R052-R054). This month: 103.56 CU
-  before W2M (user), so ~66 left (estimate; the Colab panel is authoritative).
+  W1d ~3, R039; J2-F ~6.5, R042; W2M ~26, R049; D1 ~5.6, mech eval ~0.5, E1 ~4.3, R052-R054), **estimated from run
+  time; actual burn is ~2x (R056)**: the panel shows **27.93 CU** left this month (75.6 used since 103.56, vs 36.9
+  from run time). Until explained, double every CU estimate; state kill caps in A100-minutes. The brief's ~200-CU
+  budget may already be reached: buying compute is the user's decision (recommended: 100 CU when W2C needs it).
 - Plan (`docs/plan_2026-10-27.md`, proposed): W2M ~27 (registered); E1/E2 ~2; D1 ~1.5; W2C 14-28 if W2M's gate
   passes; J1d ~23 only if D1's text gate passes; coupled-sampler pilot <= 5 only if S0 passes; reserve 15. Likely
   path ~71, ~50 unallocated.
 - CPU: ~13.5 CPU-h before session 5; session 5 ~1.2 h (Sudoku paired rerun, test suites).
 
 ## Next 3 actions
-1. **User:** choose the package in `docs/plan_2026-10-27.md` section 10 (recommended ~40 CU: W2M-G, M3 no-clean pilot,
-   W2C stage 1, E1b, the gated direction-1 kill) and report this month's Colab balance.
-2. PR 15 (`scripts/analyze_e1.py`) merged 2026-10-27 (Codex: no findings). A deep audit is due before any (c) claim
-   rests on E1 (only if E1b runs).
-3. After the user's choice: register (W2C, M3 no-clean, W2M-G, E1b, direction 1's CPU gate), then one build PR from a
-   fresh session (Codex review, delta audit); merge only when no Colab run is mid-flight; tell the user what to launch.
+1. **User:** the purchase decision (R056: 100 CU, ~$10, when W2C stage 1 is ready; not 500) and closing runtimes once
+   a notebook finishes. Package approved (R056): W2M-G, M3 no-clean pilot, W2C stage 1, E1b, gated direction-1 kill.
+2. **Fresh session** (`docs/prompts/handoff_2026-10-28.md`): register the package, then build it in one PR (Codex
+   review, delta audit), including a notebook cell that releases the runtime when a run ends.
+3. Launch W2M-G, the M3 pilot and E1b first (~16 CU at the corrected burn; fits the balance); W2C stage 1 (~44) and
+   the kill (~10) after. Never merge code while a run is mid-flight.
