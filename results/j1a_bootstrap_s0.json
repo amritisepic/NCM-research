@@ -1,0 +1,43 @@
+{
+ "method": "analyze_j1.paired_bootstrap's resampling (default_rng(0), integers(0, m, m), 1000 resamples); each resample's corpus BLEU from summed sentence-level sacreBLEU statistics (lowercased, as evaluated)",
+ "sacrebleu": "2.6.0",
+ "n_test": 3003,
+ "J2-F": {
+  "cap": 11,
+  "J2-F_vs_J0": {
+   "diff": -0.47992201267818047,
+   "ci95": [
+    -0.8405088448926883,
+    -0.11928902900139253
+   ],
+   "n_resamples": 1000
+  },
+  "J2-F_vs_J1": {
+   "diff": 0.3215210208396897,
+   "ci95": [
+    -0.050335046533518474,
+    0.6910033048550448
+   ],
+   "n_resamples": 1000
+  }
+ },
+ "J2": {
+  "cap": 9,
+  "J2_vs_J0": {
+   "diff": -6.490264753030306,
+   "ci95": [
+    -7.025322599657071,
+    -5.997336841096919
+   ],
+   "n_resamples": 1000
+  },
+  "J2_vs_J1": {
+   "diff": -5.540156970461467,
+   "ci95": [
+    -6.1040122614214125,
+    -5.0138632052801855
+   ],
+   "n_resamples": 1000
+  }
+ }
+}

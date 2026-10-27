@@ -1,0 +1,46 @@
+{
+ "run": "w2m_L_ts_m1",
+ "gpu": "NVIDIA A100-SXM4-40GB",
+ "finished_utc": "2026-10-27T06:38:58Z",
+ "git_sha": "6799eb1cb5a26a5f9c301cc6b0dbcd37ff982657",
+ "git_shas_all_sessions": [
+  "6799eb1cb5a26a5f9c301cc6b0dbcd37ff982657",
+  "790f261fc41bf3a53a16d297f77d5b94e98a6630"
+ ],
+ "sessions": {
+  "L_ts_m1_policy_s0": [
+   {
+    "event": "start",
+    "git_sha": "790f261fc41bf3a53a16d297f77d5b94e98a6630",
+    "utc": "2026-10-27T04:43:23Z",
+    "gpu": "NVIDIA A100-SXM4-40GB",
+    "cmd": "python scripts/train_gen.py --config configs/scale/L_ts_m1_policy.yaml --run_dir {R}/L_ts_m1_policy_s{S} --seed {S}",
+    "seed": 0,
+    "local_data_copy": true,
+    "micro_batch_64": true,
+    "had_ckpt": false,
+    "last_logged_step": null
+   },
+   {
+    "event": "start",
+    "git_sha": "6799eb1cb5a26a5f9c301cc6b0dbcd37ff982657",
+    "utc": "2026-10-27T06:16:59Z",
+    "gpu": "NVIDIA A100-SXM4-40GB",
+    "cmd": "python scripts/train_gen.py --config configs/scale/L_ts_m1_policy.yaml --run_dir {R}/L_ts_m1_policy_s{S} --seed {S}",
+    "seed": 0,
+    "local_data_copy": true,
+    "micro_batch_64": true,
+    "had_ckpt": true,
+    "last_logged_step": 450
+   },
+   {
+    "event": "end",
+    "git_sha": "6799eb1cb5a26a5f9c301cc6b0dbcd37ff982657",
+    "utc": "2026-10-27T06:38:58Z",
+    "exit": 0,
+    "minutes": 21.97,
+    "last_logged_step": 600
+   }
+  ]
+ }
+}

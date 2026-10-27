@@ -1082,3 +1082,66 @@ on 3584 training windows (512 more for early stopping), scored on the first 1024
   A100 integrity checks still guard released-weight equivalence.
 - Corrections to R045 (verdict unchanged): level 4 gain per code is 0.015 (not 0.016); levels 1 **and 2** gain > 1 nat
   per window (level 2: 1.54).
+
+## R049 — W2M, seed 0 (7 of 8 arms): plausible-wrong replacement alone reproduces the on-policy collapse; truthful row flags halve it; the uniform control itself drifted (2026-10-27; registered W2M + W2Ma)
+Runs `w2m_L_ts_m{0,1,2,3,4,6,7}` (M5 skipped by the user, as W2Ma allowed), seed 0, 600 steps, A100-40GB except M6
+(L4), torch 2.11, at five commits whose `src/ scripts/ configs/ assets/ notebooks/` are identical to the cleared
+`34ac4f0` (docs-only differences). M1 resumed once (step 450); M4 and M6 ran in two sessions. ~26 CU (~243 A100-min +
+158 L4-min, setup not counted). `w2m_mech_eval` not run (W2Ma probe fix, PR 14). Results `results/colab/w2m_L_ts_m*/`;
+bigram statistics `results/w2m_sample_stats.json` (`scripts/w1_sample_stats.py --set w2m`, run with the absent M5
+removed from its arm table at run time).
+
+| arm | Gen-PPL GPT-2 L | D = X - M0 (paired, ± SE) | TS-33M | entropy | MAUVE | bigram gain | dup/1k | clean val NLL |
+|---|---|---|---|---|---|---|---|---|
+| A0 released (W1b) | 16.16 | | | 3.97 | 0.827 | 2.144 | 6.6 | 861.8 |
+| M0 uniform | 21.71 | 0 | 18.73 | 3.989 | 0.865 | 2.054 | 8.3 | 753.8 |
+| M1 current policy | 42.50 | +20.79 ± 0.27 | 51.80 | 4.026 | 0.468 | 1.698 | 18.2 | 751.2 |
+| M2 frozen plausible-wrong | 42.62 | +20.91 ± 0.35 | 51.74 | 4.018 | 0.412 | 1.691 | 21.3 | 757.9 |
+| M3 uniform-wrong | 21.69 | -0.02 ± 0.10 | 18.65 | 3.992 | 0.865 | 2.059 | 8.3 | 753.9 |
+| M4 M2 + truthful flags | 31.58 | +9.87 ± 0.23 | 32.60 | 4.019 | 0.720 | 1.894 | 13.9 | 754.4 |
+| M6 used-parent policy | 42.18 | +20.47 ± 0.37 | 51.44 | 4.021 | 0.454 | 1.692 | 18.8 | 751.2 |
+| M7 uniform at A3's rates | 22.07 | +0.36 ± 0.08 | 19.14 | 3.993 | 0.860 | 2.052 | 8.3 | 741.2 |
+Human val windows: bigram gain 2.213, 2.9 duplicates per 1k. dup/1k and bigram gain from the R031 script.
+
+**Registered readings**
+- **Sanity fails:** M0 is 5.55 above A0 (registered: within 1.0). The registration gives no consequence; reported. The
+  shift is common to the uniform variants (M0 / M3 / M7: 21.7-22.1).
+- **Validity passes:** D(M1) = 20.79 >= 5.0. Damaging >= 10.40, healthy <= 4.16.
+- (b') predictions: M2 damaging, **holds** (20.91); M3 healthy, **holds** (-0.02); M4 rescues (R4 >= 0.8 with flag use
+  <= -1 nat/window): **R4 = 1 - 9.87/20.91 = 0.53, not met** (flag use not yet measured); M5 withdrawn (W2Ma), not run;
+  M6 damaging, **holds** (20.47); M7 healthy, **holds** (0.36). No overturn or weakening condition fires.
+- **Registered reading: mixed** (M4's prediction neither met nor overturned). One seed: no mechanism is established;
+  criterion (c) needs the deciding arms at fresh seeds under a new registration, which goes to the user.
+
+**Exploratory (labelled; not registered analyses)**
+- Tested competitors are not needed for the damage (one seed): a frozen proposer (M2) damages as much as the current
+  policy (M1), proposals under the used parent (M6) as much as under the canonical one, uniform replacement at A3's
+  lower realized rates (M7) not at all, and the policy forward is fp32 here. What the damage needs is plausible-wrong
+  replacement codes; uniform-wrong codes in the same slots do nothing.
+- Damage does not scale with the number of wrong slots: M1's realized disagreement on corrupted rows is far below M2's
+  from L2 on (L5 0.269 vs 0.500, L7 0.080 vs 0.400; equal at L0-L1), yet D(M1) = D(M2).
+- **The collapse is invisible in clean-context NLL here:** the collapsed arms' clean val NLL is within 4 nats of the
+  control's (M1 751.2, M2 757.9, M6 751.2 vs M0 753.8), whereas W1's A3 (no clean rows) was 42 nats above A1. With 25%
+  clean rows the collapsed models still predict real data as well as the control; the damage is confined to generation,
+  which conditions on the model's own samples. Candidate account, not established: plausible-wrong corruption teaches
+  the model to discount contexts that look like its own samples while real-data contexts stay trusted.
+- Character as in W1: bigram gain 2.05 -> 1.69-1.70 nats/token, adjacent duplicates 8.3 -> 18-21 per 1k, unigram JS
+  0.008-0.012 throughout, entropy +0.03; both scorers and MAUVE give the same ordering.
+- **The control drifted:** M0's curve (256 samples) is 19.25 at step 100, 22.55 at 300, 22.69 at 600 while its clean
+  NLL falls 804.6 -> 753.8; W1's A1 (no clean rows) stayed at 16.0-17.1 from step 270 to 1800 (NLL 844-855). Prime
+  suspect: the 25% clean rows, the one W2M protocol change that touches the uniform arms besides schedule length.
+  Untested.
+- M4 tracks M2 at step 100 (37.50 vs 37.63; zero-initialised flag), reaches 31.7 by step 300, then stays (32.5 at
+  600); flag-vector norm 0.15. M6 ran on an L4; its D equals M1's, so the hardware difference changes no reading.
+
+## R050 — CPU: J1a bootstrap computed; WMT14 BLEU split into precision and length (2026-10-27; registered J1a, exploratory)
+- **J1a paired bootstrap** (deferred in R036 / R042 for lack of references): `scripts/analyze_j1.py`'s direct loop ran
+  out of memory on the laptop (MemoryError in sacreBLEU's reference caching, both candidates; nothing written). Redone
+  with the identical resampling (`default_rng(0)`, `integers(0, m, m)`, 1000 resamples) from summed sentence-level
+  sacreBLEU statistics, equal to the direct computation on the first three resamples of every comparison:
+  `results/j1a_bootstrap_s0.json`. J2-F - J0 at cap 11: -0.48 [-0.84, -0.12]; J2-F - J1: +0.32 [-0.05, +0.69]; J2 -
+  J0 at cap 9: -6.49 [-7.03, -6.00]; J2 - J1: -5.54 [-6.10, -5.01]. Neither candidate exceeds both comparators, as J1a
+  requires; consistent with both kills.
+- **BLEU decomposition** (exploratory; the round-2 review predicted >= 50% in precision): J1's deficit vs J0 is
+  n-gram precision, not length: with the brevity penalty set to 1, 92% (val) / 105% (test) of it remains (BP 0.952 vs
+  0.956 on val). J2-F's smaller deficit is about half brevity (45% / 58% remains). `results/j1_bleu_decomposition.json`.

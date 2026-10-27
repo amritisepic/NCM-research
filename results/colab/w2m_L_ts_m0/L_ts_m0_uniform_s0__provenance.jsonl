@@ -1,0 +1,2 @@
+{"event": "start", "git_sha": "5b50a76eeecd70b4b342a30c896fdf93288e3bb2", "utc": "2026-10-27T04:39:26Z", "gpu": "NVIDIA A100-SXM4-40GB", "cmd": "python scripts/train_gen.py --config configs/scale/L_ts_m0_uniform.yaml --run_dir {R}/L_ts_m0_uniform_s{S} --seed {S}", "seed": 0, "local_data_copy": true, "micro_batch_64": true, "had_ckpt": false, "last_logged_step": null}
+{"event": "end", "git_sha": "5b50a76eeecd70b4b342a30c896fdf93288e3bb2", "utc": "2026-10-27T05:09:25Z", "exit": 0, "minutes": 29.98, "last_logged_step": 600}

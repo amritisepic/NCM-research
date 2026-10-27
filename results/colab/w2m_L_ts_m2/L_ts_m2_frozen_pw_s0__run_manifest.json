@@ -1,0 +1,16 @@
+{
+ "base_sha256": {
+  "config.yaml": "4009baccad5a159bfc12cd48f3da17c22c4a281b86f71f2fc70b7c1bbb62004b",
+  "tokenizer.pt": "76e26003719db32dc3d542518951c286be07d6a5881f29ad5152d299764b0f81",
+  "generator.pt": "0acaf4f795390f9f7ccc8f84047867619a1d00e291681e299b855d7e563be6ff",
+  "bpe_vocab_8192.pickle": "fb176b4c68108e4b5ef61b9ff2af3731600124e3e160970a6bd78cd0a5d3ff6c",
+  "bpe_merges_8192.pickle": "0d4cab13f2e7b684b75eaa290a52e596ba87744ef13d943cf3a50a5a8e080ec1"
+ },
+ "data_sha256": {
+  "train_bpe_8192.bin": "b1dccdf7562f20a8a02f5563cb92c62b7cfb7c2eab5379973e897b661f1df7db",
+  "train_bpe_8192_offsets.npy": "c45c0471bc3fd62c204819ffadd84f9c904c2ea4e42f8f2daa902aacf609f958",
+  "valid_bpe_8192.pickle": "f4723c2b0e4c36ac792e609dc50ddf7879ba4e33b7d794bc4ad44b952fde5c8d"
+ },
+ "torch": "2.11.0+cu130",
+ "cuda": "13.0"
+}
