@@ -1018,3 +1018,47 @@ numbers: `scripts/analyze_j1.py --candidate J2-F` -> `results/j2f_analysis_s0.js
   claim rests on the released TinyStories, WMT14 and Sudoku models; the checkpoint differences (A2 - A1, A4 - A1,
   J1 - J0) are seed-0 supporting evidence and enter a (c) claim only with seeds (none funded). Passed to the build
   session.
+
+## R045 — S0: neighbouring codes of one level carry little dependence the factorized head misses; coupled sampler dropped (2026-10-27; registered S0, laptop)
+`scripts/s0_neighbour_probe.py` -> `results/s0_neighbour_gain.json`, as registered (S0, pushed before the probe was built):
+released TinyStories generator frozen, fp32 TF32 off, laptop RTX 4050 (no Colab), 280 s. Per level k = 1..6 a
+zero-initialised rank-64 term on the frozen hidden states adds the canonical left neighbour's code to the head; trained
+on 3584 training windows (512 more for early stopping), scored on the first 1024 even-index val windows.
+
+| level | canonical NLL (nats/window) | gain | % of level | gain per code | epochs (best) |
+|---|---|---|---|---|---|
+| 1 | 55.90 ± 0.21 | 3.24 ± 0.11 | 5.8% | 0.41 | 9 (6) |
+| 2 | 80.69 ± 0.42 | 1.54 ± 0.06 | 1.9% | 0.10 | 5 (2) |
+| 3 | 84.82 ± 0.63 | 0.77 ± 0.05 | 0.9% | 0.03 | 5 (2) |
+| 4 | 77.97 ± 0.77 | 0.49 ± 0.03 | 0.6% | 0.016 | 4 (1) |
+| 5 | 66.12 ± 0.83 | 0.17 ± 0.01 | 0.3% | 0.004 | 4 (1) |
+| 6 (not gated) | 64.08 ± 0.68 | 0.26 ± 0.02 | 0.4% | 0.005 | 4 (1) |
+| sum 1-5 | 365.5 ± 2.3 | 6.22 ± 0.15 | 1.7% | | |
+
+- **Gate part (1) fails** (needs >= 10 nats/window and >= 5%): per S0, direction 1 (Astra's marginal-preserving coupled
+  sampler) is dropped without waiting for E2. The gain is real at every level (SEs paired over windows) and falls
+  steeply with level: only level 1 (8 codes) gains > 1 nat per window. It is a lower bound (one left neighbour, rank 64,
+  3584 windows); a richer coupling could find more, but nothing here suggests within-level dependence is where NCM's
+  coarse-level losses are.
+- Checks: the head reproduces the model's level logits exactly from the cached hidden states; the zero-initialised term
+  returns the released logits; 7 CPU tests, each requirement mutation-checked (`tests/test_s0_probe.py`).
+- Consequence: E2 (the adjacent-pair interaction, the gate's second half) no longer decides anything; it is not built
+  in this round (exploratory only, ~1 CU saved). Built in the same session, not yet merged: the W2Ma probe fix and
+  `scripts/w2m_flag_power.py`, which reproduces R043's numbers (one correction: L0 is replaced in 75.65% of corrupted
+  rows, R043 wrote 75.6%).
+
+## R046 — E1 cost prototype; D1 / J1d / E1 registered; eval PR built (2026-10-27; process, laptop)
+- **E1 prototype** (released TinyStories, laptop RTX 4050, fp32): per-window (hits, samples) at cuts 5..11 for the first
+  three val windows: (0/2048, 0/2048, 0/2048, 20/256, 20/32, 29/32, 27/32); (0/2048, 2/2048, 8/2048, 24/224, 25/96, 31/32,
+  31/32); (0/2048, 0/2048, 1/2048, 30/32, 31/32, 32/32, 32/32). At cut 8 rho is ~0.08-0.94 (T_8 ~0.06-2.5 nats); cuts
+  5-7 rarely hit and took ~95% of the ~190 s per window. Not a result (three windows, no N_k recorded: the run was
+  stopped when the laptop GPU dropped off the bus on the fourth window; it needs a reboot). Consequence, written into
+  E1's registration before any run: cuts 8..K-1 on every item, cuts 5-7 descriptive on 8 items; 64 TinyStories windows,
+  128 WMT14 pairs, 128 Sudoku puzzles (~2-3 CU).
+- Registered (`docs/preregistration.md`): **D1** (batch-1 wall-clock gate; both the upstream decoders, which re-run the
+  prefix in every call, and prefix-cached ones are timed, the gate takes the faster of each side), **J1d** (contingent
+  seeds), **E1** (predictions of plan section 4, with R044's replication unit).
+- Built on `claude/wip-e1-d1` (one PR): `src/ncmr/cached_decode.py`, `scripts/bench_batch1.py`, `scripts/e1_equivalence.py`,
+  the W2Ma row-level probe in `scripts/mech_eval_w2m.py`, `scripts/w2m_flag_power.py`, `scripts/s0_neighbour_probe.py`;
+  notebooks `d1_batch1_wallclock`, `e1_equivalence`, `w2m_mech_eval` (regenerated; the W2M arm notebooks are unchanged).
+  Full CPU suite: 381 passed. Codex review and deep audit 9 pending; nothing launched.

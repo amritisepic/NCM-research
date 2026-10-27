@@ -469,3 +469,97 @@ Why: `docs/reviews/codex_audit4.md` (A4-1 to A4-5); triage `docs/reviews/triage_
 - **Reading:** the gain is a lower bound on the within-level dependence the factorized head misses (one left
   neighbour, a rank-64 term, 3584 training windows).
 - **Cost:** laptop, ~1-2 h; no Colab.
+
+## D1 — batch-1 wall-clock gate for criterion (d) (registered 2026-10-27, before any D1 timing run)
+- **Why:** J1a requires batch-1 wall-clock and an attention-inclusive cost for any (d) claim; the user kept that rule
+  (R044). R042's val-only lead (J2-F + "stable x1": 7.80 passes, 29.1% below 11, BLEU -0.54 vs J0) is only a latency
+  claim: each Jacobi pass processes every level. Plan `docs/plan_2026-10-27.md` section 4 (D).
+- **Setup:** `scripts/bench_batch1.py`, notebook `d1_batch1_wallclock`; A100-40GB (the gate), L4 optional; eager PyTorch,
+  no compilation or CUDA graphs (dispatch overhead is measured, identically for every decoder). Items: the first 256
+  newstest2014 test sentences (sources tokenised and padded to 96 as the evaluation does) and the first 256 released
+  Sudoku-hard puzzles. Batch 1; each item's latency runs from its token prefix on the GPU to its output text (WMT14,
+  detokenised) or board (Sudoku), CUDA-synchronised before and after. Warm-up: every configuration on the first 16
+  items, untimed. Then per item every configuration 3 times in a seeded random interleaved order; item latency = median
+  of its 3; reported: mean (the gate), SE, median, p10, p90 over the 256 items. fp32 with TF32 off (primary: the
+  precision of every quality number); bf16 autocast (secondary, never gated). No quality metric is computed on test.
+- **Decoders:** sequential greedy (WMT14: level 0 from the source prefix, then levels 1-10, 11 calls; Sudoku: level-0
+  queries, then levels 1-11, 12 calls); Jacobi exact (passes until no code changes, at most K + 1; WMT14 detects a
+  fixed point from pass 1, J1c); Jacobi + stable x1 (exact, or stop at the first pass t >= 2 whose detokenised text
+  equals pass t-1's; output that text; the per-pass tokenizer decode and detokenisation are timed); Sudoku Jacobi +
+  verifier (exact, or the first pass whose decoded board satisfies the rules and the clues; R020). Each in two
+  implementations: `eager`, the upstream code, which re-runs the source / puzzle prefix in every forward call (upstream
+  `generate` re-encodes the 96-token source in each of its 11 calls: 1368 generator rows vs 408 for one Jacobi pass);
+  and `cached` (`src/ncmr/cached_decode.py`), which runs the prefix once per item with its pad mask and every later
+  call on the target rows only. The sequential side of every comparison is the faster implementation of J0's
+  sequential decoder; the Jacobi side the faster implementation of its configuration.
+- **Configurations:** WMT14: J0 sequential, J0 Jacobi exact, J0 + stable x1, J2-F + stable x1 (J2-F's seed-0
+  `final.pt`). Sudoku: sequential, Jacobi exact, Jacobi + verifier.
+- **Integrity (fp32; the gate is not read if any fails; at most 2 of 256 items may differ, for float-order near-ties
+  between batch-128 and batch-1 decoding):** J0 Jacobi exact reproduces the first 256 saved test hypotheses and pass
+  counts (`results/colab/w2c_L_wmt_ctrl/L_wmt_released__hyp_test.json`) and the sequential output; both
+  implementations of every configuration give the same outputs and passes; J0 + stable x1 and J2-F + stable x1 equal
+  the rule applied to their saved capped test hypotheses; the rule applied to the four arms' saved val outputs
+  reproduces `results/j2f_stop_rule_val_s0.json` (passes exactly, BLEU exactly when the newstest2013 text is present);
+  Sudoku: cached = eager sequential, Jacobi exact = sequential; repeats of an item give identical outputs.
+- **Cost reported per configuration:** mean passes and pass histogram; generator rows per item; executed FLOPs per item
+  (FlopCounterMode with math attention: matmuls, attention over every key of the dense masks, convolutions, heads,
+  tokenizer decodes), and the generator blocks alone in `src/ncmr/flops.py`'s convention (24 d^2 + 4 d x keys per row
+  and layer), both from per-call counts and the measured passes.
+- **Gate (fp32, A100):** the text half of (d) stays alive only if mean latency(J2-F + stable x1) <= 0.75 x mean
+  latency(J0 sequential), both at their faster implementation; the rule's val BLEU condition is already met (R042:
+  -0.54). The paired bootstrap 95% interval of the ratio (1000 resamples of items) is reported, not gated. The Sudoku
+  half is alive only if Jacobi + verifier <= 0.75 x sequential. Also reported: J0 + stable x1 and J0 Jacobi exact
+  against J0 sequential (training-free).
+- **Consequences:** text gate passes -> J1d (below) runs, then the user is asked before any claim (brief, criterion d).
+  Fails -> (d) is reported as unreachable on text for this model family under the wall-clock rule, with the cost model
+  and the Sudoku timing; no more Jacobi training.
+- **Cost:** ~1.5 CU.
+
+## J1d — seeds for J2-F + stable x1, contingent on D1's text gate (registered 2026-10-27, before D1 and before any seed)
+- **Runs only if D1's text gate passes.** Arms: J2-F and J1 at seeds 1 and 2, exactly as registered (J1, J1a, J1b, J1c,
+  J2-F; `configs/scale/L_wmt_consist_frozen.yaml`, `L_wmt_ctrl.yaml`), ~23 CU. Seed 0 is the existing run.
+- **Rule, fixed now:** stable x1 as in D1 (cap K + 1 = 12), applied to each run's saved capped test hypotheses. Test
+  (newstest2014) is scored once per seed, after all seeds have run.
+- **Comparators per seed:** J0 + stable x1 and the same seed's J1 + stable x1; J0 and that J1 capped at ceil(J2-F +
+  rule's mean passes), with J1a's paired bootstrap (1000 resamples) and the 0.02 length-ratio rule.
+- **Claim (text half of d):** over seeds 0-2, the seed mean of J2-F + stable x1's passes <= 8.25 and its BLEU within 1
+  of J0 exact; at every seed its BLEU exceeds both capped comparators by more than the 95% paired bootstrap interval;
+  and each seed's checkpoint passes D1's latency gate (<= 0.75 x J0 sequential, fp32, A100) under D1's protocol on the
+  same 256 sentences. A result believed to meet (d) goes to the user before more compute (brief).
+
+## E1 — how much of NCM's code NLL is representation choice (registered 2026-10-27, before any E1 run; criterion (c) candidate C1)
+- **Why:** plan section 4 (C1). Clean code NLL and sample quality have come apart in two domains (TinyStories A1 / A2 /
+  A4, R030-R031; WMT14 J1 / J2-F, R042). If most fine-level code NLL is spent choosing among codes that decode to the
+  same text, code NLL is the wrong selection metric and the dissociation is explained.
+- **Quantities** (item x, canonical codes c*, reconstruction x^ = D(c*), cut k): N_k = -log Q(c*_{>=k} | c*_{<k})
+  (teacher-forced); A_k = -log Q(c*_{<k}) (TinyStories level 0: the released unigram); rho_k = P(D(c*_{<k}, C_{>=k}) =
+  x^), C_{>=k} ancestral samples from the model at T = 1 (level k given c*_{<k}, each finer level given the coarser
+  sampled ones), estimated by Monte Carlo (rounds of 64, at most 2048 samples, stop once 20 hits are reached; Gumbel
+  noise seeded per item and cut, the same for every model); T_k = -log rho_k; R_k = N_k - T_k (a lower bound on the nats
+  spent choosing among codes with the same text); U_k = A_k + T_k (an upper bound on the text NLL). A hit is exact
+  equality: TinyStories all 128 tokens; WMT14 the tokens up to the first EOS, pads dropped (the text the evaluation
+  reads); Sudoku the board. fp32, TF32 off. `scripts/e1_equivalence.py`, notebook `e1_equivalence`.
+- **Items and models:** TinyStories, the first 64 even-index val windows: A0 (released), A1, A2, A4 (wave-1 seed-0
+  `final.pt`). WMT14, the first 128 newstest2013 (val) pairs as `prep_wmt14.py` stores them (targets <= 63 tokens), target
+  given source: J0 (released), J1, J2-F (seed 0).
+  Sudoku-hard, the first 128 released hard puzzles: the released model.
+- **Cuts:** k = 8..K-1 on every item (registered). k = 5..7 on the first 8 items only, descriptive: a laptop
+  prototype on 3 released TinyStories windows (R046) found 0-8 hits in 2048 samples at k = 5-7 (~95% of the
+  cost) and 20-30 hits within 32-256 samples at k = 8.
+- **Summaries per model and cut:** hit share; means ± SE over items of N_k, A_k and, when every item has a hit, T_k,
+  R_k, U_k and R share = mean R / mean N. With zero-hit items: bounds R_lo (their R = 0) and R_hi (their T = log(n/3),
+  the rule-of-three bound), and the median T if more than half hit. Paired over items, model minus base (A1; J0): dN_k
+  and, when both have hits on every item, dT_k and |dT| / |dN|. The stopping rule biases each T_k by about 1/20 nat
+  (inverse sampling), negligible against N_k.
+- **Predictions:**
+  1. Released TinyStories: R_8 >= 0.8 N_8 (read on R_lo if any item lacks a hit). Overturned if R_8 < 0.5 N_8 (read on
+     R_hi). Criterion (c) replication (R044: domains and checkpoints): the same inequality in the released WMT14 and
+     Sudoku-hard models; a model whose mean N_8 < 5 nats per item is reported, not read.
+  2. A2 - A1, A4 - A1 (TinyStories) and J1 - J0 (WMT14): |dT_8| <= 0.2 |dN_8| (the NLL differences are representation
+     choice). Seed-0 checkpoints: supporting evidence, not part of a (c) claim without seeds (R044). Overturned if dT_8
+     carries >= 50% of dN_8 in two of the three comparisons.
+  3. In each domain the models' rank order by mean U_8 (lower = better) equals their order by the registered quality
+     metric while the order by mean N_8 does not. TinyStories: Gen-PPL (GPT-2 large, W1b protocol, seed 0) A0 16.16,
+     A2 16.29, A1 16.60, A4 36.8; WMT14: val BLEU J0 23.55, J2-F 22.90, J1 22.82. T_8's order is reported beside it.
+- **Integrity:** the sampler's level calls equal the teacher-forced logits (tests); each item reports whether x^ = x.
+- **Cost:** ~2-3 CU (one notebook, A100 or L4). E2 is not run (R045: S0 failed, so E2 decides nothing).
