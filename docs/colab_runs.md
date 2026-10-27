@@ -37,16 +37,16 @@ Final eval per W1 arm: 16 x 256 samples in fp32 (~5-10 min on an A100).
 | `w2b_L_sdk_repair` | Sudoku: board-feedback repair passes (B6/C5) | A100 / L4 | ~2.5 | **hold** (after WMT14; R031) |
 | `w2c_L_wmt_ctrl` | WMT14 control (+ released reference J0), J1 + J1c | A100 / L4 | ~4.6 | done (R036: J1 loses 0.8 BLEU, recipe OK); seeds 1-2 only if J2-F advances |
 | `w2c_L_wmt_consist` | WMT14 self-consistency fine-tune (criterion d, text); fp32 teacher (J1b), padded degenerate rows (J1c) | A100 / L4 | ~6.4 | done (R036: misses the screen; 16% of test sentences collapse onto two fixed strings); no further seeds |
-| `w2c_L_wmt_consist_frozen` | J2-F: J2 with a frozen released-model teacher (contingent arm, triggered by J2's miss) | **A100** (as the pair; its launch check compares against J0's A100 decoding) | ~6.5 | **ready** (PR 10 merged; deep audits 6 and 7 triaged, R038). Needs `L_wmt_released/hyp_val.json` on Drive (from `w2c_L_wmt_ctrl`; present) |
-| `w2m_L_ts_m0` ... `w2m_L_ts_m7`, `w2m_mech_eval` | W2M: eight 600-step tier-L mechanism arms for the on-policy collapse + eval-only mechanism measures | A100 / L4 | ~27 total (< 4 each) | **ready** (PR 12 + PR 13 merged; deep audit 8 triaged, R041). Run the eight arms in any order, then `w2m_mech_eval` |
+| `w2c_L_wmt_consist_frozen` | J2-F: J2 with a frozen released-model teacher (contingent arm, triggered by J2's miss) | **A100** | ~6.5 | done (R042: no collapse, 5.6% pass saving; misses the screen; no seeds) |
+| `w2m_L_ts_m0` ... `w2m_L_ts_m7`, `w2m_mech_eval` | W2M: eight 600-step tier-L mechanism arms for the on-policy collapse + eval-only mechanism measures | A100 / L4 | ~27 total (< 4 each) | arms **ready** (R041); M5 is a near-replicate of M4 at these rates (R043, W2Ma): skip it if not yet run (user's choice). **Hold `w2m_mech_eval`** for the probe fix (W2Ma), or run it and report probe (b) as uninformative |
 | `p1b_tc_rerun` | P1b: within-level-AR TC probe | — | — | **withdrawn** (R023: false premise; notebook removed; P1c to come) |
 | `w2_Mc_ncm` | tier M design C (M1): NCM from scratch, d512 x 6, 6k steps, seed 0 | A100 / L4 | ~7.7 | **hold** (criterion b needs a candidate; wave 1 produced none) |
 | `w2_Mc_ar` | tier M design C (M1): AR, same body, FLOP-matched, seed 0 | A100 / L4 | ~4.3 | **hold** (as above) |
 | `w2_Mc_ar15` | M1 conditional: AR at 1.5x steps, seed 0 | A100 / L4 | ~6.4 | only when asked (before a criterion-(b) claim) |
 | `calib_t4` | old calibration (superseded by w0) | T4 | 0.6 | skip |
 
-Budget: ~200 CU (raised 2026-10-23). Spent: ~73 CU (p1, c4, w0 ~12.5; wave 1 ~46 incl. restarts, R030; WMT14 pair ~11.9, R036; W1d ~3, R039).
-Next: J2-F ~6.5 (cleared), then W2M ~27 once built and audited. Held: Sudoku 3 arms ~7.5, A1 seeds 1-2 ~13, M1 pair ~12. Reasons and
+Budget: ~200 CU (raised 2026-10-23). Spent: ~79.5 CU (p1, c4, w0 ~12.5; wave 1 ~46 incl. restarts, R030; WMT14 pair ~11.9, R036; W1d ~3, R039; J2-F ~6.5, R042).
+Next: W2M ~27 (cleared). Proposed in `docs/plan_2026-10-27.md` (awaiting the user): E1/E2 ~2, D1 ~1.5, then W2C / J1d by gate; cut M1, Sudoku arms, A1 seeds 1-2. Reasons and
 ranking: `log.md` R031 and `STATE.md`. Every notebook now records the git SHA and each session's resume point
 (`_meta.json`, `<run>__provenance.jsonl`) and refuses to resume a run directory under changed code (PR 3). Progress check: the notebook prints `{"step": ..., "steps_per_s": ...,
 "tflops_eff": ...}`; remaining steps / steps_per_s = time left.

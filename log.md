@@ -920,3 +920,79 @@ generator and share the dropout stream; the logged per-level corrupted fractions
   **`w2m_L_ts_m0` ... `m7` and `w2m_mech_eval` are cleared** (A100 or L4).
 - **R039 corrections** (audit 8 recomputation): oracle j = 5, A0 = 9.51 (not 9.52); oracle j = 3, A2 - A1 =
   +0.42 ± 0.16 (not ± 0.17), also in R039's exploratory point (1). No reading changes.
+
+## R042 — WMT14 J2-F, seed 0: a frozen teacher removes J2's collapse, but saves only 5.6% of passes; misses the screen (2026-10-27; registered J1 + J1a + J1b + J1c + J2-F)
+Run `w2c_L_wmt_consist_frozen` (J2-F, 2000 steps), A100-40GB, torch 2.11, at `f1bc96c`, one session, no resume, 72.1
+A100-minutes, ~6.5 CU. Code path: between PR 10's audited head (`f50a27d`) and `f1bc96c` the trainer and its imports
+changed only by the added, unused `fp32_eval` helper in `src/ncmr/train.py`. The launch-time teacher check (J0's first
+128 saved exact hypotheses and pass counts) passed; the run stops otherwise. Results
+`results/colab/w2c_L_wmt_consist_frozen/` (the notebook's copies of repository result files left out). Registered
+numbers: `scripts/analyze_j1.py --candidate J2-F` -> `results/j2f_analysis_s0.json`.
+
+| | val passes | val BLEU | test passes | test BLEU | test length ratio | val NLL |
+|---|---|---|---|---|---|---|
+| J0 released | 10.916 | 23.55 | 11.069 | 22.61 | 0.930 | 301.4 |
+| J1 control | 11.527 | 22.82 | 11.622 | 21.81 | 0.930 | 257.9 |
+| J2 consist (moving teacher) | 9.357 | 18.53 | 8.890 | 16.02 | 0.750 | 284.1 |
+| J2-F consist (frozen teacher) | 10.285 | 22.90 | 10.386 | 22.13 | 0.922 | 283.4 |
+
+**Registered readings**
+- Sanity: 32,000 trajectory sources, 0 degenerate (J1b's 1% rule satisfied); executed FLOP proxy equal to J1's and J2's
+  (8.38e16). Exact differs from sequential for 1 test sentence (2143); "exact" excludes it.
+- **Screen (val): J2-F fails** (passes 10.285 > 9.0; BLEU 22.90 >= 22.55 holds). No seeds 1-2 for J2-F or J1.
+- **H12 (test): kill condition met**: 5.6% NFE saving (needs >= 25%) at a 0.48 BLEU loss; passes 1.24 below J1's.
+- J1a at cap ceil(10.386) = 11: J2-F 0.48 below J0, 0.32 above J1; length ratio within 0.009 of J0's (limit 0.02).
+  Bootstrap not computed (references not in the repository); moot given the kill.
+- **J2-F's prediction holds:** shared-output share 0.30% on test (<= 1%; one string, "Staff was very helpful and
+  helpful.", 9 sentences, 8.8 passes), 0.0% on val (J2: 16.2% / 8.7%). One seed each: J2's collapse onto
+  input-independent outputs needed the moving teacher. Secondary prediction holds (J2-F saves fewer passes than J2);
+  test passes >= 10.0, so the frozen-teacher route is reported as not reducing passes (registered wording).
+- Criterion (d), text half: no registered candidate is left. The consistency line stops here.
+
+**Exploratory (labelled; not registered analyses)**
+- **Training moved quality to early passes, not convergence to fewer.** Test BLEU at cap c, J2-F / J0 / J1: c = 6
+  20.70 / 17.63 / 14.73; c = 7 21.57 / 19.70 / 17.65; c = 8 22.02 / 21.50 / 20.22; c = 9 22.10 / 22.51 / 21.56;
+  c = 1 10.16 / 0.31 / 0.12. Val at c = 8: 22.75 / 22.45 / 21.33. J2-F leads J0 at every cap <= 8 and trails it from 9.
+- **Output-stability stop, val only (nothing computed on test):** stop at the first pass whose decoded text equals the
+  previous pass's. J2-F 7.80 mean passes (29.1% below 11), output identical to its exact output for 80.0% of
+  sentences; J0 9.02 (18.0%), 88.3%; J1 9.76 (11.3%), 92.2%. BLEU not computed (needs the references). Costs: each
+  rule pass needs a tokenizer decode, and each Jacobi pass processes every level (w0: 0.30 of a whole eager sequential
+  decode by position count), so 7.8 passes are ~2.3x the sequential decode's positions. Any saving would be batch-1
+  latency, not compute.
+- **Fine-tuning tax:** J1 (teacher forcing only) loses 0.73 val / 0.80 test BLEU while its val NLL falls 43.5 nats per
+  sentence (301.4 -> 257.9); J2-F loses 0.65 / 0.48 at 283.4. With TinyStories A1 (clean NLL -17.8 nats, Gen-PPL
+  +0.44, R030) this is a second domain where continued training on NCM's own objective lowers code NLL and degrades
+  generation (one seed each).
+- Course of training (500-sentence curve subset): exact passes 10.12 at step 500 and 10.07 at 2000 (J2 9.81 -> 9.64;
+  J1 11.34-11.52): the effect is there by step 500 and does not grow. Teacher trajectories stay at 10.8-10.9 passes.
+- Test: adjacent duplicated words per 1k, J0 17.1, J1 21.0, J2-F 24.4, J2 25.6; words per sentence vs J0 0.993 (J2
+  0.911); outputs identical to J0's 6.2% (J1 6.5%). Wall-clock 4286 s (J2 4202, J1 3071; incl. evaluations).
+
+**Decisions**
+- J2-F is dead for criterion (d) as registered; per its registration, no seeds. The stability-stop observation is a
+  lead on val only: any use needs a new registration, the references and a batch-1 wall-clock gate first
+  (`docs/plan_2026-10-27.md`).
+
+## R043 — W2M pre-reading check: the flags saturate (M5 is a near-replicate of M4) and probe (b) is confounded by level identity; amendment W2Ma; Astra review triaged; plan (2026-10-27; process, CPU)
+- Ran the repository's `mask_flags` and `shuffle_within_level` (`src/ncmr/w2m.py`) on 4096 simulated rows at W1's rates
+  (25% clean rows) with a stand-in VQ that follows the footprint code path (linear up-sampling, level 0 covering the
+  whole window, kernel-3 residual-conv halo). This simulates the mask geometry, not the tokenizer's weights; the
+  script will be added with the mech-eval fix.
+- **Flags:** in corrupted rows L0 is replaced in 75.6%; the flag is 1 at 75.6% of level-1 slots (constant within a
+  row), >= 96.9% from level 2 and 100% from level 5: 99.6% of all flag slots. Truthful and within-level shuffled flags
+  differ by 0.0014 per slot. M4 and M5 therefore give the model the same row-level indicator (row corrupted; L0
+  replaced); their contrast cannot test positional detection at these rates.
+- **Probe (b):** its contexts (W1's rates, no clean rows) are 99.68% "contaminated"; the 2.0 negatives per 640-position
+  window sit 91% at level 1. A score that only knows "this is a level-1 position" reaches AUC 0.952 (0.957 on
+  L0-clean windows), above the registered 0.90 line for "contradicts undetectable". The pooled AUC is uninterpretable.
+- Corroborates the Astra review's saturation warning (`docs/research_review_2026-10-26.md`) and adds the probe
+  confound. Neither touches W2M's training or its Gen-PPL readings. Amendment **W2Ma** appended to
+  `docs/preregistration.md` (readings only), before any W2M result is in the repository.
+- Astra review triaged and the remaining budget re-planned: `docs/plan_2026-10-27.md`; round-2 prompt
+  `docs/prompts/gpt6_astra_round2_2026-10-27.md`. Checked from the review: its decomposition identity (chain rule),
+  the 2.66e-4 chain-clean probability, the 12.15 vs 11.70 gap midpoints and 1059.1 nats / 85.9%: all correct.
+- **Decisions (user, 2026-10-27):** the plan's allocation table is approved; fetch the public newstest2013/2014
+  references and the released TinyStories checkpoints for CPU work; Colab balance this month: 103.56 CU. "Ignore the
+  cost rule" was given with that balance as the reason, so it is read as releasing budget caution, not as changing
+  criterion (d)'s registered cost accounting (J1a: batch-1 wall-clock and an attention-inclusive cost), which stands
+  until the user says otherwise. Open: (c)'s replication unit; whether to skip M5.

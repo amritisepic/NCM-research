@@ -1,0 +1,33 @@
+{
+ "run": "w2c_L_wmt_consist_frozen",
+ "gpu": "NVIDIA A100-SXM4-40GB",
+ "finished_utc": "2026-10-27T03:25:01Z",
+ "git_sha": "f1bc96cefa73453f574b75b01d8d1aa7c436c34b",
+ "git_shas_all_sessions": [
+  "f1bc96cefa73453f574b75b01d8d1aa7c436c34b"
+ ],
+ "sessions": {
+  "L_wmt_consist_frozen_s0": [
+   {
+    "event": "start",
+    "git_sha": "f1bc96cefa73453f574b75b01d8d1aa7c436c34b",
+    "utc": "2026-10-27T02:12:57Z",
+    "gpu": "NVIDIA A100-SXM4-40GB",
+    "cmd": "python scripts/train_wmt14_L.py --config configs/scale/L_wmt_consist_frozen.yaml --run_dir {R}/L_wmt_consist_frozen_s{S} --seed {S} --data {R}/../data/wmt14_train_pairs.npz --teacher_check {R}/L_wmt_released/hyp_val.json",
+    "seed": 0,
+    "local_data_copy": false,
+    "micro_batch_64": false,
+    "had_ckpt": false,
+    "last_logged_step": null
+   },
+   {
+    "event": "end",
+    "git_sha": "f1bc96cefa73453f574b75b01d8d1aa7c436c34b",
+    "utc": "2026-10-27T03:25:01Z",
+    "exit": 0,
+    "minutes": 72.07,
+    "last_logged_step": 2000
+   }
+  ]
+ }
+}

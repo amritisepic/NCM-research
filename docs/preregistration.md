@@ -418,3 +418,25 @@ Why: `docs/reviews/codex_audit4.md` (A4-1 to A4-5); triage `docs/reviews/triage_
   flag vector gives the released model's logits, shuffled flags preserve per-level counts, M6 conditions on the used
   L0, M7's rates, resume equals an uninterrupted run), Codex review and a deep audit before launch.
 - **Cost:** ~27 CU (M0 / M3 / M7 ~2.9 each, M1 / M2 / M4 / M5 / M6 ~3.7 each, mechanism eval ~1); each run < 15 CU.
+
+## W2Ma — amendment to W2M's readings after a pre-reading check of the flags and the probe (registered 2026-10-27, before any W2M result was in the repository)
+- **Why:** R043. At W1's rates the truthful flags saturate: on corrupted rows 99.6% of flag slots are 1 (level 1 is
+  constant within a row; >= 96.9% from level 2 on), and within-level shuffling changes 0.0014 per slot. Probe (b)'s
+  labels are 99.7% positive, its negatives sit 91% at level 1, and a score that only knows the level reaches AUC 0.95.
+- **M4 / M5:** at these rates M5 is not a positional control but a near-replicate of M4: both carry a row-level
+  corruption indicator (and, at level 1, whether L0 was replaced). The (b') prediction "M5 damaging (R5 < 0.5)" is
+  withdrawn. M4 rescuing M2 (R4 >= 0.8 with flag use (c) <= -1 nat per window) is read as "row-level provenance
+  prevents the damage": evidence for hidden provenance at the row level, not for positional detection. R5 >= 0.8 is
+  then expected and does not weaken (b'). |D(M4) - D(M5)| is reported as a lower bound on run-to-run variation (same
+  seed, data and masks). If M5 has not run, the user may skip it.
+- **Probe (b):** the pooled AUC and its L0-clean-windows variant are not read. Replacement, if the user approves the
+  code change: a row-level detectability probe per level k = 1..6 (50% clean windows mixed in; label = window
+  corrupted; logistic probe on level-k hidden states; held-out AUC), for plausible-wrong contexts with uniform-wrong
+  contexts as the positive control. If the uniform-wrong AUC is < 0.75 at every level, the probe is reported as too
+  weak to read. Positional detectability is not measurable at W1's rates (beyond level 2, corrupted windows have
+  almost no clean positions). The fix to `scripts/mech_eval_w2m.py` goes through a PR, Codex review and a delta deep
+  audit before `w2m_mech_eval` runs; if the eval runs first, (b) is reported as uninformative.
+- **Validity gate:** if D(M1) < 5.0, the registered descriptive-only reading stands and no mechanism arm is
+  replicated. A follow-up that separates W2M's three protocol changes (fp32 policy, 25% clean rows, 600 steps) is not
+  pre-approved; it goes to the user with its cost.
+- Unchanged: every arm, metric, threshold and reading not named here.

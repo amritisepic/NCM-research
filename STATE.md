@@ -1,6 +1,6 @@
 # STATE — read this first
 
-_Last updated: 2026-10-27, session 7 (R039-R041; previous handoff: `docs/prompts/handoff_2026-10-24.md`). Branches: `claude/ncm-research` (notebooks clone it) and
+_Last updated: 2026-10-27, session 8 (R042-R043; plan `docs/plan_2026-10-27.md`; previous handoff: `docs/prompts/handoff_2026-10-24.md`). Branches: `claude/ncm-research` (notebooks clone it) and
 `claude/ncm-phase2-analysis-finetune-pkh64d` (older mirror). Repo is PUBLIC: commit nothing identifying (no
 personal names/emails, no absolute local paths, no session links, no credentials). Goals, success bar and rules:
 `docs/brief.md`._
@@ -22,6 +22,12 @@ triggers it (registered after this result, stated in the text); not built. Nothi
 waits for PR 7 and J2-F for its code, review and deep audit; Codex is at its usage limit (since 2026-10-24 16:36 UTC). Advisory, unregistered literature report:
 `docs/literature_advice_2026-10-24.md`. **W1d (R039):** reproduction gate exact; A2's Gen-PPL gain exists only at T = 1
 (+0.22 at T = 0.8, +0.05 at 0.9, -0.33 at 1.0): registered reading "trade-off", A2 not pursued, no W1c.
+**J2-F (R042):** the frozen teacher removes J2's collapse (shared outputs 0.3% vs 16.2%; prediction held) but saves
+only 5.6% of test passes: misses the screen, kill met, no seeds; the consistency line stops. Lead (val only): an
+output-stability stop at 7.80 passes (29% below 11), latency-only at ~2.3x the positions. **W2M pre-reading (R043):**
+flags saturate at W1's rates (M5 is a near-replicate of M4) and probe (b) is confounded by level identity (AUC 0.95
+from the level alone); amendment **W2Ma** (readings only). Astra review triaged; re-plan proposed in
+`docs/plan_2026-10-27.md` (primary target criterion (c); (d) gets one wall-clock gate), **awaiting the user**.
 
 ## Environment
 - **Codex:** reviews PRs (bot `chatgpt-codex-connector`; 2-15 min per review); a review triggered only by opening a PR may
@@ -64,12 +70,13 @@ waits for PR 7 and J2-F for its code, review and deep audit; Codex is at its usa
 - R021: repair levels built from the finest Sudoku codebook fix <= 63% of failures even with an oracle.
 - Throughput (A100): tier L 39-41 TFLOPS (2.1 s/step uniform, 3.0 on-policy, 3.7 two-pass), tier M NCM 24.7, AR 44.2.
 
-## Live hypotheses / bets (ranked: significance x chance of a clean result / CU)
-1. **Criterion (d), text half: J2-F, frozen-teacher consistency on WMT14** (registered, contingent, triggered; ~6.5 CU
-   seed 0). J2 (moving teacher) failed (R036) by collapsing part of the test set onto fixed strings; J2-F predicts that
-   share <= 1% (overturned if > 5%). The bar is high: J0 capped at 9 passes already loses only 0.10 BLEU (18% fewer
-   passes), at 8 passes 1.11. The Sudoku half is met training-free (exact Jacobi + verifier), pending batch-1
-   wall-clock. Needs a trainer option, PR review and a deep audit (Codex).
+## Live hypotheses / bets (ranked: significance x chance of a clean result / CU; plan `docs/plan_2026-10-27.md`)
+0. **Proposed (not registered), awaiting the user:** E1, how much of the code NLL is representation choice (codes
+   that decode to the same text): `R_k = N_k + log rho_k` at fine cuts, released + W1 + WMT14 checkpoints, ~2 CU,
+   eval-only; primary criterion-(c) candidate (it would explain A1 / A2 / A4 / J1's NLL-quality dissociation). D1,
+   batch-1 wall-clock gate for (d) (~1.5 CU; text prior ~20%). S0, CPU gate for Astra's coupled sampler.
+1. ~~Criterion (d), text half: J2-F~~ — done (R042): no collapse, 5.6% saving, misses the screen. (d)'s text half has
+   no registered candidate; the Sudoku half (verifier stop) still lacks batch-1 wall-clock.
 2. **Mechanism of the on-policy collapse (candidate for criterion c):** undetectable corruption -> the model discounts
    its own coarse codes. Sudoku CPU (R031, matched slots and rates): plausible wrong codes raise predictive entropy on
    clean contexts by 74% (uniform: 5%) and clean NLL by 32 nats (2.7), and cut reliance on the true L6 code by 76% (R034,
@@ -86,32 +93,32 @@ waits for PR 7 and J2-F for its code, review and deep audit; Codex is at its usa
    observation: A1's 0.69 shortfall to A0 is entirely in sampling levels 0-3 (oracle j >= 3 closes it).
 5. Coarse-plan interventions (levels 1-5 hold 86% of the oracle gap): eval-only, entropy-matched (~1 CU); speculative.
 - On hold: B6/C5 Sudoku repair (S1, ~7.5 CU with its controls); M1 tier M (criterion b has no candidate);
-  C2 red-black steps (P1c step 2 not built).
+  C2 red-black steps (P1c step 2 not built). **Plan proposes cutting** S1, M1 and A1 seeds 1-2 (awaiting the user).
 
 ## Killed / demoted
 - **B1a on-policy corruption with canonical labels** (W1 A3/A4/A5): not supported at tier L, and destructive
   (R030/R031); as an improvement method, dropped unless corruption is made detectable. Sudoku's greedy on-policy arm
   (S1 A2) recommended for dropping: the greedy policy changes only a few % of codes.
 - B7 soft labels (A6): not supported (+0.85 Gen-PPL).
+- B2-trained consistency for text Jacobi (J2 moving teacher, R036; J2-F frozen teacher, R042): neither saves >= 25%
+  of exact passes at < 1 BLEU; no seeds.
 - C4 carry for Sudoku (R019; scoped R023). Fixing tokenizer loss on TinyStories. Level-skipping early exit on Sudoku.
 - C7, C8, C11 demoted. Training-free Jacobi on text (no saving). Token-aligned schedule demoted (R020).
 - P1b withdrawn (R023).
 
 ## Compute
-- Colab: ~73 CU spent (p1, c4, w0 ~12.5; wave 1 ~46 incl. ~6.5 lost to restarts, R030; WMT14 pair ~11.9, R036;
-  W1d ~3, R039). Budget ~200: ~127 left (J2-F's ~6.5 not yet reported).
-- Plan: J2-F ~6.5 next; then J2-F/J1 seeds 1-2 (~22) if J2-F passes its screen, batch-1 wall-clock ~1-2; mechanism
-  arms ~15 if registered; NLL-proxy eval ~1 (planned ~48). Held: Sudoku 3 arms ~7.5, A1 seeds 1-2 ~13, M1 pair ~12
-  (~32.5). ~62 unallocated if all of it runs.
+- Colab: ~79.5 CU spent (p1, c4, w0 ~12.5; wave 1 ~46 incl. ~6.5 lost to restarts, R030; WMT14 pair ~11.9, R036;
+  W1d ~3, R039; J2-F ~6.5, R042). Budget ~200: ~120.5 left; the user's Colab balance this month: 103.56 CU.
+- Plan (`docs/plan_2026-10-27.md`, proposed): W2M ~27 (registered); E1/E2 ~2; D1 ~1.5; W2C 14-28 if W2M's gate
+  passes; J1d ~23 only if D1's text gate passes; coupled-sampler pilot <= 5 only if S0 passes; reserve 15. Likely
+  path ~71, ~50 unallocated.
 - CPU: ~13.5 CPU-h before session 5; session 5 ~1.2 h (Sudoku paired rerun, test suites).
 
 ## Next 3 actions
-1. J2-F (`w2c_L_wmt_consist_frozen`, A100, ~6.5 CU) launched by the user 2026-10-27. When it arrives: analyse with
-   `scripts/analyze_j1.py --candidate J2-F` against J1-J1c + J2-F; if it looks like it meets criterion (d), stop and ask.
-2. W2M (registered 2026-10-25, all 8 arms, ~27 CU): built (`claude/wip-w2m`; full suite 290 pass on CPU). PR 12: Codex round 1
-   found two P1s (flag footprint missed the quant_resi conv; measure (a) out of GPU memory), both accepted and fixed in
-   `2ede453` (`docs/reviews/triage_pr12.md`); round 2 clean; merged (`31827b8`, R040). Deep audit 8: two P1s (bf16 MAUVE,
-   TF32 canonical labels) fixed in PR 13 (`b1bd2ed`, R041). **Cleared to launch**: `w2m_L_ts_m0`..`m7` (any order,
-   A100 or L4), then `w2m_mech_eval`. Afterwards on CPU: `scripts/w1_sample_stats.py --set w2m` for the bigram gain.
-3. After J2-F and W2M: decide with the user between J2-F/J1 seeds 1-2 (if J2-F passes), the clean-NLL-vs-quality
-   eval (~1 CU), and the held Sudoku / M1 runs.
+1. **Plan approved** (user, 2026-10-27; R043): allocation table, downloads. Open: whether to skip M5; (c)'s replication
+   unit. The (d) cost accounting (J1a) stands. W2M: run M0 and M1 first (validity gate), then the rest.
+2. W2M: `w2m_L_ts_m0`..`m7` cleared (A100 or L4; R041). **Hold `w2m_mech_eval`** until the probe fix (W2Ma) is
+   reviewed and audited, or run it and report (b) as uninformative. Read W2M with W2M + W2Ma; then CPU
+   `scripts/w1_sample_stats.py --set w2m`.
+3. If the plan is approved: one PR (E1/E2 eval, D1 benchmark, mech-eval probe fix, flag-power script), Codex review,
+   deep audit 9; register E1 and D1 before their runs; CPU: J1a bootstrap, the stability rule's val BLEU, S0.
