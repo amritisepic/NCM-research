@@ -1,6 +1,8 @@
 """Exploratory (not registered): token-level character of the wave-1 samples, from the saved ids only.
 
   python scripts/w1_sample_stats.py [--root results/colab] [--train_tokens 20000000] [--read 30 --read_seed 2026]
+  python scripts/w1_sample_stats.py --set w2m       (W2M's registered bigram gain / adjacent duplicates: A0 + M0-M7,
+                                                     writes results/w2m_sample_stats.json; audit 8, question 8)
 
 For every arm and for 4096 human validation windows (the MAUVE reference set):
   - unigram fit: mean log p_train(token) (bag-of-words content; add-one unigram from the first `train_tokens` training
@@ -30,6 +32,12 @@ ARMS = {"A0": ("w1_L_ts_ctrl", "L_ts_released16"), "A1": ("w1_L_ts_ctrl", "L_ts_
         "A2": ("w1_L_ts_requant", "L_ts_requant_s0"), "A3": ("w1_L_ts_onpol", "L_ts_onpol_s0"),
         "A4": ("w1_L_ts_b1", "L_ts_b1_s0"), "A5": ("w1_L_ts_onpol2", "L_ts_onpol2_s0"),
         "A6": ("w1_L_ts_soft", "L_ts_soft_s0")}
+W2M_ARMS = {"A0": ("w1_L_ts_ctrl", "L_ts_released16"), "M0": ("w2m_L_ts_m0", "L_ts_m0_uniform_s0"),
+            "M1": ("w2m_L_ts_m1", "L_ts_m1_policy_s0"), "M2": ("w2m_L_ts_m2", "L_ts_m2_frozen_pw_s0"),
+            "M3": ("w2m_L_ts_m3", "L_ts_m3_uniform_wrong_s0"), "M4": ("w2m_L_ts_m4", "L_ts_m4_frozen_pw_flags_s0"),
+            "M5": ("w2m_L_ts_m5", "L_ts_m5_frozen_pw_shuffled_s0"), "M6": ("w2m_L_ts_m6", "L_ts_m6_policy_usedparent_s0"),
+            "M7": ("w2m_L_ts_m7", "L_ts_m7_uniform_a3rates_s0")}
+SETS = {"w1": ARMS, "w2m": W2M_ARMS}
 V, W, LAM = 8192, 128, 0.1
 
 
@@ -81,13 +89,15 @@ def main():
     ap.add_argument("--root", default=os.path.join(ROOT, "results", "colab"))
     ap.add_argument("--data_dir", default=os.path.join(ROOT, "data", "tinystories"))
     ap.add_argument("--train_tokens", type=int, default=20_000_000)
-    ap.add_argument("--out", default=os.path.join(ROOT, "results", "w1_sample_stats.json"))
+    ap.add_argument("--set", default="w1", choices=sorted(SETS))
+    ap.add_argument("--out", default="", help="default results/<set>_sample_stats.json")
     ap.add_argument("--read", type=int, default=0)
     ap.add_argument("--read_seed", type=int, default=2026)
     a = ap.parse_args()
+    a.out = a.out or os.path.join(ROOT, "results", f"{a.set}_sample_stats.json")
     p_uni, uni, keys, cnt = bigram_model(a.train_tokens, a.data_dir)
     sets = {"human_val": [[t for t in cut_at_eos(r) if t != PAD] for r in examples("val", 4096).tolist()]}
-    for arm, (d, prefix) in ARMS.items():
+    for arm, (d, prefix) in SETS[a.set].items():
         sets[arm] = json.load(open(os.path.join(a.root, d, f"{prefix}__samples_final.json")))["ids"]
     ref_counts = np.bincount(np.concatenate([np.asarray(s, dtype=np.int64) for s in sets["human_val"]]), minlength=V)
     out = {"train_tokens": a.train_tokens, "bigram_interpolation": LAM, "sets": {}}
@@ -118,12 +128,12 @@ def main():
         vocab = safe_pickle_load(os.path.join(a.data_dir, "bpe_vocab_8192.pickle"))
         dec = lambda ids: b"".join(vocab[int(t)] for t in ids if int(t) not in (EOS, PAD)).decode("utf-8", "replace")
         rng = np.random.default_rng(a.read_seed)
-        path = os.path.join(os.path.dirname(a.out), f"w1_samples_read_s{a.read_seed}.md")
+        path = os.path.join(os.path.dirname(a.out), f"{a.set}_samples_read_s{a.read_seed}.md")
         with open(path, "w", encoding="utf-8") as f:
-            f.write(f"# Wave-1 samples, {a.read} per arm, drawn with numpy default_rng({a.read_seed}) from each arm's "
+            f.write(f"# {a.set} samples, {a.read} per arm, drawn with numpy default_rng({a.read_seed}) from each arm's "
                     "4096 final samples (same indices for every arm)\n\n")
             idx = rng.choice(4096, a.read, replace=False)
-            for arm in ("A0", "A1", "A2", "A3", "A4", "A5"):
+            for arm in (("A0", "A1", "A2", "A3", "A4", "A5") if a.set == "w1" else tuple(W2M_ARMS)):
                 f.write(f"## {arm}\n\n")
                 for i in idx:
                     f.write(f"- [{int(i)}] {' '.join(dec(sets[arm][i]).split())}\n")

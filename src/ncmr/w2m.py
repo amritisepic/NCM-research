@@ -180,7 +180,8 @@ class MechArm:
     # ------------------------------------------------------------------ proposals
     @torch.no_grad()
     def canonical(self, x):
-        with torch.autocast(device_type=self.device, enabled=False):
+        # the canonical codes are the labels: fp32 with TF32 off, like every teacher used as a target (audit 8, A8-2)
+        with fp32_eval(self.tok, self.device):
             return self.tok.vq.z_to_idx(self.tok._encode_pre_quant(x))
 
     def _logits(self, model, fwd, ctx_codes):
