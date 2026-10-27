@@ -129,11 +129,41 @@ for key, (cfgname, what, units) in W2M_ARMS.items():
     }
 RUNS["w2m_mech_eval"] = {
     "desc": "W2M eval-only mechanism measures (no training): the released model and the eight W2M final checkpoints, same windows "
-            "and seeds for every model, fp32 with TF32 off. (a) coarse-context dependence KL per level j = 1..6, (b) logistic-probe "
-            "AUC for plausible-wrong and uniform-wrong contexts, (c) flag use for M4 / M5. Run after all eight w2m_L_ts_m* notebooks "
-            "finished on the same Drive (reads {R}/L_ts_m*_s0/final.pt).",
+            "and seeds for every model, fp32 with TF32 off. (a) coarse-context dependence KL per level j = 1..6, (b) row-level "
+            "detectability per level k = 1..6 (W2Ma: 50% clean windows, label = window corrupted, logistic probe on level-k hidden "
+            "states) for plausible-wrong contexts with uniform-wrong as the positive control; the pooled probe is kept but not "
+            "read, (c) flag use for M4 / M5. Run after the w2m_L_ts_m* notebooks finished on the same Drive (reads "
+            "{R}/L_ts_m*_s0/final.pt; if M5 was skipped, add --only released,m0,m1,m2,m3,m4,m6,m7 to the command).",
     "gpu": "A100 or L4", "units": 1.0, "needs": ["ts", "ckpt"], "seeds": [0],
     "cmds": ["python scripts/mech_eval_w2m.py --run_root {R} --run_dir {R}/w2m_mech_eval --seed {S}"],
+}
+RUNS["d1_batch1_wallclock"] = {
+    "desc": "D1 (pre-registered, eval-only, no training): batch-1 wall-clock gate for criterion (d). Per-item latency on the "
+            "first 256 test items, CUDA-synchronised, warm-up excluded, fp32 with TF32 off (the gate) and bf16 (secondary). "
+            "WMT14: J0 sequential vs J0 Jacobi exact, J0 and J2-F Jacobi + stable-text stop; Sudoku-hard: sequential vs "
+            "Jacobi exact and + verifier stop; each decoder with and without a prefix cache. Reads J2-F's checkpoint from "
+            "Drive ({R}/L_wmt_consist_frozen_s0/final.pt, from w2c_L_wmt_consist_frozen) and the newstest2013 text from "
+            "{R}/../data. Use an A100 (the gate is read on the A100 run); a second run on an L4 is optional.",
+    "gpu": "A100 (gate); L4 optional", "units": 1.5, "needs": ["ckpt", "wmt14"], "seeds": [0],
+    "cmds": [
+        "python scripts/bench_batch1.py --task wmt14 --run_dir {R}/d1_wmt --j2f_ckpt {R}/L_wmt_consist_frozen_s0/final.pt "
+        "--val_text {R}/../data/wmt14_train_pairs_val_text.json",
+        "python scripts/bench_batch1.py --task sudoku --run_dir {R}/d1_sudoku",
+    ],
+}
+RUNS["e1_equivalence"] = {
+    "desc": "E1 (pre-registered, eval-only, no training): how much of NCM's code NLL is representation choice. Per item and "
+            "cut k = 5..K-1: teacher-forced NLL of the fine levels N_k and Monte Carlo of rho_k, the probability that "
+            "ancestral samples of levels >= k decode to the same text (T = 1, up to 2048 samples, stop at 20 hits); "
+            "T_k = -log rho_k, R_k = N_k - T_k. Models: TinyStories A0 / A1 / A2 / A4 (wave-1 checkpoints on Drive), WMT14 "
+            "J0 / J1 / J2-F (checkpoints on Drive), Sudoku-hard released. fp32, TF32 off.",
+    "gpu": "A100 or L4", "units": 2.5, "needs": ["ts", "ckpt", "wmt14"], "seeds": [0],
+    "cmds": [
+        "python scripts/e1_equivalence.py --domain tinystories --models A0,A1,A2,A4 --run_root {R} --run_dir {R}/e1_ts --n 64 --round 64 --coarse_n 8",
+        "python scripts/e1_equivalence.py --domain wmt14 --models J0,J1,J2F --run_root {R} --data {R}/../data/wmt14_train_pairs.npz "
+        "--run_dir {R}/e1_wmt --n 128 --round 64 --coarse_n 8",
+        "python scripts/e1_equivalence.py --domain sudoku --models S0 --run_dir {R}/e1_sdk --n 128 --round 64 --coarse_n 8",
+    ],
 }
 RUNS["w1d_requant_diag"] = {
     "desc": "Eval-only diagnostic W1d (exploratory; registered before launch; no training): the released model (A0), the "
