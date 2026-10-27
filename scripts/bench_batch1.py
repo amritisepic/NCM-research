@@ -205,10 +205,19 @@ def generator_block_flops(net):
             "seq_cached": sum(bf(q, k) for q, k in calls_cached), "seq_cached_rows": sum(q for q, _ in calls_cached)}
 
 
-def flops_per_item(name, side, passes, unit):
+def decodes_made(side, passes, stop):
+    """Tokenizer decodes one item actually runs: the stable / verifier rules decode after every pass that is not a
+    fixed point, and the output reuses the last decode (`memo`); a fixed point at pass t > 1 repeats pass t-1's codes,
+    so t-1 decodes. Exact and sequential decode the output once."""
+    if side in ("stable1", "verifier"):
+        return passes - 1 if stop == "fixed" and passes > 1 else passes
+    return 1
+
+
+def flops_per_item(name, side, passes, unit, stop=None):
     """(executed counted FLOPs, generator-block FLOPs, generator rows) for one item of configuration `name`."""
     cached = name.endswith("cached")
-    dec = passes if side in ("stable1", "verifier") else 1      # per-pass decodes, or the final output decode
+    dec = decodes_made(side, passes, stop)
     if side == "seq":
         k = "seq_cached" if cached else "seq_eager"
         return unit[f"count_{k}"] + unit["count_decode"], unit[k], unit[f"{k}_rows"]
@@ -309,7 +318,9 @@ def integrity_sudoku(res):
 
 
 def gate_ok(g):
-    return all(len(v) <= MAX_MISMATCH for k, v in g.items() if isinstance(v, list))
+    """At most MAX_MISMATCH items per comparison (batch-128 vs batch-1 near-ties); repeats of one item must agree."""
+    return not g.get("nondeterministic") and all(len(v) <= MAX_MISMATCH for k, v in g.items()
+                                                 if isinstance(v, list) and k != "nondeterministic")
 
 
 # ------------------------------------------------------------------------------------------------ main
@@ -394,7 +405,7 @@ def main():
         for name, side, _ in configs:
             d = r[name]
             unit = res["flops_units"][name.split()[0] if a.task == "wmt14" else "S"]
-            fl = [flops_per_item(name, side, p, unit) for p in d["passes"]]
+            fl = [flops_per_item(name, side, p, unit, st) for p, st in zip(d["passes"], d["stop"])]
             out["configs"][name] = {**summarise(d["lat"], d["passes"]), "side": side,
                                     "stops": {s: d["stop"].count(s) for s in sorted(set(d["stop"]))},
                                     "executed_flops_per_item": float(np.mean([f[0] for f in fl])),

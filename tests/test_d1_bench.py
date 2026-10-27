@@ -286,7 +286,7 @@ def test_bench_wmt_like_end_to_end():
     assert all(p <= e for p, e in zip(r["J0 jacobi stable1 eager"]["passes"], r["J0 jacobi exact eager"]["passes"]))
     assert not any(r[n]["nondeterministic"] for n in r)
     unit = BB.flop_units(net, tok, items[0])
-    e, g, rows = BB.flops_per_item("J0 jacobi stable1 cached", "stable1", 3, unit)
+    e, g, rows = BB.flops_per_item("J0 jacobi stable1 cached", "stable1", 3, unit, "stable")
     assert e == unit["count_prefix"] + 3 * unit["count_pass_cached"] + 3 * unit["count_decode"]
     assert rows == net.prefix_len + 3 * sum(WMT_LEVELS[1:])
     assert unit["count_seq_eager"] > unit["count_seq_cached"] and unit["count_pass"] > unit["count_pass_cached"]
@@ -308,3 +308,40 @@ def test_mismatch_tolerance_reads_the_gate():
     assert BB.gate_ok({"a": [1, 2], "b": []}) and not BB.gate_ok({"a": [1, 2, 3]})
     c = BB.ratio_ci([1.0, 1.0, 1.0], [2.0, 2.0, 2.0])
     assert c["ratio"] == 0.5 and c["ci95"] == [0.5, 0.5]
+
+
+def test_gate_needs_deterministic_repeats_and_direct_implementation_agreement():
+    """Codex PR 14: a nondeterministic item blocks the gate; eager and cached are compared with each other, so disjoint
+    mismatches against the saved outputs (2 + 2 items) cannot both pass."""
+    assert not BB.gate_ok({"nondeterministic": [0]}) and BB.gate_ok({"nondeterministic": []})
+    n = 6
+    saved = {"hyp_test": [f"t{i}" for i in range(n)], "nfe_test": [3] * n,
+             "hyp_test_capped": {str(c): [f"t{i}" for i in range(n)] for c in range(1, 13)}}
+    ok = {"out": [f"t{i}" for i in range(n)], "passes": [3] * n}
+    bad = lambda ids: {"out": [f"x{i}" if i in ids else f"t{i}" for i in range(n)], "passes": [3] * n}
+    res = {"J0 seq eager": ok, "J0 seq cached": ok, "J0 jacobi exact eager": bad({0, 1}),
+           "J0 jacobi exact cached": bad({2, 3}), "J0 jacobi stable1 eager": {"out": ok["out"], "passes": [2] * n},
+           "J0 jacobi stable1 cached": {"out": ok["out"], "passes": [2] * n}}
+    g = BB.integrity_wmt(res, saved, None, n)
+    assert g["J0_jacobi_exact_cached_vs_eager"] == [0, 1, 2, 3] and not BB.gate_ok(g)
+
+
+def test_counted_decodes_match_what_a_fixed_point_stop_runs():
+    """Codex PR 14: a fixed point at pass t > 1 runs t - 1 decodes under the stable rule; whole-configuration FlopCounter
+    counts equal flops_per_item."""
+    tok, net, x = tiny_wmt_like()
+    vq = tok.vq
+    S, K = sum(WMT_LEVELS), len(WMT_LEVELS)
+    detok = lambda ids: " ".join(map(str, ids))
+    cfgs = {n: fn for n, _, fn in BB.make_configs("wmt14", {"J0": net}, tok, detok, K + 1)}
+    unit = BB.flop_units(net, tok, BB.Item(x[:1]))
+    seen = set()
+    for i in range(x.shape[0]):
+        it = BB.Item(x[i:i + 1])
+        for name, side in (("J0 jacobi stable1 eager", "stable1"), ("J0 jacobi exact cached", "exact")):
+            out = {}
+            counted = BB.counted_flops(lambda: out.setdefault("r", cfgs[name](it)))
+            _, passes, stop = out["r"]
+            seen.add(stop)
+            assert counted == BB.flops_per_item(name, side, passes, unit, stop)[0], (name, i, stop)
+    assert "fixed" in seen
