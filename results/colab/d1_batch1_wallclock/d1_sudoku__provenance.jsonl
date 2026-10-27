@@ -1,0 +1,2 @@
+{"event": "start", "git_sha": "2a27ae9c4ca628fbb5e84928476dbba530c21083", "utc": "2026-10-27T21:16:52Z", "gpu": "NVIDIA A100-SXM4-40GB", "cmd": "python scripts/bench_batch1.py --task sudoku --run_dir {R}/d1_sudoku", "seed": 0, "local_data_copy": false, "micro_batch_64": false, "had_ckpt": false, "last_logged_step": null}
+{"event": "end", "git_sha": "2a27ae9c4ca628fbb5e84928476dbba530c21083", "utc": "2026-10-27T21:33:07Z", "exit": 0, "minutes": 16.25, "last_logged_step": null}

@@ -1,0 +1,2 @@
+{"event": "start", "git_sha": "2a27ae9c4ca628fbb5e84928476dbba530c21083", "utc": "2026-10-27T23:06:02Z", "gpu": "NVIDIA L4", "cmd": "python scripts/e1_equivalence.py --domain sudoku --models S0 --run_dir {R}/e1_sdk --n 128 --round 64 --coarse_n 8", "seed": 0, "local_data_copy": false, "micro_batch_64": false, "had_ckpt": false, "last_logged_step": null}
+{"event": "end", "git_sha": "2a27ae9c4ca628fbb5e84928476dbba530c21083", "utc": "2026-10-27T23:07:30Z", "exit": 0, "minutes": 1.46, "last_logged_step": null}

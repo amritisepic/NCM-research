@@ -1,0 +1,355 @@
+{
+ "protocol": {
+  "n_windows": 512,
+  "n_probe_train": 384,
+  "levels_j": [
+   1,
+   2,
+   3,
+   4,
+   5,
+   6
+  ],
+  "eval_seed": 2026,
+  "rates": [
+   0.75,
+   0.7,
+   0.65,
+   0.6,
+   0.55,
+   0.5,
+   0.45,
+   0.4,
+   0.35,
+   0.3,
+   0.25,
+   0.0
+  ],
+  "probe": "logistic, L2 1e-2 on standardised features, L-BFGS 100",
+  "contaminated_label": "flag > 0 (the input position's cumulative reconstruction contains a replaced ancestor)",
+  "probe_row_level": {
+   "clean_frac": 0.5,
+   "seed": 2028,
+   "paired_masks": true,
+   "levels_k": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ],
+   "features": "mean of the last hidden states (after ln_f) over level k's positions",
+   "label": "window corrupted (not a clean row)",
+   "too_weak_below_auc": 0.75,
+   "amendment": "W2Ma"
+  },
+  "precision": "fp32, TF32 off",
+  "torch": "2.11.0+cu130"
+ },
+ "runs": {
+  "released": "released",
+  "m0": "L_ts_m0_uniform_s0",
+  "m1": "L_ts_m1_policy_s0",
+  "m2": "L_ts_m2_frozen_pw_s0",
+  "m3": "L_ts_m3_uniform_wrong_s0",
+  "m4": "L_ts_m4_frozen_pw_flags_s0",
+  "m6": "L_ts_m6_policy_usedparent_s0",
+  "m7": "L_ts_m7_uniform_a3rates_s0"
+ },
+ "models": {
+  "released": {
+   "context_dependence_kl": {
+    "1": 0.008204555841629291,
+    "2": 0.007472339427962422,
+    "3": 0.006380036680552309,
+    "4": 0.00687804933015053,
+    "5": 0.004030824806636996,
+    "6": 0.0026918472449034246
+   },
+   "probe_pooled": {
+    "status": "not read (W2Ma: confounded by level identity, R043)",
+    "plausible_wrong": 0.9877604246139526,
+    "plausible_wrong_l0_clean_windows_only": 0.9961810111999512,
+    "uniform_wrong": 0.9861631393432617,
+    "uniform_wrong_l0_clean_windows_only": 0.9946571588516235
+   },
+   "probe_row_level": {
+    "plausible_wrong": {
+     "1": 0.4933937191963196,
+     "2": 0.9177881479263306,
+     "3": 0.9652557373046875,
+     "4": 0.9907022714614868,
+     "5": 0.9907022714614868,
+     "6": 0.9948617815971375
+    },
+    "uniform_wrong": {
+     "1": 0.7093222737312317,
+     "2": 0.9672131538391113,
+     "3": 0.9926596879959106,
+     "4": 1.0,
+     "5": 1.0,
+     "6": 1.0
+    },
+    "too_weak_to_read": false
+   }
+  },
+  "m0": {
+   "context_dependence_kl": {
+    "1": 0.014465312555716701,
+    "2": 0.015472847752095132,
+    "3": 0.016398852016439085,
+    "4": 0.019045948693834962,
+    "5": 0.013056814672643843,
+    "6": 0.011193708207927025
+   },
+   "probe_pooled": {
+    "status": "not read (W2Ma: confounded by level identity, R043)",
+    "plausible_wrong": 0.9870341420173645,
+    "plausible_wrong_l0_clean_windows_only": 0.9955554604530334,
+    "uniform_wrong": 0.9901425242424011,
+    "uniform_wrong_l0_clean_windows_only": 0.9969565868377686
+   },
+   "probe_row_level": {
+    "plausible_wrong": {
+     "1": 0.4965745210647583,
+     "2": 0.9366284012794495,
+     "3": 0.979691743850708,
+     "4": 0.989234209060669,
+     "5": 0.9914363026618958,
+     "6": 0.9941277503967285
+    },
+    "uniform_wrong": {
+     "1": 0.6709077954292297,
+     "2": 0.9931490421295166,
+     "3": 0.9987766742706299,
+     "4": 1.0,
+     "5": 1.0,
+     "6": 1.0
+    },
+    "too_weak_to_read": false
+   }
+  },
+  "m1": {
+   "context_dependence_kl": {
+    "1": 0.014740474060202992,
+    "2": 0.0162648367748634,
+    "3": 0.017742886256324662,
+    "4": 0.020120413080780858,
+    "5": 0.013658780818269363,
+    "6": 0.012410014618364497
+   },
+   "probe_pooled": {
+    "status": "not read (W2Ma: confounded by level identity, R043)",
+    "plausible_wrong": 0.9883719682693481,
+    "plausible_wrong_l0_clean_windows_only": 0.996376097202301,
+    "uniform_wrong": 0.9915231466293335,
+    "uniform_wrong_l0_clean_windows_only": 0.9968534708023071
+   },
+   "probe_row_level": {
+    "plausible_wrong": {
+     "1": 0.5070956945419312,
+     "2": 0.979936420917511,
+     "3": 0.98850017786026,
+     "4": 1.0,
+     "5": 0.9997553825378418,
+     "6": 1.0
+    },
+    "uniform_wrong": {
+     "1": 0.6569611430168152,
+     "2": 0.9926596879959106,
+     "3": 0.9997553825378418,
+     "4": 1.0,
+     "5": 1.0,
+     "6": 1.0
+    },
+    "too_weak_to_read": false
+   }
+  },
+  "m2": {
+   "context_dependence_kl": {
+    "1": 0.0151076263490971,
+    "2": 0.01706054821439025,
+    "3": 0.019185909435360547,
+    "4": 0.02267810439077479,
+    "5": 0.014764164203125629,
+    "6": 0.013013281252164551
+   },
+   "probe_pooled": {
+    "status": "not read (W2Ma: confounded by level identity, R043)",
+    "plausible_wrong": 0.9881681203842163,
+    "plausible_wrong_l0_clean_windows_only": 0.9959639310836792,
+    "uniform_wrong": 0.9910764694213867,
+    "uniform_wrong_l0_clean_windows_only": 0.9967831373214722
+   },
+   "probe_row_level": {
+    "plausible_wrong": {
+     "1": 0.5137020349502563,
+     "2": 0.9787130355834961,
+     "3": 0.9899682402610779,
+     "4": 1.0,
+     "5": 0.9995107054710388,
+     "6": 1.0
+    },
+    "uniform_wrong": {
+     "1": 0.6545143723487854,
+     "2": 0.9924150109291077,
+     "3": 0.9997553825378418,
+     "4": 1.0,
+     "5": 1.0,
+     "6": 1.0
+    },
+    "too_weak_to_read": false
+   }
+  },
+  "m3": {
+   "context_dependence_kl": {
+    "1": 0.014469686113189929,
+    "2": 0.01560216827316452,
+    "3": 0.016511675838500182,
+    "4": 0.019199208992099686,
+    "5": 0.01318246249540572,
+    "6": 0.011278835843878336
+   },
+   "probe_pooled": {
+    "status": "not read (W2Ma: confounded by level identity, R043)",
+    "plausible_wrong": 0.9872125387191772,
+    "plausible_wrong_l0_clean_windows_only": 0.9955443739891052,
+    "uniform_wrong": 0.9901222586631775,
+    "uniform_wrong_l0_clean_windows_only": 0.9969050288200378
+   },
+   "probe_row_level": {
+    "plausible_wrong": {
+     "1": 0.4977979063987732,
+     "2": 0.9393198490142822,
+     "3": 0.9770002961158752,
+     "4": 0.988989531993866,
+     "5": 0.9914363026618958,
+     "6": 0.9941277503967285
+    },
+    "uniform_wrong": {
+     "1": 0.6718865036964417,
+     "2": 0.9924150109291077,
+     "3": 0.9987766742706299,
+     "4": 1.0,
+     "5": 1.0,
+     "6": 1.0
+    },
+    "too_weak_to_read": false
+   }
+  },
+  "m4": {
+   "context_dependence_kl": {
+    "1": 0.017175085579645286,
+    "2": 0.017875977385909184,
+    "3": 0.01958742957540975,
+    "4": 0.02325149743981551,
+    "5": 0.014978056288900364,
+    "6": 0.013160730358776872
+   },
+   "probe_pooled": {
+    "status": "not read (W2Ma: confounded by level identity, R043)",
+    "plausible_wrong": 0.9878751039505005,
+    "plausible_wrong_l0_clean_windows_only": 0.9962215423583984,
+    "uniform_wrong": 0.9917972087860107,
+    "uniform_wrong_l0_clean_windows_only": 0.9968651533126831
+   },
+   "probe_row_level": {
+    "plausible_wrong": {
+     "1": 0.5227550864219666,
+     "2": 0.9363837242126465,
+     "3": 0.988744854927063,
+     "4": 0.9990213513374329,
+     "5": 0.9992660284042358,
+     "6": 1.0
+    },
+    "uniform_wrong": {
+     "1": 0.6628333926200867,
+     "2": 0.9921703338623047,
+     "3": 0.9997553825378418,
+     "4": 1.0,
+     "5": 1.0,
+     "6": 1.0
+    },
+    "too_weak_to_read": false
+   },
+   "flag_use": {
+    "nll_true_flags": 1426.991943359375,
+    "nll_zero_flags": 1462.417724609375,
+    "delta_per_window": -35.42578125
+   }
+  },
+  "m6": {
+   "context_dependence_kl": {
+    "1": 0.015004326793738455,
+    "2": 0.01653236985504713,
+    "3": 0.018117683929130587,
+    "4": 0.020474055182609942,
+    "5": 0.013957020008173454,
+    "6": 0.012571131643463983
+   },
+   "probe_pooled": {
+    "status": "not read (W2Ma: confounded by level identity, R043)",
+    "plausible_wrong": 0.9881553649902344,
+    "plausible_wrong_l0_clean_windows_only": 0.9960595965385437,
+    "uniform_wrong": 0.9915332794189453,
+    "uniform_wrong_l0_clean_windows_only": 0.9967831373214722
+   },
+   "probe_row_level": {
+    "plausible_wrong": {
+     "1": 0.5217763781547546,
+     "2": 0.9770002961158752,
+     "3": 0.9894788861274719,
+     "4": 1.0,
+     "5": 0.9997553825378418,
+     "6": 1.0
+    },
+    "uniform_wrong": {
+     "1": 0.6547590494155884,
+     "2": 0.9916809797286987,
+     "3": 0.9995107054710388,
+     "4": 1.0,
+     "5": 1.0,
+     "6": 1.0
+    },
+    "too_weak_to_read": false
+   }
+  },
+  "m7": {
+   "context_dependence_kl": {
+    "1": 0.014452534027450026,
+    "2": 0.015390145484343462,
+    "3": 0.016042759610581346,
+    "4": 0.018194828657956713,
+    "5": 0.012840856528200923,
+    "6": 0.011313199368049842
+   },
+   "probe_pooled": {
+    "status": "not read (W2Ma: confounded by level identity, R043)",
+    "plausible_wrong": 0.9871488213539124,
+    "plausible_wrong_l0_clean_windows_only": 0.9954413771629333,
+    "uniform_wrong": 0.9907922148704529,
+    "uniform_wrong_l0_clean_windows_only": 0.9971488118171692
+   },
+   "probe_row_level": {
+    "plausible_wrong": {
+     "1": 0.4977979063987732,
+     "2": 0.9371177554130554,
+     "3": 0.9789577126502991,
+     "4": 0.988744854927063,
+     "5": 0.9897235631942749,
+     "6": 0.9958404898643494
+    },
+    "uniform_wrong": {
+     "1": 0.6667482852935791,
+     "2": 0.9936383962631226,
+     "3": 0.9990213513374329,
+     "4": 1.0,
+     "5": 1.0,
+     "6": 1.0
+    },
+    "too_weak_to_read": false
+   }
+  }
+ }
+}

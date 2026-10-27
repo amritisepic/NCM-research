@@ -1,0 +1,2 @@
+{"event": "start", "git_sha": "2a27ae9c4ca628fbb5e84928476dbba530c21083", "utc": "2026-10-27T20:31:31Z", "gpu": "NVIDIA L4", "cmd": "python scripts/mech_eval_w2m.py --run_root {R} --run_dir {R}/w2m_mech_eval --seed {S} --only released,m0,m1,m2,m3,m4,m6,m7", "seed": 0, "local_data_copy": false, "micro_batch_64": false, "had_ckpt": false, "last_logged_step": null}
+{"event": "end", "git_sha": "2a27ae9c4ca628fbb5e84928476dbba530c21083", "utc": "2026-10-27T20:50:28Z", "exit": 0, "minutes": 18.95, "last_logged_step": null}
