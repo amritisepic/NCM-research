@@ -901,3 +901,22 @@ generator and share the dropout stream; the logged per-level corrupted fractions
   not new measurements, registered amendments, or launch approvals.
 - Verified the export against the original response and checked its completeness and publication hygiene.
   No production code, experimental configuration, registration, or unrelated local work is included.
+
+## R041 — Deep audit 8 (W2M): two P1s fixed, PR 13 merged; W2M cleared to launch (2026-10-27; process)
+- Audit 8 (Codex desktop on `2ede453`, branch `codex/audit8` at `c2dca74`; brief `docs/prompts/codex_audit8_w2m.md`;
+  doc `docs/reviews/codex_audit8.md`). Re-run here first: 30 passed, 3 strict xfails. Triage
+  `docs/reviews/triage_audit8_2026-10-27.md`.
+- **A8-1 (P1):** W2M's final MAUVE used bf16 features and wave 1's reference cache. Now fp32 with a separate
+  `mauve_ref_val_fp32_<n>.npy`, for `corruption.mode: mech` only; wave-1 arms unchanged (behavioural test).
+- **A8-2 (P1):** the canonical codes (every W2M arm's labels) were encoded with TF32 enabled; now under `fp32_eval`.
+  Common to all eight arms, so it would not have biased one arm against another, but it broke the targets rule.
+- Audit answers: no defect in proposal precision, mask stream, replacement semantics, flags, resume, old-arm identity,
+  mechanism measures or notebooks. W2M's registered bigram gain had no script: `scripts/w1_sample_stats.py --set w2m`
+  added (CPU, after the results arrive). Several W2M tests were weaker than their names; the audit's probes that close
+  those gaps are ported.
+- Audit tests ported (strict xfails removed; they fail against `2ede453`, mutation-checked; the number tests normalise
+  CRLF before checking the pinned blob digests). Full suite 324 passed (CPU, torch 2.6). PR 13: Codex, no P0/P1;
+  merged (`b1bd2ed`). The fixes are the audit's own proposed patches with its tests passing (R028 precedent), so
+  **`w2m_L_ts_m0` ... `m7` and `w2m_mech_eval` are cleared** (A100 or L4).
+- **R039 corrections** (audit 8 recomputation): oracle j = 5, A0 = 9.51 (not 9.52); oracle j = 3, A2 - A1 =
+  +0.42 ± 0.16 (not ± 0.17), also in R039's exploratory point (1). No reading changes.

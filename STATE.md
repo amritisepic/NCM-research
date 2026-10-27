@@ -1,6 +1,6 @@
 # STATE — read this first
 
-_Last updated: 2026-10-27, session 7 (R039-R040; previous handoff: `docs/prompts/handoff_2026-10-24.md`). Branches: `claude/ncm-research` (notebooks clone it) and
+_Last updated: 2026-10-27, session 7 (R039-R041; previous handoff: `docs/prompts/handoff_2026-10-24.md`). Branches: `claude/ncm-research` (notebooks clone it) and
 `claude/ncm-phase2-analysis-finetune-pkh64d` (older mirror). Repo is PUBLIC: commit nothing identifying (no
 personal names/emails, no absolute local paths, no session links, no credentials). Goals, success bar and rules:
 `docs/brief.md`._
@@ -106,12 +106,12 @@ waits for PR 7 and J2-F for its code, review and deep audit; Codex is at its usa
 - CPU: ~13.5 CPU-h before session 5; session 5 ~1.2 h (Sudoku paired rerun, test suites).
 
 ## Next 3 actions
-1. J2-F (`w2c_L_wmt_consist_frozen`, A100, ~6.5 CU) launched by the user 2026-10-27; audit 8 running in Codex desktop. When it arrives: analyse with
+1. J2-F (`w2c_L_wmt_consist_frozen`, A100, ~6.5 CU) launched by the user 2026-10-27. When it arrives: analyse with
    `scripts/analyze_j1.py --candidate J2-F` against J1-J1c + J2-F; if it looks like it meets criterion (d), stop and ask.
 2. W2M (registered 2026-10-25, all 8 arms, ~27 CU): built (`claude/wip-w2m`; full suite 290 pass on CPU). PR 12: Codex round 1
    found two P1s (flag footprint missed the quant_resi conv; measure (a) out of GPU memory), both accepted and fixed in
-   `2ede453` (`docs/reviews/triage_pr12.md`); round 2 clean; **merged** (`31827b8`, R040). Deep audit 8 (also covers
-   PR 5's text-trainer changes) to run in Codex desktop from the brief below; not cleared to launch until both are triaged. Offload prompt:
-   `docs/prompts/codex_audit8_w2m.md` (deep audit 8).
+   `2ede453` (`docs/reviews/triage_pr12.md`); round 2 clean; merged (`31827b8`, R040). Deep audit 8: two P1s (bf16 MAUVE,
+   TF32 canonical labels) fixed in PR 13 (`b1bd2ed`, R041). **Cleared to launch**: `w2m_L_ts_m0`..`m7` (any order,
+   A100 or L4), then `w2m_mech_eval`. Afterwards on CPU: `scripts/w1_sample_stats.py --set w2m` for the bigram gain.
 3. After J2-F and W2M: decide with the user between J2-F/J1 seeds 1-2 (if J2-F passes), the clean-NLL-vs-quality
    eval (~1 CU), and the held Sudoku / M1 runs.
