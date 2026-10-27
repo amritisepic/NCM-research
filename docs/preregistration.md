@@ -563,3 +563,25 @@ Why: `docs/reviews/codex_audit4.md` (A4-1 to A4-5); triage `docs/reviews/triage_
      A2 16.29, A1 16.60, A4 36.8; WMT14: val BLEU J0 23.55, J2-F 22.90, J1 22.82. T_8's order is reported beside it.
 - **Integrity:** the sampler's level calls equal the teacher-forced logits (tests); each item reports whether x^ = x.
 - **Cost:** ~2-3 CU (one notebook, A100 or L4). E2 is not run (R045: S0 failed, so E2 decides nothing).
+
+## E1a — amendment to E1's analysis after the round-2 review (registered 2026-10-27, before any E1 run; analysis and readings only)
+- **Why:** `docs/research_review_2026-10-27.md` section 2: -log of a stopped, capped hit rate has no finite expectation
+  and an unknown bias; the rule-of-three endpoint is not a valid input to an aggregate claim; prediction 1's 0.8 is
+  undemanding at hundreds of nats; R046's three pilot windows are already observed; there is no theorem that U must rank
+  models like their quality metrics. E1's sampling, items, cuts and saved fields (`level_nll`, `mc[k] = [hits, samples]`
+  per item) are unchanged; everything below is computed afterwards from the saved results.
+- **Primary uncertainty:** per item and cut, the anytime-valid beta-mixture confidence sequence for rho (Bernoulli,
+  alpha = beta = 1/2; valid at E1's batchwise stopping), intersected with [exp(-N_k), 1] (c* itself decodes to x^), at
+  delta = 0.05 / (items x cuts read) per model (Bonferroni). Reported: T_k in [-log p_U, -log p_L] and R_k in
+  [N_k + log p_L, N_k + log p_U]; mean bounds = means of the per-item endpoints (equal item weights). The registered
+  point summaries are reported beside them; the "about 1/20 nat" bias statement is withdrawn.
+- **Prediction 1 reading:** on the confidence bounds (lower bound of mean R_8 / mean N_8 for "holds", upper bound for
+  "overturned"). Reported twice: all 64 registered windows, and the 61 untouched by the R046 pilot (the first three val
+  windows excluded). Added (untouched windows): the lower bound of mean R_8 / mean N_8 exceeds 0.90 and at least 80% of
+  windows have a T_8 interval no wider than 2 nats; overturned if the upper bound is below 0.80; inconclusive if more
+  than 20% of windows are censored (no hit). Same rules for the released WMT14 and Sudoku-hard models.
+- **Prediction 2:** "holds" only if the whole interval of dT_8 lies within +/-0.2 |dN_8| (endpoints propagated);
+  absolute dT_8 also reported.
+- **Prediction 3** (rank order by U_8 vs quality): reported descriptively, no longer read as a test.
+- **Integrity:** per item, R_k should not increase with k and U_k should not decrease; violations beyond the intervals
+  are reported as estimation or implementation problems.
