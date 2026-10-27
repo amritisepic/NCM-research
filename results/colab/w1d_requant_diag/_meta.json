@@ -1,0 +1,77 @@
+{
+ "run": "w1d_requant_diag",
+ "gpu": "NVIDIA A100-SXM4-40GB",
+ "finished_utc": "2026-10-25T00:40:55Z",
+ "git_sha": "81a697970b9400a2b82393c4f337d66f2f2b2746",
+ "git_shas_all_sessions": [
+  "81a697970b9400a2b82393c4f337d66f2f2b2746"
+ ],
+ "sessions": {
+  "w1d_A0": [
+   {
+    "event": "start",
+    "git_sha": "81a697970b9400a2b82393c4f337d66f2f2b2746",
+    "utc": "2026-10-25T00:08:03Z",
+    "gpu": "NVIDIA A100-SXM4-40GB",
+    "cmd": "python scripts/diag_w1_frontier.py --name A0 --run_dir {R}/w1d_A0 --expect results/colab/w1_L_ts_ctrl/L_ts_released16__result.json",
+    "seed": 0,
+    "local_data_copy": false,
+    "micro_batch_64": false,
+    "had_ckpt": false,
+    "last_logged_step": null
+   },
+   {
+    "event": "end",
+    "git_sha": "81a697970b9400a2b82393c4f337d66f2f2b2746",
+    "utc": "2026-10-25T00:20:02Z",
+    "exit": 0,
+    "minutes": 11.99,
+    "last_logged_step": null
+   }
+  ],
+  "w1d_A1": [
+   {
+    "event": "start",
+    "git_sha": "81a697970b9400a2b82393c4f337d66f2f2b2746",
+    "utc": "2026-10-25T00:20:02Z",
+    "gpu": "NVIDIA A100-SXM4-40GB",
+    "cmd": "python scripts/diag_w1_frontier.py --name A1 --ckpt {R}/L_ts_ctrl_s0/final.pt --run_dir {R}/w1d_A1 --expect results/colab/w1_L_ts_ctrl/L_ts_ctrl_s0__result.json",
+    "seed": 0,
+    "local_data_copy": false,
+    "micro_batch_64": false,
+    "had_ckpt": false,
+    "last_logged_step": null
+   },
+   {
+    "event": "end",
+    "git_sha": "81a697970b9400a2b82393c4f337d66f2f2b2746",
+    "utc": "2026-10-25T00:30:26Z",
+    "exit": 0,
+    "minutes": 10.39,
+    "last_logged_step": null
+   }
+  ],
+  "w1d_A2": [
+   {
+    "event": "start",
+    "git_sha": "81a697970b9400a2b82393c4f337d66f2f2b2746",
+    "utc": "2026-10-25T00:30:26Z",
+    "gpu": "NVIDIA A100-SXM4-40GB",
+    "cmd": "python scripts/diag_w1_frontier.py --name A2 --ckpt {R}/L_ts_requant_s0/final.pt --run_dir {R}/w1d_A2 --expect results/colab/w1_L_ts_requant/L_ts_requant_s0__result.json",
+    "seed": 0,
+    "local_data_copy": false,
+    "micro_batch_64": false,
+    "had_ckpt": false,
+    "last_logged_step": null
+   },
+   {
+    "event": "end",
+    "git_sha": "81a697970b9400a2b82393c4f337d66f2f2b2746",
+    "utc": "2026-10-25T00:40:55Z",
+    "exit": 0,
+    "minutes": 10.48,
+    "last_logged_step": null
+   }
+  ]
+ }
+}

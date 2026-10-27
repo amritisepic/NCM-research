@@ -1,0 +1,2 @@
+{"event": "start", "git_sha": "81a697970b9400a2b82393c4f337d66f2f2b2746", "utc": "2026-10-25T00:08:03Z", "gpu": "NVIDIA A100-SXM4-40GB", "cmd": "python scripts/diag_w1_frontier.py --name A0 --run_dir {R}/w1d_A0 --expect results/colab/w1_L_ts_ctrl/L_ts_released16__result.json", "seed": 0, "local_data_copy": false, "micro_batch_64": false, "had_ckpt": false, "last_logged_step": null}
+{"event": "end", "git_sha": "81a697970b9400a2b82393c4f337d66f2f2b2746", "utc": "2026-10-25T00:20:02Z", "exit": 0, "minutes": 11.99, "last_logged_step": null}

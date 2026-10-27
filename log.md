@@ -839,3 +839,42 @@ generator and share the dropout stream; the logged per-level corrupted fractions
 - The A6-1 guard (run identity checked only once a checkpoint exists) also sat in `scripts/train_gen.py` and
   `scripts/train_sudoku_L.py`; fixed with tests in PR 11 (review requested). No queued notebook uses those trainers.
 - The user launched `w1d_requant_diag`.
+
+## R039 — W1d: A2's Gen-PPL gain is a T = 1 effect; registered reading "trade-off", A2 not pursued (2026-10-26; registered W1d, exploratory)
+- Run: `w1d_requant_diag`, A100-40GB, code `81a6979` (all three sessions), 2026-10-25 00:08-00:41 UTC, ~33 min
+  (~3 CU with setup). Results `results/colab/w1d_requant_diag/` (the notebook's copies of four repo-level JSONs in
+  `results/` were identical to them and are not duplicated). Numbers below recomputed from the result JSONs; paired
+  differences are over the 8 sample seeds (frontier) or 4 window groups (oracle), mean ± SE, sampling noise only.
+- **Integrity gate passes:** at T = 1 every group of A0, A1 and A2 reproduces its wave-1 Gen-PPL exactly (max |diff| 0.0,
+  tol 0.01). The numbers are read.
+- **Frontier** (Gen-PPL GPT-2 large; A0 / A1 / A2; A2 - A1 paired):
+  | T | A0 | A1 | A2 | A2 - A1 | entropy A1 / A2 | MAUVE A1 / A2 |
+  |---|---|---|---|---|---|---|
+  | 0.8 | 13.40 | 13.60 | 13.82 | +0.22 ± 0.08 | 3.949 / 3.945 | 0.921 / 0.919 |
+  | 0.9 | 14.34 | 14.79 | 14.84 | +0.05 ± 0.10 | 3.955 / 3.955 | 0.909 / 0.932 |
+  | 1.0 | 16.02 | 16.56 | 16.23 | -0.33 ± 0.12 | 3.962 / 3.964 | 0.896 / 0.930 |
+  Mean of the three paired differences -0.02 ± 0.08. TinyStories-33M Gen-PPL agrees in sign at every T (+0.42, +0.28,
+  -0.24). Entropies are within 0.005 nats at every T; A2's MAUVE is not lower by more than 0.01 at any T (0.8: -0.002).
+  A2 is worse than the released model at every T (+0.42, +0.50, +0.21).
+- **Registered frontier reading: "trade-off"** (the Gen-PPL gain reverses at T = 0.8, and the mean over T is not 2 SE
+  below 0). Not "A2 ahead": **W1c is not registered; A2 is reported as a likelihood / MAUVE shift without a Gen-PPL gain
+  and is not pursued** (bet 4 dropped). The held A1 seeds 1-2 lose their W1c use; they remain the only source of A1's
+  training SD for M1's gate.
+- **Oracle curve** (levels 0..j real, rest sampled at T = 1; Gen-PPL GPT-2 large):
+  | j | A0 | A1 | A2 | A2 - A1 | A1 - A0 |
+  |---|---|---|---|---|---|
+  | -1 | 15.96 | 16.66 | 16.52 | -0.14 ± 0.09 | +0.69 ± 0.11 |
+  | 3 | 12.38 | 12.38 | 12.80 | +0.42 ± 0.17 | +0.00 ± 0.09 |
+  | 5 | 9.52 | 9.43 | 9.54 | +0.11 ± 0.03 | -0.09 ± 0.01 |
+  | 7 | 8.92 | 8.87 | 8.89 | +0.02 ± 0.01 | -0.05 ± 0.01 |
+  Registered oracle reading: A2 - A1 does not survive to j = 5 (it reverses sign), so whatever gain A2 has arises while
+  the model samples its own coarse levels. Caveat: the j = -1 gain itself is 1.4 SE, so this reading rests on a gain that
+  this run barely resolves.
+- **Exploratory (not registered):** (1) Given real levels 0..3, A2 renders levels 4+ *worse* than A1 (+0.42 ± 0.17); its
+  only edge is when it conditions on its own sampled coarse codes. That fits re-quantized labels teaching the model to
+  render consistently from wrong parents at some cost on right ones. One seed; a hypothesis, not a finding. (2) Wave 1's
+  continued training (A1) loses 0.69 Gen-PPL to the released model with no oracle, but nothing once levels 0..3 are
+  real and slightly gains at j >= 5: the control's damage sits in sampling levels 0-3. This argues against reading W1's
+  shortfall to A0 as a fine-level effect. (3) The T = 1 advantage plus the T = 0.8 reversal at equal entropy looks like
+  a change in how the sampled tail is shaped rather than a better model; untested.
+- Compute: ~73 CU spent of ~200.

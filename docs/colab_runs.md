@@ -30,7 +30,7 @@ Final eval per W1 arm: 16 x 256 samples in fp32 (~5-10 min on an A100).
 | `w1_L_ts_b1` | B1: on-policy + re-quantized labels, 1350 steps | A100 / L4 | ~9.7 (incl. restarts) | done (R030: collapsed; nominally advances vs A3) -> seeds **dropped** (user, R033) |
 | `w1_L_ts_requant` | B1b: re-quantized labels, 1800 steps | A100 / L4 | ~6.5 | done (R030: 0.31 below A1, bar 0.35) |
 | `w1_L_ts_soft` | B7: soft labels, 1800 steps | A100 / L4 | ~6.5 | done (R030: 0.85 worse than A1) |
-| `w1d_requant_diag` | W1d (eval-only): temperature frontier and oracle curve for A0 / A1 / A2 from the wave-1 checkpoints on Drive | **A100** (exact reproduction gate) | ~2.5 | **ready** (PR 7 merged after Codex's review of `f087a48`; deep audit 5 done; PR 5 does not touch its code path) |
+| `w1d_requant_diag` | W1d (eval-only): temperature frontier and oracle curve for A0 / A1 / A2 from the wave-1 checkpoints on Drive | **A100** (exact reproduction gate) | ~3 | done (R039: gate exact; "trade-off", A2 not pursued) |
 | `w2b_L_sdk_ctrl` | Sudoku tier L control (+ released reference A0), S1 | A100 / L4 | ~2.5 | **hold** (after WMT14; R031) |
 | `w2b_L_sdk_uniform` | Sudoku: uniform corruption control | A100 / L4 | ~2.5 | **hold** (after WMT14; R031) |
 | `w2b_L_sdk_onpolicy` | Sudoku: on-policy greedy corruption (B1a) | A100 / L4 | ~2.5 | **drop** (recommended, R031: the greedy policy corrupts a few % of codes; the mechanism is tested on CPU instead) |
@@ -45,8 +45,8 @@ Final eval per W1 arm: 16 x 256 samples in fp32 (~5-10 min on an A100).
 | `w2_Mc_ar15` | M1 conditional: AR at 1.5x steps, seed 0 | A100 / L4 | ~6.4 | only when asked (before a criterion-(b) claim) |
 | `calib_t4` | old calibration (superseded by w0) | T4 | 0.6 | skip |
 
-Budget: ~200 CU (raised 2026-10-23). Spent: ~70 CU (p1, c4, w0 ~12.5; wave 1 ~46 incl. restarts, R030; WMT14 pair ~11.9, R036). Next: W1d ~2.5
-and J2-F ~6.5 once their code is reviewed. Held: Sudoku 3 arms ~7.5, A1 seeds 1-2 ~13, M1 pair ~12. Reasons and
+Budget: ~200 CU (raised 2026-10-23). Spent: ~73 CU (p1, c4, w0 ~12.5; wave 1 ~46 incl. restarts, R030; WMT14 pair ~11.9, R036; W1d ~3, R039).
+Next: J2-F ~6.5 (cleared), then W2M ~27 once built and audited. Held: Sudoku 3 arms ~7.5, A1 seeds 1-2 ~13, M1 pair ~12. Reasons and
 ranking: `log.md` R031 and `STATE.md`. Every notebook now records the git SHA and each session's resume point
 (`_meta.json`, `<run>__provenance.jsonl`) and refuses to resume a run directory under changed code (PR 3). Progress check: the notebook prints `{"step": ..., "steps_per_s": ...,
 "tflops_eff": ...}`; remaining steps / steps_per_s = time left.

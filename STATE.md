@@ -1,6 +1,6 @@
 # STATE — read this first
 
-_Last updated: 2026-10-24, session 5 (R036; previous handoff: `docs/prompts/handoff_2026-10-24.md`). Branches: `claude/ncm-research` (notebooks clone it) and
+_Last updated: 2026-10-26, session 7 (R039; previous handoff: `docs/prompts/handoff_2026-10-24.md`). Branches: `claude/ncm-research` (notebooks clone it) and
 `claude/ncm-phase2-analysis-finetune-pkh64d` (older mirror). Repo is PUBLIC: commit nothing identifying (no
 personal names/emails, no absolute local paths, no session links, no credentials). Goals, success bar and rules:
 `docs/brief.md`._
@@ -20,7 +20,8 @@ as registered. Exploratory: 16% of test sentences collapse onto two input-indepe
 the rest J2 saves 9%. The user had J2-F (frozen released-model teacher) registered as a contingent arm; J2's miss
 triggers it (registered after this result, stated in the text); not built. Nothing is cleared to launch: `w1d_requant_diag`
 waits for PR 7 and J2-F for its code, review and deep audit; Codex is at its usage limit (since 2026-10-24 16:36 UTC). Advisory, unregistered literature report:
-`docs/literature_advice_2026-10-24.md`.
+`docs/literature_advice_2026-10-24.md`. **W1d (R039):** reproduction gate exact; A2's Gen-PPL gain exists only at T = 1
+(+0.22 at T = 0.8, +0.05 at 0.9, -0.33 at 1.0): registered reading "trade-off", A2 not pursued, no W1c.
 
 ## Environment
 - **Codex:** reviews PRs (bot `chatgpt-codex-connector`; 2-15 min per review); a review triggered only by opening a PR may
@@ -82,8 +83,8 @@ waits for PR 7 and J2-F for its code, review and deep audit; Codex is at its usa
    eval-only temperature check of A3 (W1d covers A0-A2 only; hedging predicts A3's gap to A1 shrinks at lower T).
 3. **Clean code NLL is not a quality proxy (candidate for criterion c):** four observations; make it rigorous with an
    equivalence-class / decoded-token NLL on the 7 W1 checkpoints (~1 CU, checkpoints on Drive) vs Gen-PPL.
-4. **A2 (Infinity-style re-quantized hierarchy):** -0.31 ± 0.08 (paired, sampling noise only) and MAUVE +0.034 at equal
-   entropy; failed the screen. A fresh 3-seed test needs a new registration and A1's seed SD (~26-39 CU).
+4. ~~A2 (Infinity-style re-quantized hierarchy)~~: dropped (R039, W1d "trade-off": the gain reverses at T = 0.8). Side
+   observation: A1's 0.69 shortfall to A0 is entirely in sampling levels 0-3 (oracle j >= 3 closes it).
 5. Coarse-plan interventions (levels 1-5 hold 86% of the oracle gap): eval-only, entropy-matched (~1 CU); speculative.
 - On hold: B6/C5 Sudoku repair (S1, ~7.5 CU with its controls); M1 tier M (criterion b has no candidate);
   C2 red-black steps (P1c step 2 not built).
@@ -98,17 +99,19 @@ waits for PR 7 and J2-F for its code, review and deep audit; Codex is at its usa
 - P1b withdrawn (R023).
 
 ## Compute
-- Colab: ~70 CU spent (p1, c4, w0 ~12.5; wave 1 ~46 incl. ~6.5 lost to restarts, R030; WMT14 pair ~11.9, R036).
-  Budget ~200: ~130 left.
-- Plan: W1d ~2.5 and J2-F ~6.5 next; then J2-F/J1 seeds 1-2 (~22) if J2-F passes its screen, batch-1 wall-clock ~1-2; mechanism
+- Colab: ~73 CU spent (p1, c4, w0 ~12.5; wave 1 ~46 incl. ~6.5 lost to restarts, R030; WMT14 pair ~11.9, R036;
+  W1d ~3, R039). Budget ~200: ~127 left (J2-F's ~6.5 not yet reported).
+- Plan: J2-F ~6.5 next; then J2-F/J1 seeds 1-2 (~22) if J2-F passes its screen, batch-1 wall-clock ~1-2; mechanism
   arms ~15 if registered; NLL-proxy eval ~1 (planned ~48). Held: Sudoku 3 arms ~7.5, A1 seeds 1-2 ~13, M1 pair ~12
   (~32.5). ~62 unallocated if all of it runs.
 - CPU: ~13.5 CPU-h before session 5; session 5 ~1.2 h (Sudoku paired rerun, test suites).
 
 ## Next 3 actions
-1. User: `w1d_requant_diag` is running (A100). Launch `w2c_L_wmt_consist_frozen` (J2-F, A100, ~6.5 CU): cleared (R038).
-2. When results arrive: W1d against its registered reading (T = 1 reproduction gate first); J2-F with
-   `scripts/analyze_j1.py --candidate J2-F` against J1-J1c + J2-F; if J2-F looks like it meets criterion (d), stop and ask.
-3. W2M (registered 2026-10-25; the user chose all 8 arms, ~27 CU, and the flag input): being implemented on
-   `claude/wip-w2m`; then PR, Codex review, deep audit (it also covers PR 5's text-trainer changes), notebooks
-   `w2m_L_ts_m0..m7` + `w2m_mech_eval`. PR 11 merged.
+1. User: launch (or report) `w2c_L_wmt_consist_frozen` (J2-F, A100, ~6.5 CU; cleared R038). When it arrives: analyse with
+   `scripts/analyze_j1.py --candidate J2-F` against J1-J1c + J2-F; if it looks like it meets criterion (d), stop and ask.
+2. W2M (registered 2026-10-25, all 8 arms, ~27 CU): implementation uncommitted in the `claude/wip-w2m` worktree
+   (trainer, corruption, `src/ncmr/w2m.py`, mech eval, 9 notebooks, 3 test files). Finish, commit, PR, Codex review,
+   then a deep audit (also covers PR 5's text-trainer changes) before any launch. Offload prompt:
+   `docs/prompts/codex_w2m_offload.md`.
+3. After J2-F and W2M: decide with the user between J2-F/J1 seeds 1-2 (if J2-F passes), the clean-NLL-vs-quality
+   eval (~1 CU), and the held Sudoku / M1 runs.
