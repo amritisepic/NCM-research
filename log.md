@@ -1271,3 +1271,86 @@ clean windows (seed 2028) with masks paired across models. No per-window values 
   included, depends ~2.5x more on one coarse code than the released model (0.088-0.106 vs 0.036). This co-occurs with the
   control's drift (M0 21.7 vs 16.2 Gen-PPL); W1's A1 (no clean rows) was not measured, so a link to the clean rows is
   untested.
+
+## R054 — E1: most fine-level code NLL is representation choice in TinyStories and Sudoku (cut 8, lower bounds 0.875 / 0.993), not established in WMT14 (0.763, censoring); prediction 2 unreadable; E1 misses its (c) bar (2026-10-27; registered E1 + E1a; analysis under review)
+Run `e1_equivalence`, L4, torch 2.11.0+cu130, at `2a27ae9` (code identical to the audited `dcdb890`). TinyStories ran
+twice from scratch: the first session (~23 min) was interrupted without output, and the second redid all four models
+(the script has no resume; Gumbel noise is seeded per item and cut, so the rerun is the registered computation).
+WMT14 and Sudoku ran once each. ~156 L4-min including the lost session (~4.3 CU; registered estimate 2-3).
+`results/colab/e1_equivalence/`. Analysis: `scripts/analyze_e1.py` -> `results/e1_analysis.json` (E1 + E1a), on PR 15
+(Codex review pending; not merged). **Provisional until PR 15 merges; no (c) claim rests on it before a deep audit.**
+
+Cut 8, every item; R share = mean R_8 / mean N_8, bounds from the per-item beta-mixture confidence sequences (delta =
+0.05 / (items x registered cuts) per model; TinyStories 1.95e-4, WMT14 1.30e-4, Sudoku 9.77e-5):
+| model | items | censored (0 hits) | mean N_8 (nats) | R share [lower, upper] | mean T_8 [lower, upper] |
+|---|---|---|---|---|---|
+| TinyStories A0 (released) | 64 | 6 | 404.3 | [0.875, 0.997] | [1.02, 50.4] |
+| A0, 61 untouched windows | 61 | 6 | 401.1 | [0.868, 0.997] | |
+| A1 | 64 | 5 | 393.3 | [0.895, 0.998] | [0.92, 41.3] |
+| A2 | 64 | 7 | 302.0 | [0.842, 0.996] | [1.23, 47.7] |
+| A4 | 64 | 3 | 248.5 | [0.913, 0.996] | [0.91, 21.7] |
+| WMT14 J0 (released) | 128 | 18 | 130.9 | [0.763, 0.984] | [2.05, 31.0] |
+| J1 | 128 | 15 | 97.9 | [0.780, 0.980] | [1.94, 21.6] |
+| J2-F | 128 | 13 | 114.0 | [0.809, 0.982] | [2.01, 21.8] |
+| Sudoku-hard (released) | 128 | 0 | 32.2 | [0.993, 1.000] | [0.001, 0.21] |
+
+**Registered readings**
+- Integrity: the run's saved summaries and paired blocks equal their recomputation (1e-9); no R_k / U_k monotonicity
+  violation beyond the intervals in any model (and none at the point estimates, 185-408 cut pairs per model); no empty
+  intersection with [exp(-N_k), 1]. x^ = x for 63 of 64 TinyStories windows, 100 of 128 WMT14 pairs and every Sudoku
+  board (hits are defined against x^).
+- **Prediction 1** (E1's rule on the bounds: holds if the lower bound >= 0.8): **holds** for released TinyStories, on all
+  64 windows (0.875) and on the 61 untouched by the R046 pilot (0.868), and for **Sudoku** (0.993); **neither** for
+  **WMT14** (0.763 < 0.8; upper 0.984). E1a's added rule: TinyStories (61 untouched) **neither** (0.868 < 0.90, and 78.7%
+  of windows have a T_8 interval <= 2 nats, needs 80%; 9.8% censored); WMT14 **neither** (14.1% censored; 54.7%
+  narrow); Sudoku **holds**. Nothing is overturned.
+- **Replication across domains (R044) fails as registered:** the inequality is not established in WMT14, and at E1a's
+  0.90 bar only Sudoku meets it. E1 does not meet its criterion-(c) bar. The shortfall is censoring: the 18 WMT14 pairs
+  without a hit in 2048 samples enter the lower bound at R = 0 and carry 21% of the total N_8 (mean 198 vs 131 nats),
+  so the bound could not reach 0.8 at this budget (TinyStories A0: 6 windows, 12% of N_8).
+- **Prediction 2:** **neither** in all three comparisons (overall neither, not overturned). The dT_8 intervals, A2 - A1
+  [-40.1, 46.8], A4 - A1 [-40.4, 20.7] and J1 - J0 [-29.1, 19.5] nats, are far wider than +/-0.2 |dN_8| (+/-18.3,
+  +/-29.0, +/-6.6; dN_8 = -91.4 ± 3.3, -144.8 ± 2.5, -33.0 ± 1.1). Censored items, whose T can reach N, make the
+  prediction unreadable at E1's budget.
+- **Prediction 3** (descriptive): U_8 and N_8 give the same order, A4 < A2 < A1 < A0 and J1 < J2-F < J0, the opposite
+  of quality at the ends (A0 best by Gen-PPL, J0 best by BLEU). U_8 is dominated by A_8, the coarse levels' canonical
+  NLL, which fine-tuning also lowered.
+
+**Exploratory (labelled)**
+- Every TinyStories checkpoint spends at least 84% of its cut-8 code NLL (lower bounds 0.842-0.913) and at least 90% at
+  cuts 9-11 on choosing among code paths that decode to the same 128 tokens; Sudoku at least 93.8% at every cut 5-11.
+  At cuts 5-7 (8 items, descriptive) TinyStories windows rarely hit (cut 5: none in 2048 samples, T >= 5.1 nats): the
+  coarse levels carry the text.
+- The 20-hit stopping rule caps how narrow a T interval can be: 20 hits in 448 samples give rho in [0.012, 0.108] at
+  this delta, 2.2 nats wide. So E1a's 2-nat condition fails for low-rho windows at any budget that stops at 20 hits.
+- Continuing sampling on the censored and wide items keeps the beta-mixture sequences valid (Ville's inequality holds
+  under optional continuation), so a registered extension (E1b, ~1.5 CU) could read prediction 1 in WMT14 without new
+  error. Proposed in `docs/plan_2026-10-27.md` section 10, not run.
+
+## R055 — Astra round 3 triaged; plan section 10: W2C stage 1, the M3 no-clean pilot and an expanded W2M-G; direction 1 gated on W2M-G (2026-10-27; process)
+- Triage in `docs/plan_2026-10-27.md` section 10 (adopt / change / reject with reasons) of
+  `docs/research_review_round3_2026-10-27.md` (R051). Every number the review derives from ours recomputes exactly
+  from the result JSONs (M2 - M3 20.9363 ± 0.3740 Gen-PPL; 4.0354 nats clean NLL; 1.69 nats over L1-L5, max 0.57 at
+  one level; 21.9 / 13.8 / 2.7 CU from W2M's measured A100 minutes). Its algebra checks: replacing a context by an
+  independent draw from its marginal with probability r gives R(y|u) = (1 - r) P(y|u) + r P(y); the clean-row
+  mixture is Bayes' rule; a mixture puts at most -log(1 - eps) nats on data NLL.
+- Sources: two literature checks (one question each) found all 15 cited papers. Caveats: SAR (arXiv 2512.06421)
+  supervises student contexts with the model's own teacher-forced prediction, not ground truth, and does not re-pair;
+  arXiv 2602.00286 is framed as generation order in masked diffusion ("model vs factorization error" not confirmed);
+  Infinity's venue and RePR's name are unconfirmed. Infinity Table 7 (9.76 / 9.69 / 3.48) and Jacobi Forcing (3.95x,
+  83.5 vs 87.8) are exact. No prior art was found for fixed-input target reassignment or decoder-fiber training; two
+  quick searches are not a novelty clearance.
+- **Check against direction 1 (CPU, the released level-0 unigram):** entropy 7.31 nats (~1500 effective codes; 2558
+  of 4096 used; top-100 mass 0.30). With the root replaced in 56.7% of rows (75% corrupted x 75.65%), the posterior
+  that a supplied root is canonical averages 0.43 under M2's unigram replacement and 0.63 under M3's uniform-wrong
+  replacement (62% of uniform-wrong roots are codes that occur in the data). Both arms smooth L1's root conditional
+  heavily, yet M3 stays healthy, and the arms differ by 0.42 nats at clean L1. Consequence: the L1 reassignment kill is
+  gated on W2M-G's crossed replay at cut 2 (prior lowered to ~15-20%).
+- Adopted: keep "mixed"; narrow the collapse claim (sufficient; competitors not needed, not irrelevant); "canonical
+  NLL barely distinguishes" replaces "invisible to clean likelihood" ("invariance" in R049 / R053 is withdrawn as a
+  word); minimum confirmation M2 / M3 at seeds 1-3 (21.9 CU); M3 instead of M0 for the no-clean pilot; cut the automatic
+  flag stage (~27 CU) in favour of an eval-only M4 routing sweep; expand W2M-G (shared banks, crossed replay,
+  divergence, root reliance); retract S0's architectural inference. Held: direction 2 (fiber training). Reserved: the
+  ten ideas.
+- Budget: D1 (~5.6), the mech eval (~0.5) and E1 (~4.3) cost ~10.4 CU against 7 allocated; ~66 CU left this month
+  (estimate). Proposed package ~40 CU (plan section 10). Nothing is registered or built; the user decides first.

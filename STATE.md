@@ -1,6 +1,6 @@
 # STATE — read this first
 
-_Last updated: 2026-10-27, session 9 (R052-R053 so far; plan `docs/plan_2026-10-27.md`; handoff `docs/prompts/handoff_2026-10-27.md`). Branches: `claude/ncm-research` (notebooks clone it) and
+_Last updated: 2026-10-27, session 9 (R052-R055; plan `docs/plan_2026-10-27.md`; handoff `docs/prompts/handoff_2026-10-27.md`). Branches: `claude/ncm-research` (notebooks clone it) and
 `claude/ncm-phase2-analysis-finetune-pkh64d` (older mirror). Repo is PUBLIC: commit nothing identifying (no
 personal names/emails, no absolute local paths, no session links, no credentials). Goals, success bar and rules:
 `docs/brief.md`._
@@ -42,7 +42,12 @@ nats), so the damage lives in generation-time contexts. J1a bootstrap and the WM
 verifier stop 0.44x): criterion (d) is closed on text, J1d is not run. **Mechanism eval (R053):** M4 uses its flags
 (-35 nats/window), so W2M's registered reading is final: mixed; plausible-wrong windows are detectable at the row level
 by every model (AUC >= 0.92 from level 2); the collapsed arms are not less coarse-context dependent on clean contexts.
-E1 has run; its E1a analysis (`scripts/analyze_e1.py`) is in a PR. Astra round 3 is in the repo (R051), not yet triaged.
+**E1 (R054, analysis on PR 15 in review):** at cut 8 most code NLL is representation choice in released TinyStories
+(lower bound 0.875) and Sudoku (0.993) but not established in WMT14 (0.763: 18 censored pairs hold 21% of N_8):
+prediction 1 holds in 2 of 3 domains, E1 misses its (c) bar; prediction 2 unreadable (censoring). **Astra round 3**
+(R051) triaged in R055 / `docs/plan_2026-10-27.md` section 10: W2C stage 1 (M2 / M3, seeds 1-3, 21.9 CU), the M3
+no-clean pilot, an expanded W2M-G (shared banks, crossed replay, root reliance, M4 flag sweep), the L1 target
+reassignment kill gated on W2M-G, E1b (continue sampling on censored items, ~1.5 CU); flag stage 2 cut. Awaiting the user.
 
 ## Environment
 - **Codex:** reviews PRs (bot `chatgpt-codex-connector`; 2-15 min per review); a review triggered only by opening a PR may
@@ -88,16 +93,17 @@ E1 has run; its E1a analysis (`scripts/analyze_e1.py`) is in a PR. Astra round 3
 - Throughput (A100): tier L 39-41 TFLOPS (2.1 s/step uniform, 3.0 on-policy, 3.7 two-pass), tier M NCM 24.7, AR 44.2.
 
 ## Live hypotheses / bets (ranked: significance x chance of a clean result / CU; plan `docs/plan_2026-10-27.md`)
-0. **Registered (R046), code merged (PR 14), ready to launch:** E1, how much of the code NLL is representation choice (codes that decode to
+0. **E1 run (R054):** prediction 1 holds for released TinyStories and Sudoku, not established for WMT14 (censoring);
+   (c) bar missed as registered; E1b (optional continuation, ~1.5 CU) could settle WMT14. Original entry: E1, how much of the code NLL is representation choice (codes that decode to
    the same text): `R_k = N_k - T_k` at cuts >= 8 (cuts 5-7 rarely hit: prototype), released TinyStories / WMT14 /
    Sudoku + A1 / A2 / A4 / J1 / J2-F, ~2-3 CU, primary criterion-(c) candidate. D1, batch-1 wall-clock gate for (d)
    (~1.5 CU; text prior ~20%). S0 failed (R045): coupled sampler dropped.
-1. ~~Criterion (d), text half: J2-F~~ — done (R042): no collapse, 5.6% saving, misses the screen. (d)'s text half has
-   no registered candidate; the Sudoku half (verifier stop) still lacks batch-1 wall-clock.
+1. ~~Criterion (d)~~ — **closed on text (R052)**: D1's gate fails (J2-F + stable x1 1.41x J0 sequential, fp32 A100);
+   Sudoku's verifier stop is 0.44x sequential. J1d not run; no more Jacobi training.
 2. **Mechanism of the on-policy collapse (candidate for criterion c).** W2M (R049, one seed): plausible-wrong
    replacement is sufficient and the tested competitors are not needed; truthful row flags halve the damage; clean NLL
-   is unaffected. Next (proposed, `docs/plan_2026-10-27.md` section 9): W2C at fresh seeds + a random-row flag control,
-   an M0 control without clean rows, eval-only generation-context diagnostics. Earlier notes: undetectable corruption -> the model discounts
+   is unaffected. Mech eval (R053): flag use -35 nats/window, reading final (mixed). Next (proposed, plan section 10, R055):
+   W2C stage 1 (M2 / M3 seeds 1-3), M3 without clean rows, expanded W2M-G; random-row flag stage cut. Earlier notes: undetectable corruption -> the model discounts
    its own coarse codes. Sudoku CPU (R031, matched slots and rates): plausible wrong codes raise predictive entropy on
    clean contexts by 74% (uniform: 5%) and clean NLL by 32 nats (2.7), and cut reliance on the true L6 code by 76% (R034,
    Codex's adversarial test). R036's paired rerun (ADV-1 fixed) reproduces the hedging (clean NLL +32 vs +3) but not
@@ -127,20 +133,18 @@ E1 has run; its E1a analysis (`scripts/analyze_e1.py`) is in a PR. Astra round 3
 - P1b withdrawn (R023).
 
 ## Compute
-- Colab: ~106 CU spent (p1, c4, w0 ~12.5; wave 1 ~46 incl. ~6.5 lost to restarts, R030; WMT14 pair ~11.9, R036;
-  W1d ~3, R039; J2-F ~6.5, R042; W2M ~26, R049). This month: 103.56 CU before W2M (user), so ~77 left (estimate; the
-  Colab panel is authoritative).
+- Colab: ~116 CU spent (p1, c4, w0 ~12.5; wave 1 ~46 incl. ~6.5 lost to restarts, R030; WMT14 pair ~11.9, R036;
+  W1d ~3, R039; J2-F ~6.5, R042; W2M ~26, R049; D1 ~5.6, mech eval ~0.5, E1 ~4.3, R052-R054). This month: 103.56 CU
+  before W2M (user), so ~66 left (estimate; the Colab panel is authoritative).
 - Plan (`docs/plan_2026-10-27.md`, proposed): W2M ~27 (registered); E1/E2 ~2; D1 ~1.5; W2C 14-28 if W2M's gate
   passes; J1d ~23 only if D1's text gate passes; coupled-sampler pilot <= 5 only if S0 passes; reserve 15. Likely
   path ~71, ~50 unallocated.
 - CPU: ~13.5 CPU-h before session 5; session 5 ~1.2 h (Sudoku paired rerun, test suites).
 
 ## Next 3 actions
-1. The user launches (A100): `d1_batch1_wallclock`; `w2m_mech_eval` with `--only released,m0,m1,m2,m3,m4,m6,m7`
-   (M5 skipped); `e1_equivalence` after amendment E1a (analysis only: confidence sequences from the saved hit counts,
-   R046's pilot windows labelled; Astra round 2 section 2). Read each against its registration; J1d seeds only if
-   J2-F + stable x1 <= 0.75x J0 sequential.
-2. **Held by the user until Astra round 3 is back** (prompt `docs/prompts/gpt6_astra_round3_2026-10-27.md`, sent 2026-10-27); then register
-   and build W2C (fresh seeds of M2 / M3 / M4 + a random-row flag control), the M0-without-clean-rows control and the
-   eval-only generation-context diagnostic (W2M-G) in one PR with Codex review and a delta audit. User approves W2C's CU.
-3. Log the mech eval's flag use (completes M4's registered reading) and row-level detectability as they land.
+1. **User:** choose the package in `docs/plan_2026-10-27.md` section 10 (recommended ~40 CU: W2M-G, M3 no-clean pilot,
+   W2C stage 1, E1b, the gated direction-1 kill) and report this month's Colab balance.
+2. PR 15 (`scripts/analyze_e1.py`): Codex review, triage, merge; then R054 stops being provisional. A deep audit before
+   any (c) claim rests on E1 (needed only if E1b runs).
+3. After the user's choice: register (W2C, M3 no-clean, W2M-G, E1b, direction 1's CPU gate), then one build PR from a
+   fresh session (Codex review, delta audit); merge only when no Colab run is mid-flight; tell the user what to launch.

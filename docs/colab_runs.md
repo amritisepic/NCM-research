@@ -40,7 +40,7 @@ Final eval per W1 arm: 16 x 256 samples in fp32 (~5-10 min on an A100).
 | `w2c_L_wmt_consist_frozen` | J2-F: J2 with a frozen released-model teacher (contingent arm, triggered by J2's miss) | **A100** | ~6.5 | done (R042: no collapse, 5.6% pass saving; misses the screen; no seeds) |
 | `w2m_L_ts_m0` ... `w2m_L_ts_m7`, `w2m_mech_eval` | W2M: eight 600-step tier-L mechanism arms for the on-policy collapse + eval-only mechanism measures | A100 / L4 | ~26 (7 arms) + ~0.5 | arms **done** (R049: M0-M4, M6, M7; M5 skipped); `w2m_mech_eval` **done** (R053, L4: M4 flag use -35 nats/window; W2M's reading final: mixed) |
 | `d1_batch1_wallclock` | D1: batch-1 wall-clock gate for criterion (d) (WMT14 J0 / J2-F, Sudoku-hard; fp32 gate, bf16 secondary) | **A100** | ~5.6 (est. 1.5) | **done** (R052: text gate fails, J2-F + stable x1 1.41x J0 sequential; Sudoku verifier 0.44x; (d) closed on text; J1d not run) |
-| `e1_equivalence` | E1: representation vs text share of code NLL (TinyStories A0 / A1 / A2 / A4, WMT14 J0 / J1 / J2-F, Sudoku) | A100 / L4 | ~4.3 (L4, incl. one interrupted session) | **run** (2026-10-27); E1a analysis (`scripts/analyze_e1.py`) in a PR, then read |
+| `e1_equivalence` | E1: representation vs text share of code NLL (TinyStories A0 / A1 / A2 / A4, WMT14 J0 / J1 / J2-F, Sudoku) | A100 / L4 | ~4.3 (L4, incl. one interrupted session) | **done** (R054: prediction 1 holds for TinyStories and Sudoku, not established for WMT14, censoring; analysis PR 15) |
 | `p1b_tc_rerun` | P1b: within-level-AR TC probe | — | — | **withdrawn** (R023: false premise; notebook removed; P1c to come) |
 | `w2_Mc_ncm` | tier M design C (M1): NCM from scratch, d512 x 6, 6k steps, seed 0 | A100 / L4 | ~7.7 | **hold** (criterion b needs a candidate; wave 1 produced none) |
 | `w2_Mc_ar` | tier M design C (M1): AR, same body, FLOP-matched, seed 0 | A100 / L4 | ~4.3 | **hold** (as above) |
@@ -48,7 +48,7 @@ Final eval per W1 arm: 16 x 256 samples in fp32 (~5-10 min on an A100).
 | `calib_t4` | old calibration (superseded by w0) | T4 | 0.6 | skip |
 
 Budget: ~200 CU (raised 2026-10-23). Spent: ~116 CU (p1, c4, w0 ~12.5; wave 1 ~46 incl. restarts, R030; WMT14 pair ~11.9, R036; W1d ~3, R039; J2-F ~6.5, R042; W2M ~26, R049; D1 ~5.6, mech eval ~0.5, E1 ~4.3, R052-R053). This month: ~66 left of the user's 103.56 (estimate; the Colab panel is authoritative).
-Next (`docs/plan_2026-10-27.md` section 9): the three PR 14 notebooks (~6), then W2M-G (~2), M0 without clean rows (~2.7), W2C stage 1 (~22) and stage 2 (~27) once registered; J1d only if D1 passes. Reasons and
+Next (`docs/plan_2026-10-27.md` section 10, awaiting the user): W2M-G (~4), M3 without clean rows (~2.7), W2C stage 1 (~22), E1b (~1.5), a gated direction-1 kill (<= 5), once registered and built; J1d dropped (D1 failed, R052). Reasons and
 ranking: `log.md` R031 and `STATE.md`. Every notebook now records the git SHA and each session's resume point
 (`_meta.json`, `<run>__provenance.jsonl`) and refuses to resume a run directory under changed code (PR 3). Progress check: the notebook prints `{"step": ..., "steps_per_s": ...,
 "tflops_eff": ...}`; remaining steps / steps_per_s = time left.
