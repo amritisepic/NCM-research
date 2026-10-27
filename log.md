@@ -1013,3 +1013,8 @@ numbers: `scripts/analyze_j1.py --candidate J2-F` -> `results/j2f_analysis_s0.js
   batch-1 wall-clock saving (attention-inclusive cost reported), not only fewer forward passes. D1 runs first; J1d (J2-F
   and J1 seeds 1-2, ~23 CU) runs only if J2-F + the stability stop passes D1's text gate (<= 0.75x J0 sequential mean
   batch-1 latency in fp32). This settles R043's reading of "ignore the cost rule". Passed to the build session.
+- **Replication unit for (c) (user):** for a property of released models (E1), replication across domains and
+  checkpoints counts; training seeds are required only where a training arm is the evidence. Consequence for E1: its
+  claim rests on the released TinyStories, WMT14 and Sudoku models; the checkpoint differences (A2 - A1, A4 - A1,
+  J1 - J0) are seed-0 supporting evidence and enter a (c) claim only with seeds (none funded). Passed to the build
+  session.
