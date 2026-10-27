@@ -1,0 +1,113 @@
+{
+ "split": "val (newstest2013, all 3000)",
+ "note": "exploratory, val only; test not computed for any rule",
+ "j0_exact_bleu": 23.554661892058366,
+ "arms": {
+  "J0": {
+   "exact": {
+    "passes": 10.916,
+    "bleu": 23.554661892058366
+   },
+   "stable x1": {
+    "passes": 9.024,
+    "bleu": 23.554293143438098
+   },
+   "stable x2": {
+    "passes": 10.045,
+    "bleu": 23.56371211922696
+   },
+   "cap 7": {
+    "passes": 6.9976666666666665,
+    "bleu": 20.747123806612198
+   },
+   "cap 8": {
+    "passes": 7.993666666666667,
+    "bleu": 22.45111888012909
+   },
+   "cap 9": {
+    "passes": 8.969333333333333,
+    "bleu": 23.416447241140254
+   }
+  },
+  "J1": {
+   "exact": {
+    "passes": 11.527333333333333,
+    "bleu": 22.821645427751573
+   },
+   "stable x1": {
+    "passes": 9.759,
+    "bleu": 22.797292008061437
+   },
+   "stable x2": {
+    "passes": 10.707333333333333,
+    "bleu": 22.821718471805806
+   },
+   "cap 7": {
+    "passes": 6.999,
+    "bleu": 18.81745330970685
+   },
+   "cap 8": {
+    "passes": 7.998,
+    "bleu": 21.326448263729986
+   },
+   "cap 9": {
+    "passes": 8.996666666666666,
+    "bleu": 22.663103776557023
+   }
+  },
+  "J2": {
+   "exact": {
+    "passes": 9.357,
+    "bleu": 18.53366595452865
+   },
+   "stable x1": {
+    "passes": 7.1306666666666665,
+    "bleu": 18.59594016308554
+   },
+   "stable x2": {
+    "passes": 8.313,
+    "bleu": 18.56346999039866
+   },
+   "cap 7": {
+    "passes": 6.623666666666667,
+    "bleu": 17.964866250866706
+   },
+   "cap 8": {
+    "passes": 7.4896666666666665,
+    "bleu": 18.40229364407007
+   },
+   "cap 9": {
+    "passes": 8.276,
+    "bleu": 18.491218506646995
+   }
+  },
+  "J2-F": {
+   "exact": {
+    "passes": 10.284666666666666,
+    "bleu": 22.903512920040335
+   },
+   "stable x1": {
+    "passes": 7.799333333333333,
+    "bleu": 23.018828598879164
+   },
+   "stable x2": {
+    "passes": 9.083333333333334,
+    "bleu": 22.971636731174637
+   },
+   "cap 7": {
+    "passes": 6.996333333333333,
+    "bleu": 22.210688249938517
+   },
+   "cap 8": {
+    "passes": 7.983,
+    "bleu": 22.75091618880483
+   },
+   "cap 9": {
+    "passes": 8.913,
+    "bleu": 22.863909659613043
+   }
+  }
+ },
+ "rule": "stable x m: stop at the first pass t > m whose decoded text equals that of each of the previous m passes (capped hypotheses from the arm's hyp_val.json); output = the text after pass t; passes = t (exact passes if no earlier stop). cap c: the saved capped hypotheses. BLEU: lowercased sacreBLEU against newstest2013, which reproduces every recorded val BLEU exactly (R042).",
+ "status": "exploratory (R042); not registered; nothing computed on test"
+}

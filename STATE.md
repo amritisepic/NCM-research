@@ -24,7 +24,8 @@ waits for PR 7 and J2-F for its code, review and deep audit; Codex is at its usa
 (+0.22 at T = 0.8, +0.05 at 0.9, -0.33 at 1.0): registered reading "trade-off", A2 not pursued, no W1c.
 **J2-F (R042):** the frozen teacher removes J2's collapse (shared outputs 0.3% vs 16.2%; prediction held) but saves
 only 5.6% of test passes: misses the screen, kill met, no seeds; the consistency line stops. Lead (val only): an
-output-stability stop at 7.80 passes (29% below 11), latency-only at ~2.3x the positions. **W2M pre-reading (R043):**
+output-stability stop at 7.80 passes (29% below 11) and BLEU -0.54 vs J0, inside (d)'s text thresholds in logical
+passes; not a claim (one seed, post-hoc rule, no timing; ~2.3x the positions). Flagged to the user; D1 decides. **W2M pre-reading (R043):**
 flags saturate at W1's rates (M5 is a near-replicate of M4) and probe (b) is confounded by level identity (AUC 0.95
 from the level alone); amendment **W2Ma** (readings only). Astra review triaged; re-plan proposed in
 `docs/plan_2026-10-27.md` (primary target criterion (c); (d) gets one wall-clock gate), **awaiting the user**.

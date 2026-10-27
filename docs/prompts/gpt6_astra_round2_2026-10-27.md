@@ -49,9 +49,11 @@ frozen copy of the released model instead of the current model.
   passes, J2-F / J0 / J1: c = 6 20.70 / 17.63 / 14.73; c = 7 21.57 / 19.70 / 17.65; c = 8 22.02 / 21.50 / 20.22;
   c = 9 22.10 / 22.51 / 21.56; c = 1 10.16 / 0.31 / 0.12.
 - Exploratory, val only (test untouched): stopping at the first pass whose decoded text equals the previous pass's
-  gives J2-F 7.80 mean passes (29% below 11), output identical to its exact output for 80% of sentences; J0 9.02
-  (18%), 88%; J1 9.76 (11%), 92%. BLEU not yet computed. At 7.8 passes this is ~2.3x the sequential decode's
-  positions.
+  gives J2-F 7.80 mean passes (29% below 11) at val BLEU 23.02 (J0 exact 23.55: -0.54), output identical to its exact
+  output for 80% of sentences. Same rule, J0: 9.02 passes (18%) at 23.55 (-0.00); J1: 9.76 (11%) at 22.80. Fixed caps
+  near J2-F's operating point: J0 cap 8 22.45 (-1.10) at 7.99 passes; J2-F cap 8 22.75. So in logical passes, on val,
+  J2-F + this rule sits inside (d)'s text thresholds; the rule was chosen after seeing J2-F's curves, one seed, no
+  timing. At 7.8 passes it is ~2.3x the sequential decode's positions, and each rule pass adds a tokenizer decode.
 - Fine-tuning tax: teacher forcing alone (J1) lowers val NLL by 43.5 nats/sentence and costs 0.73 val BLEU; adjacent
   duplicated words per 1k rise 17.1 (J0) -> 21.0 (J1) -> 24.4 (J2-F).
 
@@ -81,8 +83,8 @@ clean-vs-corrupted-window probe with uniform-wrong contexts as the positive cont
   M2, M3, M4 (optionally M1).
 - **D1 (~1.5 CU):** batch-1 latency, A100 and L4, fp32 (quality precision) and bf16: WMT14 J0 sequential, J0 Jacobi
   exact, J0 and J2-F Jacobi + stability stop; Sudoku sequential vs verifier stop. The text half of (d) stays alive only
-  if J2-F + stop <= 0.75x J0 sequential latency in fp32 and the rule's val BLEU is within 1 of J0's. Then (only then)
-  J2-F and J1 seeds 1-2 (~23 CU). Our prior that text passes: ~20%.
+  if J2-F + stop <= 0.75x J0 sequential latency in fp32 and the rule's val BLEU is within 1 of J0's (now known:
+  -0.54). Then (only then) J2-F and J1 seeds 1-2 (~23 CU). Our prior that text passes the timing gate: ~20%.
 - **S0 (CPU), gate for your coupled sampler:** held-out gain from adding the canonical left-neighbour code to the
   frozen factorized head (zero-initialised low-rank bilinear term), levels 1-6. Pilot (<= 5 CU) only if levels 1-5
   gain >= 10 nats/window and >= 5% of their NLL, and E2's adjacent interaction is positive.
@@ -105,7 +107,9 @@ clean-vs-corrupted-window probe with uniform-wrong contexts as the positive cont
    counts, controls) and the result that would separate mode mixing from plain marginal broadening.
 4. **J2-F and criterion (d).** Explain why frozen-teacher consistency improves early-pass outputs but barely speeds
    exact convergence (your triangular-map argument predicts what here?). Is the stability stop principled, and is
-   J0 + the same rule the decisive comparator? From first principles, predict D1 for a 120M model at batch 1 on an
+   J0 + the same rule the decisive comparator? How should the rule be registered (fixed on val, then test once per
+   seed) so that a hostile reviewer accepts it, given that it was chosen after seeing seed 0's val curves? From first
+   principles, predict D1 for a 120M model at batch 1 on an
    A100 in fp32 and bf16 (Jacobi pass ~3.3x an average sequential step's positions). What is the fair sequential
    baseline (prefix recomputed vs cached)? Is a latency-only (d) claim worth making at 2.3x the compute?
 5. **W2M under W2Ma.** With saturated flags, what can M2 / M3 / M4 still distinguish, and could an M4 rescue come from

@@ -969,6 +969,17 @@ numbers: `scripts/analyze_j1.py --candidate J2-F` -> `results/j2f_analysis_s0.js
   0.911); outputs identical to J0's 6.2% (J1 6.5%). Wall-clock 4286 s (J2 4202, J1 3071; incl. evaluations).
 
 **Decisions**
+- **Update (same day, references fetched):** the public newstest2013 (HF `wmt/wmt14` validation parquet, the source
+  `prep_wmt14.py` uses) and newstest2014 (`data/wmt14/reference_translations.pickle`, the evaluation's file)
+  references reproduce every recorded BLEU exactly (J0 / J1 / J2 / J2-F, val and test; differences <= 7e-15).
+  Exploratory, **val only** (`results/j2f_stop_rule_val_s0.json`; nothing computed on test): stability stop ("stable
+  x1", above) gives J2-F **7.80 passes (29.1% below 11) at BLEU 23.02, 0.54 below J0's exact 23.55**; stable x2 9.08
+  passes, 22.97. J0 + stable x1: 9.02 passes (18.0%) at 23.55 (-0.00): a training-free 18%. J1 + stable x1: 9.76,
+  22.80. At about J2-F's operating point, J0 capped at 8 gets 22.45 (-1.10) at 7.99 passes and J1 21.33. In logical
+  passes on val, J2-F + stable x1 is inside criterion (d)'s text thresholds. Not a claim: one seed, a rule chosen after
+  seeing seed 0's curves, no timing (J1a needs batch-1 wall-clock and an attention-inclusive cost; at 7.8 passes the
+  decode is ~2.3x the sequential positions, plus a tokenizer decode per pass). Per the brief, flagged to the user
+  before more compute; D1 (wall-clock) is the next step, J1d (seeds) only after it.
 - J2-F is dead for criterion (d) as registered; per its registration, no seeds. The stability-stop observation is a
   lead on val only: any use needs a new registration, the references and a batch-1 wall-clock gate first
   (`docs/plan_2026-10-27.md`).
