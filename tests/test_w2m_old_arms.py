@@ -9,9 +9,10 @@ import pytest
 import torch
 
 from ncmr.corruption import CorruptionCfg, build_hierarchy
-from w2m_support import Harness, script_nodes, tiny_case
+from w2m_support import Harness, run_nodes, script_nodes, tiny_case
 
 HERE = Path(__file__).resolve().parent
+ROOT = HERE.parent
 
 
 def _ref_corruption():
@@ -23,7 +24,9 @@ def _ref_corruption():
 
 
 OLD_FUNCS = ["_run_key", "_digest", "prefix_emb", "policy_codes", "compute_loss", "val_nll", "draw_samples",
-             "sample_metrics", "_sample_metrics"]
+             "sample_metrics"]
+# `_sample_metrics` changed for W2M only (audit 8, A8-1: fp32 MAUVE and its own reference cache); its W1 behaviour is
+# checked by test_w1_arms_keep_bf16_mauve_and_the_legacy_reference_cache below instead of by AST identity.
 
 
 @pytest.mark.parametrize("name", OLD_FUNCS)
@@ -109,3 +112,66 @@ def test_existing_configs_are_untouched_by_the_w2m_branch():
         pytest.skip("base commit not available")
     changed = [p for p in out.stdout.split() if "L_ts_m" not in p]
     assert changed == [], changed
+
+
+def test_w1_arms_keep_bf16_mauve_and_the_legacy_reference_cache(tmp_path, monkeypatch):
+    """Non-W2M arms (every wave-1 config) still featurize MAUVE under bf16 autocast and reuse the legacy reference
+    cache file, so a re-run of a W1 arm stays comparable with wave 1 (audit 8, A8-1)."""
+    import os
+    from types import SimpleNamespace
+
+    import numpy as np
+    import torch
+
+    from ncmr import eval_text
+    seen, refs = [], []
+
+    class Tokenizer:
+        eos_token, eos_token_id = "eos", 0
+
+        def __call__(self, text, **kwargs):
+            return {"input_ids": [1, 2]}
+
+    class Scorer(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.lin = torch.nn.Linear(4, 4)
+
+        def forward(self, ids, **kwargs):
+            h = self.lin(torch.ones(*ids.shape, 4))
+            seen.append(torch.is_autocast_enabled("cpu"))
+            return SimpleNamespace(hidden_states=[h])
+
+    monkeypatch.setattr(eval_text, "_load_lm", lambda *a: (Tokenizer(), Scorer().eval()))
+    monkeypatch.setattr(eval_text, "gen_ppl", lambda *a, **k: 1.0)
+    monkeypatch.setattr(eval_text, "mauve_score", lambda p, q, **k: refs.append(q.copy()) or 0.5)
+    ns = dict(os=os, np=np, ROOT=str(tmp_path), device="cpu", corr=SimpleNamespace(mode="uniform"),
+              draw_samples=lambda *a: ([[2, 3], [3, 4]], 11, 0.0),
+              bpe=SimpleNamespace(encode=lambda s: [int(x) for x in s.split()],
+                                  decode=lambda ids: " ".join(map(str, ids))),
+              examples=lambda *a: [[2, 3], [3, 4]], cut_at_eos=lambda r: r)
+    funcs, _, _ = script_nodes("cur")
+    run_nodes([funcs["_sample_metrics"]], ns)
+    ns["_sample_metrics"](2, [42], mauve=True)                       # cold cache: writes the legacy file
+    assert seen and all(seen), seen                                  # bf16 autocast on, as in wave 1
+    assert (tmp_path / "runs/cache/mauve_ref_val_2.npy").exists()
+    assert not (tmp_path / "runs/cache/mauve_ref_val_fp32_2.npy").exists()
+    np.save(tmp_path / "runs/cache/mauve_ref_val_2.npy", np.full((2, 4), 7.0))
+    refs.clear()
+    ns["_sample_metrics"](2, [42], mauve=True)                       # warm cache: the legacy file is reused
+    assert refs and all(np.all(q == 7.0) for q in refs)
+
+
+def test_w2m_sample_stats_arms_match_the_notebooks_run_names():
+    """`scripts/w1_sample_stats.py --set w2m` (W2M's bigram-gain reading) reads the files the W2M notebooks write."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("w1_sample_stats", ROOT / "scripts" / "w1_sample_stats.py")
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    nspec = importlib.util.spec_from_file_location("make_notebooks", ROOT / "notebooks" / "make_notebooks.py")
+    nb = importlib.util.module_from_spec(nspec)
+    nspec.loader.exec_module(nb)
+    want = {f"M{k[1]}": (f"w2m_L_ts_{k}", f"{cfg}_s0") for k, (cfg, _, _) in nb.W2M_ARMS.items()}
+    got = {k: v for k, v in m.W2M_ARMS.items() if k != "A0"}
+    assert got == want
+    assert m.W2M_ARMS["A0"] == m.ARMS["A0"]

@@ -325,16 +325,20 @@ def _sample_metrics(n, seeds, mauve=False):
         wall += w
     reenc = [bpe.encode(bpe.decode(s)) for s in ids]    # token statistics on the re-encoding, as upstream
     ref = None
+    fp32_mauve = corr.mode == "mech"   # W2M registers MAUVE in fp32; W1's arms keep their bf16 featurization (audit 8, A8-1)
     if mauve:
-        cache = os.path.join(ROOT, "runs", "cache", f"mauve_ref_val_{len(ids)}.npy")
+        tag = "fp32_" if fp32_mauve else ""   # a separate reference cache: never mix bf16 human features with fp32 samples
+        cache = os.path.join(ROOT, "runs", "cache", f"mauve_ref_val_{tag}{len(ids)}.npy")
         if os.path.exists(cache):
             ref = np.load(cache)
         else:
-            ref = mauve_features([bpe.decode(cut_at_eos(r)) for r in examples("val", len(ids))], device)
+            ref = mauve_features([bpe.decode(cut_at_eos(r)) for r in examples("val", len(ids))], device,
+                                 amp=not fp32_mauve)
             os.makedirs(os.path.dirname(cache), exist_ok=True)
             np.save(cache, ref)
     scorers = ("gpt2-large", "roneneldan/TinyStories-33M") if mauve else ("gpt2-large",)
-    res = evaluate_samples(reenc, bpe.decode, groups, scorers=scorers, ref_feats=ref, device=device)
+    res = evaluate_samples(reenc, bpe.decode, groups, scorers=scorers, ref_feats=ref, device=device,
+                           mauve_amp=not fp32_mauve)
     res.update({"nfe_per_sample": nfe, "gen_wall_s": wall})
     return res, ids, groups
 

@@ -1,0 +1,19 @@
+# Triage of Codex deep audit 8 (W2M before launch)
+
+Source: `docs/reviews/codex_audit8.md`, `tests/test_audit8_{precision,protocol,numbers}.py` (Codex desktop on `2ede453`,
+branch `codex/audit8` at `c2dca74`; brief `docs/prompts/codex_audit8_w2m.md`). Audit suite re-run here first on the
+audited commit (torch 2.6 CPU): 30 passed, 3 strict xfails (the two A8-1 cases and A8-2), as reported.
+
+| # | Finding | Verdict | Evidence | Action |
+|---|---|---|---|---|
+| A8-1 | P1: W2M's final MAUVE runs `mauve_features` / `evaluate_samples` with their bf16-autocast defaults, against a precision-agnostic reference cache shared with wave 1; the registration says MAUVE in fp32. | **accept** | `scripts/train_gen.py` `_sample_metrics` passes neither `amp` nor `mauve_amp`; `src/ncmr/eval_text.py` defaults both to bf16. Reproduced: the audit's test fails on `2ede453` (scorer sees autocast on, output bf16; the legacy cache's sentinel features are reused). | For `corruption.mode: mech` only: `amp=False` / `mauve_amp=False` and a separate cache `mauve_ref_val_fp32_<n>.npy`. Wave-1 arms keep bf16 and the legacy cache (comparable with wave 1). `_sample_metrics` leaves the old-arm AST-identity list, as the audit proposes; replaced by a behavioural test (`tests/test_w2m_old_arms.py::test_w1_arms_keep_bf16_mauve_and_the_legacy_reference_cache`: autocast on, legacy file written and reused). |
+| A8-2 | P1: `MechArm.canonical` (the canonical codes, i.e. every W2M arm's labels) disables autocast but inherits the TF32 flags the trainer enables on CUDA. | **accept** | `src/ncmr/w2m.py` `canonical` used `torch.autocast(enabled=False)` only; `scripts/train_gen.py` sets both TF32 flags on CUDA. Reproduced: the audit's test observes `(autocast False, matmul TF32 True, cudnn TF32 True)` in the encoder and quantizer on `2ede453`. Common to M0-M7, so not an arm-specific bias, but it breaks AGENTS.md's rule for targets. | `canonical` runs inside `fp32_eval(self.tok, device)` (TF32 off, restored on exit), as proposed. Wave 1's hierarchy path is unchanged. |
+| Q8 | Not a finding: W2M's registered bigram gain is not computed by the trainer or notebooks; `scripts/w1_sample_stats.py` lists only wave-1 arms. | **accept** | Answer 8. | `scripts/w1_sample_stats.py --set w2m` (A0 + M0-M7, R031's estimator, writes `results/w2m_sample_stats.json`); a test checks its file names against the notebooks' run names. Runs on CPU after the results arrive. |
+| Q9 | Not findings: some W2M tests are weaker than their names (the proposal-precision test never inspects dtype / TF32; `Harness.state()["torch_rng"]` compares the live RNG with itself; no real-loop `grad_accum` comparison; evaluation stubbed in the resume tests). | **accept** (note) | Answer 9. | The audit's probes that cover each gap are ported (`tests/test_audit8_protocol.py`, `tests/test_audit8_precision.py`). The vacuous RNG comparison in `tests/w2m_support.py` stays: the ported probes take RNG snapshots right after each run, so the property is tested. |
+| R039 | Two rounding slips: oracle j = 5 A0 is 9.51 (not 9.52); oracle j = 3 A2 - A1 SE is 0.16 (not 0.17). Reading unchanged. | **accept** | `tests/test_audit8_numbers.py` recomputes from the pinned result blobs. | Corrected in R041 (log is append-only). |
+
+Port notes: the three A8 tests lose their `xfail(strict=True)` markers and pass on the fixed code; against `2ede453`'s
+`scripts/train_gen.py` and `src/ncmr/w2m.py` they fail (3 failed, mutation check). `tests/test_audit8_numbers.py` now
+normalises CRLF to LF when it reads the working copy (a Windows checkout with autocrlf otherwise fails the pinned blob
+digests before any number is checked); no assertion changed. The other audit tests are ported unchanged.
+Limits (from the audit): CPU only; no CUDA / Inductor kernels, full-size memory, or torch 2.11 run of the new probes.
