@@ -102,3 +102,20 @@ def test_coarse_cuts_run_on_the_subset_only():
     assert [sorted(r["mc"]) for r in rows] == [["11", "6"], ["11"], ["11"]]
     s = E1.summarise(rows, [6, 11], 12)
     assert s["6"]["items"] == 1 and s["11"]["items"] == 3
+
+
+def test_invalid_reconstruction_never_counts_as_hits_and_is_excluded():
+    dom, tok, net = ts_domain()
+    x = torch.randint(0, 32, (1, 128), generator=torch.Generator().manual_seed(3))
+    pre = torch.zeros(1, 1, dtype=torch.long)
+    assert E1.mc_hits(dom, pre, dom.canonical(x), 11, None, 0, 64, 16, 20) == (0, 0)
+    nll = [1.0] * 8 + [10.0] * 4
+    rows = _rows([(nll, {8: (20, 40)}), (nll, {8: (0, 0)})])
+    s = E1.summarise(rows, [8], 12)["8"]
+    assert s["items"] == 1 and s["hit_share"] == 1.0
+    assert E1.paired(rows, rows, 8)["dN_mean"] == 0.0
+
+
+def test_zero_hit_item_with_small_n_is_clamped_at_r_zero():
+    rows = _rows([([1.0] * 8 + [0.75] * 4, {8: (0, 2048)})])           # N_8 = 3 < log(2048 / 3)
+    assert E1.summarise(rows, [8], 12)["8"]["R_hi_mean"] == 0.0

@@ -98,6 +98,8 @@ def mc_hits(dom, prefix_ids, canon, k, target, seed, max_samples, round_, hits_n
     cache = CD.PrefixCache(net, *CD.prefix_inputs(net, prefix_ids))
     g = torch.Generator(device=canon.device).manual_seed(int(seed))
     hits = n = 0
+    if target is None:              # x^ itself is not a valid output (Sudoku board that does not parse): no hit counts
+        return 0, 0
     while n < max_samples and hits < hits_needed:
         m = min(round_, max_samples - n)
         codes = CD.sample_from_cut(net, cache, canon, k, m, g, temperature)
@@ -134,7 +136,7 @@ def summarise(rows_all, cuts, K):
     and bounds on mean R with zero-hit items at T = N (R_lo) and T = log(n/3) (R_hi))."""
     out = {}
     for k in cuts:
-        rows = [r for r in rows_all if str(k) in r["mc"]]
+        rows = [r for r in rows_all if str(k) in r["mc"] and r["mc"][str(k)][1] > 0]   # x^-invalid items excluded
         if not rows:
             continue
         N = np.array([sum(r["level_nll"][k:]) for r in rows])
@@ -144,7 +146,7 @@ def summarise(rows_all, cuts, K):
         T = np.where(h > 0, -np.log(np.maximum(h, 1) / n), np.inf)
         se = lambda v: float(v.std(ddof=1) / np.sqrt(len(v))) if len(v) > 1 else 0.0
         o = {"items": len(rows), "hit_share": float((h > 0).mean()), "samples_mean": float(n.mean()),
-             "N_mean": float(N.mean()), "N_se": se(N), "A_mean": float(A.mean()),
+             "N_mean": float(N.mean()), "N_se": se(N), "A_mean": float(A.mean()), "A_se": se(A),
              "T_median": float(np.median(T)) if (h > 0).mean() > 0.5 else None}
         Tlo = np.where(h > 0, T, np.minimum(np.log(n / 3.0), N))      # rule of three: 95% bound after 0 hits
         R_lo, R_hi = np.where(h > 0, N - T, 0.0), N - Tlo
@@ -161,6 +163,8 @@ def summarise(rows_all, cuts, K):
 
 def paired(rows_a, rows_b, k):
     """Model b minus model a at cut k over the same items: dN, and dT where both have a hit on every item."""
+    keep = [i for i, (a, b) in enumerate(zip(rows_a, rows_b)) if a["mc"][str(k)][1] > 0 and b["mc"][str(k)][1] > 0]
+    rows_a, rows_b = [rows_a[i] for i in keep], [rows_b[i] for i in keep]
     dN = np.array([sum(b["level_nll"][k:]) - sum(a["level_nll"][k:]) for a, b in zip(rows_a, rows_b)])
     o = {"dN_mean": float(dN.mean()), "dN_se": float(dN.std(ddof=1) / np.sqrt(len(dN)))}
     ha = np.array([a["mc"][str(k)] for a in rows_a], float)
@@ -202,15 +206,15 @@ def main():
     ap.add_argument("--run_root", default="", help="directory holding the fine-tuned run directories (final.pt)")
     ap.add_argument("--run_dir", required=True)
     ap.add_argument("--data", default="", help="WMT14: prep_wmt14.py's train_pairs.npz (val_src / val_tgt)")
-    ap.add_argument("--n", type=int, default=256)
+    ap.add_argument("--n", type=int, default=64)
     ap.add_argument("--cut_min", type=int, default=5)
     ap.add_argument("--max_samples", type=int, default=2048)
-    ap.add_argument("--round", type=int, default=256)
+    ap.add_argument("--round", type=int, default=64)
     ap.add_argument("--hits", type=int, default=20)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--log_every", type=int, default=16)
     ap.add_argument("--full_cut_min", type=int, default=8, help="registered cuts: >= this on every item")
-    ap.add_argument("--coarse_n", type=int, default=16, help="descriptive cuts below full_cut_min: first n items only")
+    ap.add_argument("--coarse_n", type=int, default=8, help="descriptive cuts below full_cut_min: first n items only")
     a = ap.parse_args()
     from ncmr.ncm_ref_loader import load_ncm
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -233,6 +237,8 @@ def main():
            "torch": torch.__version__,
            "protocol": {"temperature": 1.0, "max_samples": a.max_samples, "round": a.round, "hits": a.hits, "seed": a.seed,
                         "full_cut_min": a.full_cut_min, "coarse_n": a.coarse_n,
+                        "R_hi_zero_hit_T": "min(log(n/3), N_k): T <= N_k always (c* itself decodes to x^)",
+                        "x_hat_invalid": "items whose x^ is not a valid output get (0 hits, 0 samples) and are excluded",
                         "precision": "fp32, TF32 off", "items": {"tinystories": "first n even-index val windows",
                                                                  "wmt14": "first n newstest2013 (val) pairs, target given source",
                                                                  "sudoku": "first n released hard puzzles"}[a.domain],

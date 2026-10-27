@@ -280,6 +280,10 @@ def integrity_wmt(res, expect_j0, expect_j2f, n):
     seq_e, seq_c = res["J0 seq eager"]["out"], res["J0 seq cached"]["out"]
     g["seq_cached_vs_eager_text_mismatch"] = mismatches(seq_c, seq_e)
     j0 = expect_j0
+    for name in ("J0 jacobi exact", "J0 jacobi stable1", "J2-F jacobi stable1"):   # implementations agree directly
+        if f"{name} eager" in res:
+            a, b = res[f"{name} eager"], res[f"{name} cached"]
+            g[f"{name.replace(' ', '_')}_cached_vs_eager"] = mismatches(list(zip(a["passes"], a["out"])), list(zip(b["passes"], b["out"])))
     for impl in ("eager", "cached"):
         r = res[f"J0 jacobi exact {impl}"]
         g[f"J0_exact_{impl}_vs_saved_text"] = mismatches(r["out"], j0["hyp_test"][:n])
@@ -425,7 +429,9 @@ def main():
             rr = out["ratios_vs_fastest_seq"][cand]["ratio"]
             out["gate"] = {"candidate": cand, "ratio": rr, "threshold": GATE, "precision": prec,
                            "verdict": ("not read (integrity)" if not out["integrity_ok"] else
-                                       "pass" if rr <= GATE else "fail") + ("" if prec == "fp32" else " (secondary precision; the gate reads fp32)")}
+                                       "pass" if rr <= GATE else "fail")
+                                      + ("" if prec == "fp32" else " (secondary precision; the gate reads fp32)")
+                                      + ("" if "A100" in res["gpu"] else f" (on {res['gpu']}; the gate reads the A100 run)")}
         res[prec] = out
         print(json.dumps({prec: {k: v for k, v in out.items() if k not in ("configs",)}}, indent=1), flush=True)
         print(json.dumps({prec: {n: {k: c[k] for k in ("mean_ms", "se_ms", "passes_mean")} for n, c in out["configs"].items()}}, indent=1), flush=True)
