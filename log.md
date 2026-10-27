@@ -1159,3 +1159,115 @@ Human val windows: bigram gain 2.213, 2.9 duplicates per 1k. dup/1k and bigram g
   experiment was changed or launched.
 - Publication requested by the user; prepared from the current research branch in a separate checkout, with only
   this review and this log entry included. Checked document completeness, arithmetic, repository hygiene and diff.
+
+## R052 — D1: batch-1 wall-clock: the text gate fails (J2-F + stable x1 takes 1.41x J0 sequential); Sudoku's verifier stop passes (0.44x); criterion (d) closes on text (2026-10-27; registered D1)
+Run `d1_batch1_wallclock`, A100-SXM4-40GB, torch 2.11.0+cu130, at `2a27ae9` (`src/ scripts/ configs/ assets/ notebooks/`
+identical to deep audit 9's `dcdb890`), one session per task, no resume: WMT14 45.5 min, Sudoku 16.3 min (~62
+A100-min, ~5.6 CU; registered estimate ~1.5). Results `results/colab/d1_batch1_wallclock/` (the notebook's copies of
+repository result files left out). 256 items per task, batch 1, eager PyTorch, every configuration 3 times per item in
+a seeded interleaved order, item latency = median of its 3, first 16 items as untimed warm-up.
+
+fp32, TF32 off; mean ± SE over items; ratio = mean / mean of the faster sequential implementation, paired bootstrap 95%
+interval over items (1000 resamples); executed GFLOP per item from FlopCounterMode with math attention (tokenizer
+decodes included).
+
+| task | configuration | impl. | mean ms | median (p10-p90) | passes | ratio | GFLOP / item | gen. rows / item |
+|---|---|---|---|---|---|---|---|---|
+| WMT14 | J0 sequential | eager | 132.85 ± 0.07 | 132.6 (131.9-133.9) | 11 calls | 1 | 250.0 | 1368 |
+| | J0 sequential | cached | 143.12 ± 0.06 | 142.9 (142.2-144.1) | 11 calls | | 82.4 | 408 |
+| | J0 Jacobi exact | eager | 193.22 ± 0.99 | 192.6 (174.7-209.2) | 11.06 | 1.454 [1.440, 1.469] | 873.6 | 4512 |
+| | J0 + stable x1 | eager | 212.44 ± 3.01 | 227.6 (138.7-269.5) | 9.25 | 1.599 [1.554, 1.640] | 799.2 | 3776 |
+| | **J2-F + stable x1** | eager | **187.82 ± 3.59** | 201.5 (92.9-253.2) | 8.18 | **1.414 [1.363, 1.465]** | 705.9 | 3336 |
+| | J2-F + stable x1 | cached | 206.32 ± 3.73 | 221.1 (108.5-272.4) | 8.18 | | 577.0 | 2647 |
+| Sudoku-hard | sequential | eager | 107.84 ± 0.05 | 107.8 (107.2-108.4) | 12 calls | 1 | 75.1 | 1414 |
+| | sequential | cached | 123.63 ± 0.04 | 123.5 (123.0-124.3) | 12 calls | | 22.8 | 413 |
+| | Jacobi exact | eager | 105.23 ± 0.93 | 99.8 (84.2-115.8) | 6.38 | 0.976 [0.959, 0.993] | 154.4 | 2636 |
+| | **Jacobi + verifier** | eager | **47.17 ± 2.62** | 23.1 (22.8-120.7) | 2.10 | **0.437 [0.394, 0.491]** | 51.7 | 866 |
+| | Jacobi + verifier | cached | 56.42 ± 2.69 | 31.8 (31.3-132.8) | 2.10 | | 45.5 | 766 |
+The cached J0 Jacobi exact (214.07 ms), J0 + stable x1 (232.00) and Sudoku Jacobi exact (116.72) are slower than eager too.
+
+**Registered readings**
+- **Integrity passes** (fp32, A100): 0 mismatches in every check (2 allowed). J0 Jacobi exact reproduces the first 256
+  saved test hypotheses, their pass counts and the sequential output; eager and cached give the same outputs and passes
+  in every configuration; J0 and J2-F + stable x1 equal the rule applied to their saved capped test hypotheses; the rule
+  applied to the four arms' saved val outputs reproduces `results/j2f_stop_rule_val_s0.json` exactly (passes and BLEU;
+  J2-F 7.799 passes at 23.019); Sudoku cached = eager sequential and Jacobi exact = sequential; repeats identical.
+- **Text gate fails:** J2-F + stable x1 takes 1.414x J0 sequential's mean batch-1 latency (gate <= 0.75), both at their
+  faster (eager) implementation; the paired interval [1.363, 1.465] lies far above 0.75. Per D1, criterion (d) is
+  reported as unreachable on text for this model family and operating point under the wall-clock rule; **J1d does not
+  run**; no more Jacobi training. The training-free variants are slower than sequential too (J0 Jacobi exact 1.454x,
+  J0 + stable x1 1.599x).
+- **Sudoku half alive:** Jacobi + verifier 0.437x sequential (gate <= 0.75). (d) needs Sudoku and a text task, so it
+  closes: a careful null with the cost model below.
+- bf16 (secondary, never gated): integrity fails (eager and cached outputs differ on many items, near-tie argmaxes),
+  so its ratios are not read (J2-F + stable x1 1.354x, Sudoku verifier 0.396x). bf16 autocast is slower than fp32 at
+  batch 1 (WMT14 sequential 170.6 vs 132.8 ms, Sudoku 134.7 vs 107.8).
+
+**Exploratory: cost model** (least squares of item latency on its passes, r >= 0.995)
+- A WMT14 Jacobi pass costs 16.7 ms (eager) against 12.1 ms per sequential call (1.38x, while it carries 3.3x the
+  generator rows). The stability check adds ~5.8 ms per pass (tokenizer decode and detokenisation: 22.4-22.6 ms per
+  pass), which is why J0 + stable x1 is slower than J0 exact. Sudoku: 15.2 ms per pass vs 9.0 ms per call; the verifier
+  adds ~6.6 ms per pass.
+- The prefix-cached decoders execute 1.2-3.4x fewer FLOPs and are slower in every configuration: at batch 1 the A100
+  is launch-bound, so latency follows forward calls and kernel count, not FLOPs or rows. At 22.6 ms per pass, J2-F +
+  stable x1 would need <= 4.3 mean passes to meet 0.75x; it takes 8.18 on these 256 test sentences (7.80 on val, R042).
+- Compute, not latency: Sudoku's verifier stop executes 0.69x the FLOPs of eager sequential but 2.0x those of cached
+  sequential; J2-F + stable x1 executes 2.8x eager sequential's FLOPs (7.0x cached vs cached). Any (d) saving in this
+  model family is a latency saving bought with extra compute.
+- Passes on the 256 test sentences (no quality metric computed on test, as registered): J2-F + stable x1 8.18, J0 +
+  stable x1 9.25.
+
+**Decisions**
+- Criterion (d) is closed for text under the registered wall-clock rule (R044); J1d (~23-34 CU) is not run. The
+  write-up reports the cost model, the Sudoku timing (verifier stop 2.10 passes, 0.44x latency; solve rate 90.3% vs
+  86.15% sequential on the full hard set, R020) and the negative text result.
+
+## R053 — W2M mechanism eval: M4 uses its flags (-35 nats/window), so W2M's registered reading is final (mixed); plausible-wrong windows are detectable at the row level by every model; the collapsed arms do not discount coarse codes on clean contexts (2026-10-27; registered W2M + W2Ma)
+Run `w2m_mech_eval` with `--only released,m0,m1,m2,m3,m4,m6,m7`, on an L4 (the queue suggested an A100; the
+registration names no GPU; fp32, TF32 off), torch 2.11.0+cu130, at `2a27ae9` (code identical to the audited
+`dcdb890`), one session, 19.0 min (~0.5 CU). `results/colab/w2m_mech_eval/w2m_mech_eval__result.json`. 512 clean val
+windows, eval seed 2026; probes trained on 384 windows, AUC on the 128 held out; the W2Ma row-level probe uses 50%
+clean windows (seed 2028) with masks paired across models. No per-window values are saved, so no SEs below.
+
+| model | (a) KL(clean ‖ perturbed) per finer position, j = 1..6 (sum) | (b) row-level AUC, plausible-wrong, L1..L6 | uniform-wrong (control), L1..L6 |
+|---|---|---|---|
+| released | 0.0082 0.0075 0.0064 0.0069 0.0040 0.0027 (0.036) | 0.493 0.918 0.965 0.991 0.991 0.995 | 0.709 0.967 0.993 1.000 1.000 1.000 |
+| M0 uniform | 0.0145 0.0155 0.0164 0.0190 0.0131 0.0112 (0.090) | 0.497 0.937 0.980 0.989 0.991 0.994 | 0.671 0.993 0.999 1.000 1.000 1.000 |
+| M1 policy | 0.0147 0.0163 0.0177 0.0201 0.0137 0.0124 (0.095) | 0.507 0.980 0.989 1.000 1.000 1.000 | 0.657 0.993 1.000 1.000 1.000 1.000 |
+| M2 plausible-wrong | 0.0151 0.0171 0.0192 0.0227 0.0148 0.0130 (0.102) | 0.514 0.979 0.990 1.000 1.000 1.000 | 0.655 0.992 1.000 1.000 1.000 1.000 |
+| M3 uniform-wrong | 0.0145 0.0156 0.0165 0.0192 0.0132 0.0113 (0.090) | 0.498 0.939 0.977 0.989 0.991 0.994 | 0.672 0.992 0.999 1.000 1.000 1.000 |
+| M4 M2 + flags | 0.0172 0.0179 0.0196 0.0233 0.0150 0.0132 (0.106) | 0.523 0.936 0.989 0.999 0.999 1.000 | 0.663 0.992 1.000 1.000 1.000 1.000 |
+| M6 used-parent | 0.0150 0.0165 0.0181 0.0205 0.0140 0.0126 (0.097) | 0.522 0.977 0.989 1.000 1.000 1.000 | 0.655 0.992 1.000 1.000 1.000 1.000 |
+| M7 A3's rates | 0.0145 0.0154 0.0160 0.0182 0.0128 0.0113 (0.088) | 0.498 0.937 0.979 0.989 0.990 0.996 | 0.667 0.994 0.999 1.000 1.000 1.000 |
+
+**Registered readings**
+- **(c) flag use, M4:** clean-label NLL per window on corrupted held-out windows, 1426.99 with the true flags vs
+  1462.42 with zero flags: **-35.4 nats per window** (<= -1 demonstrates flag use). With R4 = 0.53 (R049), M4's
+  prediction (R4 >= 0.8 with flag use) is not met, and the weakening condition (R4 < 0.2 with flag use) does not fire.
+  **W2M's registered reading is final: mixed.** In W2Ma's terms: row-level provenance that the model demonstrably uses
+  halves the damage but does not prevent it (one seed).
+- **(b) W2Ma row-level probe:** the uniform-wrong positive control is >= 0.75 at levels 2-6 in every model (0.655-0.709
+  at level 1), so the probe is read at levels 2-6. Plausible-wrong windows are separated from clean ones at AUC >= 0.918
+  at level 2 and >= 0.965 from level 3, in every model, including the released one, which never trained on such codes.
+  Level 1 is at chance (0.49-0.52). The pooled AUCs (~0.99) are not read (W2Ma).
+- (a) is reported per level; W2M registered no threshold for it.
+
+**Exploratory (labelled; not registered analyses)**
+- At W1's rates (about half of a corrupted window's codes replaced) plausible-wrong corruption is detectable at the row
+  level, by every model: (b')'s premise "undetectable" fails at this granularity; positional detectability stays
+  unmeasurable at these rates (W2Ma). Caveats: 128 held-out windows (AUC SE ~0.02 near 0.95); detecting a heavily
+  corrupted window says little about whether the model's own samples, every code of which is plausible by
+  construction, look corrupted to it.
+- With R049's clean-NLL invariance: the collapsed arms predict real data as well as the control and, like every model,
+  separate corrupted windows from clean ones. A context-conditional response is therefore available to them (discount
+  coarse codes when the context looks corrupted, trust them on real data). Whether their own samples trigger it at
+  generation time is the open question; W2M-G (oracle curve and entropy on own-sample vs real contexts) would test it.
+- The three arms trained on plausible-wrong codes without flags (M1, M2, M6) reach 0.98 at level 2, against 0.94 for
+  the uniform arms and M4 and 0.92 for the released model: suggestive (~2 SE, no paired test possible) that this
+  training sharpens a row-level corruption signal and that M4's flag takes over part of it.
+- **(a) On clean contexts the collapsed arms do not discount coarse codes:** one changed coarse code moves their finer
+  predictions 5-15% more than the uniform arms' (sum 0.095-0.102 vs 0.088-0.090), not less; M4 is highest (0.106).
+  The (b') phrase "discounts its own coarse codes" is not visible on clean contexts. Every fine-tuned arm, M0
+  included, depends ~2.5x more on one coarse code than the released model (0.088-0.106 vs 0.036). This co-occurs with the
+  control's drift (M0 21.7 vs 16.2 Gen-PPL); W1's A1 (no clean rows) was not measured, so a link to the clean rows is
+  untested.

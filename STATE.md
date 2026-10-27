@@ -1,6 +1,6 @@
 # STATE — read this first
 
-_Last updated: 2026-10-27, session 8 (R042-R046; plan `docs/plan_2026-10-27.md`; **next session: `docs/prompts/handoff_2026-10-27.md`**). Branches: `claude/ncm-research` (notebooks clone it) and
+_Last updated: 2026-10-27, session 9 (R052-R053 so far; plan `docs/plan_2026-10-27.md`; handoff `docs/prompts/handoff_2026-10-27.md`). Branches: `claude/ncm-research` (notebooks clone it) and
 `claude/ncm-phase2-analysis-finetune-pkh64d` (older mirror). Repo is PUBLIC: commit nothing identifying (no
 personal names/emails, no absolute local paths, no session links, no credentials). Goals, success bar and rules:
 `docs/brief.md`._
@@ -38,6 +38,11 @@ uniform-wrong M3 0.0, used-parent M6 +20.5, uniform at A3's rates M7 +0.4, truth
 Registered reading **mixed** (M4 short of 0.8; nothing overturned); **sanity fails** (M0 21.7 vs A0 16.2: the control
 drifted, prime suspect the 25% clean rows). Exploratory: the collapsed arms keep the control's clean NLL (within 4
 nats), so the damage lives in generation-time contexts. J1a bootstrap and the WMT BLEU split: R050.
+**D1 (R052):** the text gate fails (J2-F + stable x1 takes 1.41x J0 sequential's batch-1 latency, fp32, A100; Sudoku's
+verifier stop 0.44x): criterion (d) is closed on text, J1d is not run. **Mechanism eval (R053):** M4 uses its flags
+(-35 nats/window), so W2M's registered reading is final: mixed; plausible-wrong windows are detectable at the row level
+by every model (AUC >= 0.92 from level 2); the collapsed arms are not less coarse-context dependent on clean contexts.
+E1 has run; its E1a analysis (`scripts/analyze_e1.py`) is in a PR. Astra round 3 is in the repo (R051), not yet triaged.
 
 ## Environment
 - **Codex:** reviews PRs (bot `chatgpt-codex-connector`; 2-15 min per review); a review triggered only by opening a PR may
