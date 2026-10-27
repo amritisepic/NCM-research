@@ -1073,3 +1073,12 @@ on 3584 training windows (512 more for early stopping), scored on the first 1024
   are not changes to registrations or launch approvals. No production code or experiment was run or changed.
 - Checked the document's arithmetic, citations, public-repository hygiene, and publication diff. Existing
   working-tree changes were excluded from this documentation-only publication.
+
+## R048 — deep audit 9 (D1, E1, W2Ma): no P0 / P1; corrections to R045 (2026-10-27; review)
+- Codex deep audit of PR 14 at `dcdb890` (`docs/reviews/codex_audit9.md`, triage `docs/reviews/triage_audit9_2026-10-27.md`):
+  no defect found. Its 19 tests (cached = upstream on a full-size random-weight WMT14 config and the released Sudoku
+  model; an independent oracle for E1's ancestral sampler; D1 timing boundaries, gate selection, wrong-checkpoint
+  detection; notebook wiring; recomputed R042 / R043 / R045 numbers) are ported to the PR and pass. CPU only: D1's own
+  A100 integrity checks still guard released-weight equivalence.
+- Corrections to R045 (verdict unchanged): level 4 gain per code is 0.015 (not 0.016); levels 1 **and 2** gain > 1 nat
+  per window (level 2: 1.54).
