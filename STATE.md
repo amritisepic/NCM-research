@@ -31,16 +31,15 @@ from the level alone); amendment **W2Ma** (readings only). Astra review triaged;
 `docs/plan_2026-10-27.md` (primary target criterion (c); (d) gets one wall-clock gate): **approved** (R043-R044; (d) keeps
 the wall-clock rule). **S0 (R045):** the left-neighbour code adds 6.2 nats/window over levels 1-5 (1.7%; gate needs >= 10
 and >= 5%): Astra's coupled sampler is dropped, E2 not run. **Registered before any run (R046):** D1, J1d (contingent),
-E1. Their code (+ the W2Ma probe fix, flag-power script) is PR 14, **blocked on Codex** (usage limit again, 2026-10-27
-06:23 UTC) and on deep audit 9 (brief `docs/prompts/codex_audit9_d1e1.md`; no Codex CLI on the laptop: run it in
-Codex desktop).
+E1. Their code (+ the W2Ma probe fix, flag-power script) is **merged** (PR 14, 2026-10-27): Codex clean after three
+P1s fixed; deep audit 9 found no P0 / P1 (R048). Notebooks `d1_batch1_wallclock`, `e1_equivalence`, `w2m_mech_eval` ready.
 
 ## Environment
 - **Codex:** reviews PRs (bot `chatgpt-codex-connector`; 2-15 min per review); a review triggered only by opening a PR may
   leave no receipt the gate counts, so request one explicitly. Deep audits requested as PR comments need a Codex cloud
   environment for the repo, which does not exist: run audits locally (`scripts/review/codex_local.sh` with the Codex
   desktop CLI, or Codex desktop). Usage limits: hit 2026-10-24 ~02:35 UTC, reset ~06:52 UTC; **hit again at 16:36 UTC**
-  (PR 7's re-request) and not reset at the time of writing: no gated merge until it resets. Open: PR 14 (D1 / E1 / W2Ma eval code; review requested 06:23 UTC 2026-10-27, Codex at its limit). PR 12 (W2M) merged 2026-10-27 (R040). Merged: PRs 2-11 (5, 6, 7, 9, 10, 11 in session 5, R037-R038). Limit reset by 22:57 UTC 2026-10-24.
+  (PR 7's re-request) and not reset at the time of writing: no gated merge until it resets. PR 14 (D1 / E1 / W2Ma eval code) merged 2026-10-27 (R048). PR 12 (W2M) merged 2026-10-27 (R040). Merged: PRs 2-11 (5, 6, 7, 9, 10, 11 in session 5, R037-R038). Limit reset by 22:57 UTC 2026-10-24.
 - `scripts/review/codex_pr.py wait` on this Windows laptop: crashes decoding the bot's emoji (cp1252) unless run with
   `PYTHONUTF8=1`, and returns early (gate FAIL) when Codex posts its "review running" status comment. Workaround used:
   poll the `codex-review-state` comment, then `codex_pr.py status`. `scripts/review/` is edit-protected: the user fixes.
@@ -79,7 +78,7 @@ Codex desktop).
 - Throughput (A100): tier L 39-41 TFLOPS (2.1 s/step uniform, 3.0 on-policy, 3.7 two-pass), tier M NCM 24.7, AR 44.2.
 
 ## Live hypotheses / bets (ranked: significance x chance of a clean result / CU; plan `docs/plan_2026-10-27.md`)
-0. **Registered, code in PR 14 (R046):** E1, how much of the code NLL is representation choice (codes that decode to
+0. **Registered (R046), code merged (PR 14), ready to launch:** E1, how much of the code NLL is representation choice (codes that decode to
    the same text): `R_k = N_k - T_k` at cuts >= 8 (cuts 5-7 rarely hit: prototype), released TinyStories / WMT14 /
    Sudoku + A1 / A2 / A4 / J1 / J2-F, ~2-3 CU, primary criterion-(c) candidate. D1, batch-1 wall-clock gate for (d)
    (~1.5 CU; text prior ~20%). S0 failed (R045): coupled sampler dropped.
@@ -126,10 +125,8 @@ Codex desktop).
 1. **Plan approved** (user, 2026-10-27; R043-R044): allocation table, downloads; (c) replication for released-model
    properties = domains and checkpoints, seeds only where a training arm is the evidence. Open: whether to skip M5. (d) keeps the registered wall-clock rule (user, R044): D1 first; J1d seeds only if J2-F + the stop
    rule passes it. W2M: run M0 and M1 first (validity gate), then the rest.
-2. W2M: `w2m_L_ts_m0`..`m7` cleared (A100 or L4; R041). **Hold `w2m_mech_eval`** until the probe fix (W2Ma) is
-   reviewed and audited, or run it and report (b) as uninformative. Read W2M with W2M + W2Ma; then CPU
+2. W2M: `w2m_L_ts_m0`..`m7` cleared (A100 or L4; R041). `w2m_mech_eval` ready (W2Ma merged): run it after the
+   arms (`--only released,m0,m1,m2,m3,m4,m6,m7` if M5 was skipped). Read W2M with W2M + W2Ma; then CPU
    `scripts/w1_sample_stats.py --set w2m`.
-3. PR 14 (D1 benchmark, E1 estimator, W2Ma probe fix, flag-power script; registrations D1 / J1d / E1 pushed): when
-   Codex resets, `codex_pr.py request 14`, triage `docs/reviews/triage_pr14.md`; deep audit 9 from
-   `docs/prompts/codex_audit9_d1e1.md` (Codex desktop); port its tests; merge only when no W2M arm is mid-run (ask the
-   user). Then the user launches `d1_batch1_wallclock` (A100), `e1_equivalence`, and `w2m_mech_eval`.
+3. The user launches `d1_batch1_wallclock` (A100; fp32 gate read only on an A100 with integrity passing) and
+   `e1_equivalence`. Read D1 against its registration; J1d seeds only if J2-F + stable x1 <= 0.75x J0 sequential.
