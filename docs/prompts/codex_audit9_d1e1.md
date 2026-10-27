@@ -1,7 +1,7 @@
 <!-- Paste everything below this comment into Codex (desktop app, or `scripts/review/codex_local.sh audit audit9
 docs/prompts/codex_audit9_d1e1.md` from a checkout of the audited commit). Work in a new branch `codex/audit9` made
 from the audited commit, and commit only the audit doc and its tests there. -->
-Deep audit. Follow '## Deep audit protocol' and '## Code Review Rules' in AGENTS.md. Audited commit: __SHA__
+Deep audit. Follow '## Deep audit protocol' and '## Code Review Rules' in AGENTS.md. Audited commit: dcdb89092bccb967402461bda297337e99587400
 (head of `claude/wip-e1-d1`, PR 14). Audit id: audit9. This repository is PUBLIC. Write no absolute local paths,
 usernames, emails, session links or credentials into any file or into your final message; refer to files by
 repo-relative path. Work on a new branch `codex/audit9` made from the audited commit; commit there and push it.
