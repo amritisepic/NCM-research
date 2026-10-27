@@ -1007,3 +1007,9 @@ numbers: `scripts/analyze_j1.py --candidate J2-F` -> `results/j2f_analysis_s0.js
   cost rule" was given with that balance as the reason, so it is read as releasing budget caution, not as changing
   criterion (d)'s registered cost accounting (J1a: batch-1 wall-clock and an attention-inclusive cost), which stands
   until the user says otherwise. Open: (c)'s replication unit; whether to skip M5.
+
+## R044 — decision: criterion (d) keeps the registered wall-clock rule (user, 2026-10-27)
+- Asked with R042's val-only stop-rule result in hand, the user kept J1a's rule: the text half of (d) needs a >= 25%
+  batch-1 wall-clock saving (attention-inclusive cost reported), not only fewer forward passes. D1 runs first; J1d (J2-F
+  and J1 seeds 1-2, ~23 CU) runs only if J2-F + the stability stop passes D1's text gate (<= 0.75x J0 sequential mean
+  batch-1 latency in fp32). This settles R043's reading of "ignore the cost rule". Passed to the build session.

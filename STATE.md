@@ -117,7 +117,8 @@ from the level alone); amendment **W2Ma** (readings only). Astra review triaged;
 
 ## Next 3 actions
 1. **Plan approved** (user, 2026-10-27; R043): allocation table, downloads. Open: whether to skip M5; (c)'s replication
-   unit. The (d) cost accounting (J1a) stands. W2M: run M0 and M1 first (validity gate), then the rest.
+   unit. (d) keeps the registered wall-clock rule (user, R044): D1 first; J1d seeds only if J2-F + the stop
+   rule passes it. W2M: run M0 and M1 first (validity gate), then the rest.
 2. W2M: `w2m_L_ts_m0`..`m7` cleared (A100 or L4; R041). **Hold `w2m_mech_eval`** until the probe fix (W2Ma) is
    reviewed and audited, or run it and report (b) as uninformative. Read W2M with W2M + W2Ma; then CPU
    `scripts/w1_sample_stats.py --set w2m`.
