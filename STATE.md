@@ -135,7 +135,7 @@ nats), so the damage lives in generation-time contexts. J1a bootstrap and the WM
    (M5 skipped); `e1_equivalence` after amendment E1a (analysis only: confidence sequences from the saved hit counts,
    R046's pilot windows labelled; Astra round 2 section 2). Read each against its registration; J1d seeds only if
    J2-F + stable x1 <= 0.75x J0 sequential.
-2. **Astra round 3** (`docs/prompts/gpt6_astra_round3_2026-10-27.md`) on W2M's reading and the W2C design; then register
+2. **Held by the user until Astra round 3 is back** (prompt `docs/prompts/gpt6_astra_round3_2026-10-27.md`, sent 2026-10-27); then register
    and build W2C (fresh seeds of M2 / M3 / M4 + a random-row flag control), the M0-without-clean-rows control and the
    eval-only generation-context diagnostic (W2M-G) in one PR with Codex review and a delta audit. User approves W2C's CU.
 3. Log the mech eval's flag use (completes M4's registered reading) and row-level detectability as they land.
