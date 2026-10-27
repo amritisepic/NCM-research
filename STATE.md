@@ -33,6 +33,11 @@ the wall-clock rule). **S0 (R045):** the left-neighbour code adds 6.2 nats/windo
 and >= 5%): Astra's coupled sampler is dropped, E2 not run. **Registered before any run (R046):** D1, J1d (contingent),
 E1. Their code (+ the W2Ma probe fix, flag-power script) is **merged** (PR 14, 2026-10-27): Codex clean after three
 P1s fixed; deep audit 9 found no P0 / P1 (R048). Notebooks `d1_batch1_wallclock`, `e1_equivalence`, `w2m_mech_eval` ready.
+**W2M (R049, seed 0, M5 skipped):** the collapse reproduces (M1 +20.8 Gen-PPL vs M0); frozen plausible-wrong M2 +20.9,
+uniform-wrong M3 0.0, used-parent M6 +20.5, uniform at A3's rates M7 +0.4, truthful row flags M4 +9.9 (R4 = 0.53).
+Registered reading **mixed** (M4 short of 0.8; nothing overturned); **sanity fails** (M0 21.7 vs A0 16.2: the control
+drifted, prime suspect the 25% clean rows). Exploratory: the collapsed arms keep the control's clean NLL (within 4
+nats), so the damage lives in generation-time contexts. J1a bootstrap and the WMT BLEU split: R050.
 
 ## Environment
 - **Codex:** reviews PRs (bot `chatgpt-codex-connector`; 2-15 min per review); a review triggered only by opening a PR may
@@ -84,7 +89,10 @@ P1s fixed; deep audit 9 found no P0 / P1 (R048). Notebooks `d1_batch1_wallclock`
    (~1.5 CU; text prior ~20%). S0 failed (R045): coupled sampler dropped.
 1. ~~Criterion (d), text half: J2-F~~ — done (R042): no collapse, 5.6% saving, misses the screen. (d)'s text half has
    no registered candidate; the Sudoku half (verifier stop) still lacks batch-1 wall-clock.
-2. **Mechanism of the on-policy collapse (candidate for criterion c):** undetectable corruption -> the model discounts
+2. **Mechanism of the on-policy collapse (candidate for criterion c).** W2M (R049, one seed): plausible-wrong
+   replacement is sufficient and the tested competitors are not needed; truthful row flags halve the damage; clean NLL
+   is unaffected. Next (proposed, `docs/plan_2026-10-27.md` section 9): W2C at fresh seeds + a random-row flag control,
+   an M0 control without clean rows, eval-only generation-context diagnostics. Earlier notes: undetectable corruption -> the model discounts
    its own coarse codes. Sudoku CPU (R031, matched slots and rates): plausible wrong codes raise predictive entropy on
    clean contexts by 74% (uniform: 5%) and clean NLL by 32 nats (2.7), and cut reliance on the true L6 code by 76% (R034,
    Codex's adversarial test). R036's paired rerun (ADV-1 fixed) reproduces the hedging (clean NLL +32 vs +3) but not
@@ -114,19 +122,20 @@ P1s fixed; deep audit 9 found no P0 / P1 (R048). Notebooks `d1_batch1_wallclock`
 - P1b withdrawn (R023).
 
 ## Compute
-- Colab: ~79.5 CU spent (p1, c4, w0 ~12.5; wave 1 ~46 incl. ~6.5 lost to restarts, R030; WMT14 pair ~11.9, R036;
-  W1d ~3, R039; J2-F ~6.5, R042). Budget ~200: ~120.5 left; the user's Colab balance this month: 103.56 CU.
+- Colab: ~106 CU spent (p1, c4, w0 ~12.5; wave 1 ~46 incl. ~6.5 lost to restarts, R030; WMT14 pair ~11.9, R036;
+  W1d ~3, R039; J2-F ~6.5, R042; W2M ~26, R049). This month: 103.56 CU before W2M (user), so ~77 left (estimate; the
+  Colab panel is authoritative).
 - Plan (`docs/plan_2026-10-27.md`, proposed): W2M ~27 (registered); E1/E2 ~2; D1 ~1.5; W2C 14-28 if W2M's gate
   passes; J1d ~23 only if D1's text gate passes; coupled-sampler pilot <= 5 only if S0 passes; reserve 15. Likely
   path ~71, ~50 unallocated.
 - CPU: ~13.5 CPU-h before session 5; session 5 ~1.2 h (Sudoku paired rerun, test suites).
 
 ## Next 3 actions
-1. **Plan approved** (user, 2026-10-27; R043-R044): allocation table, downloads; (c) replication for released-model
-   properties = domains and checkpoints, seeds only where a training arm is the evidence. Open: whether to skip M5. (d) keeps the registered wall-clock rule (user, R044): D1 first; J1d seeds only if J2-F + the stop
-   rule passes it. W2M: run M0 and M1 first (validity gate), then the rest.
-2. W2M: `w2m_L_ts_m0`..`m7` cleared (A100 or L4; R041). `w2m_mech_eval` ready (W2Ma merged): run it after the
-   arms (`--only released,m0,m1,m2,m3,m4,m6,m7` if M5 was skipped). Read W2M with W2M + W2Ma; then CPU
-   `scripts/w1_sample_stats.py --set w2m`.
-3. The user launches `d1_batch1_wallclock` (A100; fp32 gate read only on an A100 with integrity passing) and
-   `e1_equivalence`. Read D1 against its registration; J1d seeds only if J2-F + stable x1 <= 0.75x J0 sequential.
+1. The user launches (A100): `d1_batch1_wallclock`; `w2m_mech_eval` with `--only released,m0,m1,m2,m3,m4,m6,m7`
+   (M5 skipped); `e1_equivalence` after amendment E1a (analysis only: confidence sequences from the saved hit counts,
+   R046's pilot windows labelled; Astra round 2 section 2). Read each against its registration; J1d seeds only if
+   J2-F + stable x1 <= 0.75x J0 sequential.
+2. **Astra round 3** (`docs/prompts/gpt6_astra_round3_2026-10-27.md`) on W2M's reading and the W2C design; then register
+   and build W2C (fresh seeds of M2 / M3 / M4 + a random-row flag control), the M0-without-clean-rows control and the
+   eval-only generation-context diagnostic (W2M-G) in one PR with Codex review and a delta audit. User approves W2C's CU.
+3. Log the mech eval's flag use (completes M4's registered reading) and row-level detectability as they land.

@@ -38,7 +38,7 @@ Final eval per W1 arm: 16 x 256 samples in fp32 (~5-10 min on an A100).
 | `w2c_L_wmt_ctrl` | WMT14 control (+ released reference J0), J1 + J1c | A100 / L4 | ~4.6 | done (R036: J1 loses 0.8 BLEU, recipe OK); seeds 1-2 only if J2-F advances |
 | `w2c_L_wmt_consist` | WMT14 self-consistency fine-tune (criterion d, text); fp32 teacher (J1b), padded degenerate rows (J1c) | A100 / L4 | ~6.4 | done (R036: misses the screen; 16% of test sentences collapse onto two fixed strings); no further seeds |
 | `w2c_L_wmt_consist_frozen` | J2-F: J2 with a frozen released-model teacher (contingent arm, triggered by J2's miss) | **A100** | ~6.5 | done (R042: no collapse, 5.6% pass saving; misses the screen; no seeds) |
-| `w2m_L_ts_m0` ... `w2m_L_ts_m7`, `w2m_mech_eval` | W2M: eight 600-step tier-L mechanism arms for the on-policy collapse + eval-only mechanism measures | A100 / L4 | ~27 total (< 4 each) | arms **ready** (R041); M5 is a near-replicate of M4 at these rates (R043, W2Ma): skip it if not yet run (user's choice). `w2m_mech_eval` **ready** (W2Ma merged, PR 14); add `--only released,m0,m1,m2,m3,m4,m6,m7` if M5 was skipped |
+| `w2m_L_ts_m0` ... `w2m_L_ts_m7`, `w2m_mech_eval` | W2M: eight 600-step tier-L mechanism arms for the on-policy collapse + eval-only mechanism measures | A100 / L4 | ~26 (7 arms) | arms **done** (R049: M0-M4, M6, M7; M5 skipped); `w2m_mech_eval` **ready**: run with `--only released,m0,m1,m2,m3,m4,m6,m7` (A100) |
 | `d1_batch1_wallclock` | D1: batch-1 wall-clock gate for criterion (d) (WMT14 J0 / J2-F, Sudoku-hard; fp32 gate, bf16 secondary) | **A100** | ~1.5 | registered (R046); **ready** (PR 14 merged, audit 9 clean) |
 | `e1_equivalence` | E1: representation vs text share of code NLL (TinyStories A0 / A1 / A2 / A4, WMT14 J0 / J1 / J2-F, Sudoku) | A100 / L4 | ~2.5 | registered (R046); **ready** (PR 14 merged) |
 | `p1b_tc_rerun` | P1b: within-level-AR TC probe | — | — | **withdrawn** (R023: false premise; notebook removed; P1c to come) |
@@ -47,8 +47,8 @@ Final eval per W1 arm: 16 x 256 samples in fp32 (~5-10 min on an A100).
 | `w2_Mc_ar15` | M1 conditional: AR at 1.5x steps, seed 0 | A100 / L4 | ~6.4 | only when asked (before a criterion-(b) claim) |
 | `calib_t4` | old calibration (superseded by w0) | T4 | 0.6 | skip |
 
-Budget: ~200 CU (raised 2026-10-23). Spent: ~79.5 CU (p1, c4, w0 ~12.5; wave 1 ~46 incl. restarts, R030; WMT14 pair ~11.9, R036; W1d ~3, R039; J2-F ~6.5, R042).
-Next: W2M ~27 (cleared). Proposed in `docs/plan_2026-10-27.md` (awaiting the user): E1/E2 ~2, D1 ~1.5, then W2C / J1d by gate; cut M1, Sudoku arms, A1 seeds 1-2. Reasons and
+Budget: ~200 CU (raised 2026-10-23). Spent: ~106 CU (p1, c4, w0 ~12.5; wave 1 ~46 incl. restarts, R030; WMT14 pair ~11.9, R036; W1d ~3, R039; J2-F ~6.5, R042; W2M ~26, R049). This month: ~77 left of the user's 103.56 (estimate).
+Next (`docs/plan_2026-10-27.md` section 9): the three PR 14 notebooks (~6), then W2M-G (~2), M0 without clean rows (~2.7), W2C stage 1 (~22) and stage 2 (~27) once registered; J1d only if D1 passes. Reasons and
 ranking: `log.md` R031 and `STATE.md`. Every notebook now records the git SHA and each session's resume point
 (`_meta.json`, `<run>__provenance.jsonl`) and refuses to resume a run directory under changed code (PR 3). Progress check: the notebook prints `{"step": ..., "steps_per_s": ...,
 "tflops_eff": ...}`; remaining steps / steps_per_s = time left.
