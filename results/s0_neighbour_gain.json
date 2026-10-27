@@ -1,0 +1,218 @@
+{
+ "protocol": {
+  "experiment": "S0 (docs/preregistration.md)",
+  "model": "released TinyStories NCM, frozen, eval mode",
+  "precision": "fp32, TF32 off, no autocast",
+  "device": "cuda",
+  "device_name": "NVIDIA GeForce RTX 4050 Laptop GPU",
+  "torch": "2.6.0+cu124",
+  "levels": [
+   1,
+   8,
+   16,
+   24,
+   32,
+   40,
+   52,
+   64,
+   76,
+   92,
+   108,
+   128
+  ],
+  "levels_probed": [
+   1,
+   2,
+   3,
+   4,
+   5,
+   6
+  ],
+  "train_windows": 3584,
+  "dev_windows": 512,
+  "val_windows": 1024,
+  "train_source": "TrainStream().batch(np.random.default_rng(0), 4096); first 3584 train, last 512 development (early stopping only)",
+  "val_source": "examples('val', 1024)",
+  "term": "z' = proj(h) + U[(A h) * (B n)] + U0 (B0 n); position 0 unchanged",
+  "rank": 64,
+  "init": "A, B, B0 ~ N(0, 1/fan_in) (torch generator seed 0, drawn in the order A, B, B0); U, U0 zero",
+  "optimizer": {
+   "name": "AdamW",
+   "lr": 0.001,
+   "weight_decay": 0.01
+  },
+  "batch_windows": 64,
+  "max_epochs": 30,
+  "patience_epochs": 3,
+  "shuffle_seed": 0,
+  "loss": "mean over the batch's windows of the level NLL (summed over positions)",
+  "nll_unit": "nats per window, summed over all positions of the level (position 0 included)",
+  "se": "std(ddof=1)/sqrt(n) over val windows; gain SE paired over windows",
+  "head_reproduction_max_abs_diff": 0.0,
+  "wall_time_s": 280.1
+ },
+ "levels": {
+  "1": {
+   "positions": 8,
+   "val_windows": 1024,
+   "base_nll_mean": 55.900823229923844,
+   "base_nll_se": 0.20645025535392206,
+   "base_nll_per_code": 6.9876029037404805,
+   "base_nll_per_code_se": 0.025806281919240257,
+   "with_term_nll_mean": 52.65891163237393,
+   "with_term_nll_se": 0.2180136636698925,
+   "gain_mean": 3.2419115975499153,
+   "gain_se": 0.11383590855857921,
+   "gain_per_code": 0.4052389496937394,
+   "gain_per_code_se": 0.014229488569822401,
+   "gain_pct_of_base": 5.799398667557568,
+   "epochs_run": 9,
+   "best_epoch": 6,
+   "dev_nll_per_epoch": [
+    53.6319694519043,
+    53.21434020996094,
+    52.97563171386719,
+    52.8470344543457,
+    52.81869125366211,
+    52.73410415649414,
+    52.74874496459961,
+    52.78071594238281,
+    52.8491096496582
+   ]
+  },
+  "2": {
+   "positions": 16,
+   "val_windows": 1024,
+   "base_nll_mean": 80.68676086887717,
+   "base_nll_se": 0.4210183638770146,
+   "base_nll_per_code": 5.042922554304823,
+   "base_nll_per_code_se": 0.02631364774231341,
+   "with_term_nll_mean": 79.14482969790697,
+   "with_term_nll_se": 0.4291722049723318,
+   "gain_mean": 1.5419311709702015,
+   "gain_se": 0.06021081699209193,
+   "gain_per_code": 0.0963706981856376,
+   "gain_per_code_se": 0.0037631760620057456,
+   "gain_pct_of_base": 1.9110088871654798,
+   "epochs_run": 5,
+   "best_epoch": 2,
+   "dev_nll_per_epoch": [
+    79.1012954711914,
+    78.84349822998047,
+    78.89746856689453,
+    79.0962905883789,
+    79.43448638916016
+   ]
+  },
+  "3": {
+   "positions": 24,
+   "val_windows": 1024,
+   "base_nll_mean": 84.81836510449648,
+   "base_nll_se": 0.6258987323023423,
+   "base_nll_per_code": 3.5340985460206866,
+   "base_nll_per_code_se": 0.026079113845930927,
+   "with_term_nll_mean": 84.04837314784527,
+   "with_term_nll_se": 0.6241594847898364,
+   "gain_mean": 0.7699919566512108,
+   "gain_se": 0.05144403968753307,
+   "gain_per_code": 0.03208299819380045,
+   "gain_per_code_se": 0.0021435016536472114,
+   "gain_pct_of_base": 0.9078127781672971,
+   "epochs_run": 5,
+   "best_epoch": 2,
+   "dev_nll_per_epoch": [
+    83.30526733398438,
+    83.26725769042969,
+    83.6423110961914,
+    84.16901397705078,
+    84.84078979492188
+   ]
+  },
+  "4": {
+   "positions": 32,
+   "val_windows": 1024,
+   "base_nll_mean": 77.96713397651911,
+   "base_nll_se": 0.7680906823421695,
+   "base_nll_per_code": 2.436472936766222,
+   "base_nll_per_code_se": 0.024002833823192796,
+   "with_term_nll_mean": 77.47270333021879,
+   "with_term_nll_se": 0.766070610777092,
+   "gain_mean": 0.49443064630031586,
+   "gain_se": 0.029758572284786223,
+   "gain_per_code": 0.01545095769688487,
+   "gain_per_code_se": 0.0009299553838995695,
+   "gain_pct_of_base": 0.6341526500758904,
+   "epochs_run": 4,
+   "best_epoch": 1,
+   "dev_nll_per_epoch": [
+    77.41836547851562,
+    77.45601654052734,
+    78.11651611328125,
+    79.00020599365234
+   ]
+  },
+  "5": {
+   "positions": 40,
+   "val_windows": 1024,
+   "base_nll_mean": 66.11923582106829,
+   "base_nll_se": 0.8252501611652956,
+   "base_nll_per_code": 1.6529808955267071,
+   "base_nll_per_code_se": 0.02063125402913239,
+   "with_term_nll_mean": 65.9501299392432,
+   "with_term_nll_se": 0.8223127025624778,
+   "gain_mean": 0.16910588182508945,
+   "gain_se": 0.01381159246940781,
+   "gain_per_code": 0.0042276470456272365,
+   "gain_per_code_se": 0.00034528981173519526,
+   "gain_pct_of_base": 0.25575897804191716,
+   "epochs_run": 4,
+   "best_epoch": 1,
+   "dev_nll_per_epoch": [
+    64.71737670898438,
+    64.73674011230469,
+    65.32849884033203,
+    66.23085021972656
+   ]
+  },
+  "6": {
+   "positions": 52,
+   "val_windows": 1024,
+   "base_nll_mean": 64.08118057250977,
+   "base_nll_se": 0.6812203259066258,
+   "base_nll_per_code": 1.2323303956251879,
+   "base_nll_per_code_se": 0.013100390882819727,
+   "with_term_nll_mean": 63.824186876416206,
+   "with_term_nll_se": 0.6807820330151286,
+   "gain_mean": 0.25699369609355927,
+   "gain_se": 0.02175607842064713,
+   "gain_per_code": 0.0049421864633376784,
+   "gain_per_code_se": 0.0004183861234739833,
+   "gain_pct_of_base": 0.40104394737666116,
+   "epochs_run": 4,
+   "best_epoch": 1,
+   "dev_nll_per_epoch": [
+    63.45952606201172,
+    63.526100158691406,
+    64.10749816894531,
+    64.9161148071289
+   ]
+  }
+ },
+ "sum_levels_1to5": {
+  "base_nll_mean": 365.4923189878464,
+  "base_nll_se": 2.3372681750258173,
+  "gain_mean": 6.217371253296733,
+  "gain_se": 0.14891478960847113,
+  "gain_pct_of_base": 1.7010949150763077
+ },
+ "gate": {
+  "part1": {
+   "rule": "gain summed over levels 1-5 >= 10.0 nats/window AND >= 5% of their summed canonical NLL",
+   "gain_1to5": 6.217371253296733,
+   "base_1to5": 365.4923189878464,
+   "gain_pct_of_base": 1.7010949150763077,
+   "verdict": "fail"
+  },
+  "part2_E2": "pending (E2 not run)"
+ }
+}

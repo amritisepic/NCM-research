@@ -1,0 +1,57 @@
+{
+ "procedure": "R043's pre-reading check of W2M (docs/preregistration.md, \"W2Ma\"), by simulation: how much information do the truthful | masks as MechArm.draw_plan on CPU generator(seed); stand-in VQ levels [1, 8, 16, 24, 32, 40, 52, 64, 76, 92, 108, 128], learned L0, kernel-3 halo; shuffle generator fresh, seed 0; rates [0.75, 0.7, 0.65, 0.6, 0.55, 0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.0]",
+ "saturation_25pct_clean_seed0": {
+  "rows": 4096,
+  "clean_rows": 1024,
+  "seed": 0,
+  "l0_replaced_corrupted_rows": 0.7565104365348816,
+  "flag_eq1_per_level_corrupted_rows": [
+   0.7565104365348816,
+   0.9693603515625,
+   0.9930691123008728,
+   0.9986572265625,
+   0.999682605266571,
+   0.9998998641967773,
+   0.9999796748161316,
+   0.9999828934669495,
+   0.9999964833259583,
+   0.9999969601631165,
+   0.9999974370002747
+  ],
+  "flag_gt0_per_level_corrupted_rows": [
+   0.7565104365348816,
+   0.9884440302848816,
+   0.9981147050857544,
+   0.9998779296875,
+   0.9999918341636658,
+   1.0,
+   0.9999949336051941,
+   0.9999957084655762,
+   1.0,
+   1.0,
+   0.9999974370002747
+  ],
+  "flag_eq1_all_slots_corrupted_rows": 0.9958297610282898,
+  "flag_gt0_all_slots_corrupted_rows": 0.9965886473655701,
+  "level1_flag_constant_within_row": true,
+  "mean_abs_truthful_minus_shuffled_corrupted_rows": 0.0014379289932549,
+  "mean_abs_truthful_minus_shuffled_all_rows": 0.001078446744941175
+ },
+ "probe_setting_no_clean_seed5": {
+  "rows": 4096,
+  "seed": 5,
+  "window_positions": 640,
+  "contaminated_fraction": 0.9968360662460327,
+  "negatives_per_window": 2.02490234375,
+  "negatives_at_level1_fraction": 0.9143959283828735,
+  "auc_level_only_all_windows": {
+   "indicator_not_level1": 0.9523137211799622,
+   "per_level_rate": 0.9928688406944275
+  },
+  "auc_level_only_l0_clean_windows": {
+   "indicator_not_level1": 0.9572039842605591,
+   "per_level_rate": 0.9981628060340881
+  },
+  "l0_clean_windows": 948
+ }
+}
