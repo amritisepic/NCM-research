@@ -1,0 +1,13 @@
+# W2M (docs/preregistration.md, "W2M -- tier-L mechanism arms"), tier L: fine-tune the released 88.6M TinyStories generator for 600 steps, W1's recipe.
+# M5 = M2 + flags shuffled within level per row (independent RNG).
+# Canonical labels; 25% of every batch's rows are left clean; one mask stream shared by all arms (src/ncmr/w2m.py).
+init: released
+corruption: {mode: mech, arm: m5, mean_rate: 0.5, spread: 0.5, retarget: false, clean_row_frac: 0.25, policy_temp: 1.0}
+train: {steps: 600, batch_size: 256, grad_accum: 8, lr: 5.0e-05, warmup: 200, min_lr_frac: 0.1, weight_decay: 0.1, beta2: 0.95,
+  ckpt_every: 100, eval_every: 100, eval_n: 1000, log_every: 25, compile: false, seed: 0}
+sample_eval:
+  at: [100, 300, 600]   # the curve (256 samples + val NLL); val NLL alone every 100 steps
+  n: 256
+  final_seeds: [42, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]   # W1b: 16 groups
+  final_n: 256
+  mauve: true

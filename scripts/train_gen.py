@@ -9,9 +9,10 @@ Config:
   init: released | scratch     # released = the paper's 88.6M TinyStories generator (fine-tuning, tier L)
   model: {n_layer, n_head, n_embd, dropout}                  # scratch only (tier M)
   corruption: {mode, mean_rate, spread, retarget, soft_tau, soft_topm, policy_temp}
+              mode: mech = the W2M arms M0-M7 (src/ncmr/w2m.py): {arm, clean_row_frac, d_target (M7)}
   train: {steps, batch_size, grad_accum, lr, warmup, min_lr_frac, weight_decay, beta2, ckpt_every, eval_every,
           eval_n, log_every, compile}
-  sample_eval: {every, n, final_seeds, final_n, mauve}
+  sample_eval: {every, at, n, final_seeds, final_n, mauve}   # at: explicit steps for the curve samples (W2M: 100/300/600)
 On-policy sampling costs one extra no-grad forward per step; it is counted in `flops_est_total`, so arms are
 compared at equal FLOPs by giving them steps in proportion (see the configs).
 Writes run_dir/{ckpt.pt, final.pt, metrics.jsonl, result.json, samples_final.json}.
@@ -35,6 +36,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "src"))
 
 from ncmr import flops as FL  # noqa: E402
+from ncmr import w2m as W2M  # noqa: E402
 from ncmr.corruption import CorruptionCfg, build_hierarchy, soft_ce  # noqa: E402
 from ncmr.data import DATA_DIR, EOS, PAD, TrainStream, cut_at_eos, examples  # noqa: E402
 from ncmr.models import build_ncm_generator, n_params  # noqa: E402
@@ -152,6 +154,13 @@ cc = cfg.get("corruption", {})
 corr = CorruptionCfg(mode=str(cc.get("mode", "none")), mean_rate=float(cc.get("mean_rate", 0.5)),
                      spread=float(cc.get("spread", 0.5)), retarget=bool(cc.get("retarget", False)),
                      soft_tau=float(cc.get("soft_tau", 0.0)), soft_topm=int(cc.get("soft_topm", 16)))
+if corr.mode == "mech":
+    # W2M: canonical labels, one-step proposals, released generator (the frozen copy and the flag vector assume it)
+    assert cfg.init == "released" and not corr.retarget and corr.soft_tau <= 0 and int(cc.get("policy_passes", 1)) == 1
+    assert str(cc.get("arm")) in W2M.ARMS, f"corruption.arm must be one of {sorted(W2M.ARMS)}"
+    if cc.get("d_target") is not None:   # M7: uniform replacement at A3's realized per-level disagreement
+        corr = dataclasses.replace(corr, level_rates=W2M.m7_level_rates([float(v) for v in cc.d_target],
+                                                                        tok.vq.vqvae_vocab_sizes))
 if corr.soft_tau > 0:
     # W1b: freeze the per-level soft-label gap (mean nearest / second-nearest distance gap over 512 val windows), so
     # the targets do not depend on the micro-batch (codex audit F7)
@@ -165,15 +174,27 @@ policy_passes = int(cc.get("policy_passes", 1))   # 1 = one-step errors; t = err
 fwd = FL.ncm_gen_fwd_per_seq(n_embd, n_layer, levels, codebook=tok.vq.vqvae_vocab_sizes[0], vq_dim=tok.embed_dim)
 # FLOP-matching unit (W1): generator-only proxy = (fwd + 2x bwd + policy passes) x analytic forward per window. It omits
 # tokenizer / hierarchy work and prices masked attention as block-sparse (the same in every arm; codex audit F4).
-fl_step = (3 + (policy_passes if corr.mode == "onpolicy" else 0)) * fwd * int(tc.batch_size)
-params = [p for p in net.parameters() if p.requires_grad]
+mech, flagmod = None, None
+if corr.mode == "mech":
+    # the frozen proposer is a copy of the RELEASED generator: made here, before any checkpoint restore
+    mech = W2M.MechArm(str(cc.arm), tok, net, L0,
+                       prefix_emb=lambda b: tok.encoder.wte(torch.full((b, 1), EOS, dtype=torch.long, device=device)),
+                       device=device, seed=seed, rates=corr.rates(K), clean_frac=float(cc.get("clean_row_frac", 0.25)),
+                       policy_temp=float(cc.get("policy_temp", 1.0)),
+                       frozen=W2M.MechArm.frozen_copy(net) if W2M.ARMS[str(cc.arm)][0] == "frozen_wrong" else None)
+    if mech.flag_mode:
+        flagmod = W2M.FlagVector(tok.embed_dim).to(device)
+fl_step = (3 + (policy_passes if corr.mode == "onpolicy" else 0) + (mech.proposal_forwards if mech else 0)) * fwd * int(tc.batch_size)
+params = [p for p in net.parameters() if p.requires_grad] + (list(flagmod.parameters()) if flagmod else [])
 trainer = Trainer(a.run_dir, params, max_lr=float(tc.lr), total_steps=int(tc.steps), warmup=int(tc.warmup),
                   weight_decay=float(tc.weight_decay), betas=(0.9, float(tc.get("beta2", 0.95))),
                   ckpt_every=int(tc.ckpt_every), device=device, amp=bool(tc.get("amp", True)),
                   min_lr_frac=float(tc.get("min_lr_frac", 0.1)))
-modules = {"model": net}
+modules = {"model": net, **({"flag": flagmod} if flagmod else {})}
 resume_extra = trainer.maybe_resume(modules, data_rng)
 fnet = torch.compile(net) if (device == "cuda" and bool(tc.get("compile", False))) else net
+if mech:
+    mech.fwd = fnet
 print(f"[gen] init={cfg.init} params {n_params(net) / 1e6:.2f}M | corruption {corr} policy_temp {policy_temp} | "
       f"{fl_step / 1e12:.2f} TFLOP/step, {fl_step * int(tc.steps) / 1e15:.1f} PFLOP total | device {device}", flush=True)
 
@@ -214,6 +235,27 @@ def compute_loss(x, gen):
                        h["soft_w"][:, l0:].reshape(-1, corr.soft_topm))
     else:
         loss = F.cross_entropy(logits.float().reshape(-1, V), tgt.reshape(-1))
+    with torch.no_grad():
+        agree = (logits.argmax(-1) == h["canonical"][:, l0:]).float().mean().item()
+    return loss, {"corrupted_frac": round(h["corrupted_frac"], 4),
+                  "corrupted_frac_per_level": [round(f, 4) for f in h["corrupted_frac_per_level"]],
+                  "argmax_eq_canonical": round(agree, 4),
+                  "labels_changed": round((h["targets"] != h["canonical"]).float().mean().item(), 4)}
+
+
+def compute_loss_mech(x, plan):
+    """W2M arms: canonical labels; replaced slots from the plan's mask stream, codes from the arm's proposer; flags (M4 /
+    M5) enter as f * w on the code inputs. Evaluation never calls this: inference and evals use zero flags."""
+    canon = mech.canonical(x)
+    repl = mech.proposals(canon, plan)
+    h = build_hierarchy(tok, x, corr, policy_codes=repl, masks=plan.masks, canonical=canon)
+    mech.record(h["used"], h["targets"], plan)
+    inputs = h["inputs"]
+    if flagmod is not None:
+        inputs = flagmod(inputs, mech.flags(plan))
+    logits = fnet(torch.cat([prefix_emb(x.shape[0]), inputs], 1))
+    V = logits.shape[-1]
+    loss = F.cross_entropy(logits.float().reshape(-1, V), h["targets"][:, l0:].reshape(-1))
     with torch.no_grad():
         agree = (logits.argmax(-1) == h["canonical"][:, l0:]).float().mean().item()
     return loss, {"corrupted_frac": round(h["corrupted_frac"], 4),
@@ -313,20 +355,32 @@ if trainer.step:
         policy_gen.set_state(resume_extra["policy_rng"].cpu())
 
 
+if trainer.step and mech is not None:
+    if "mech" not in resume_extra:
+        raise RuntimeError("checkpoint lacks the W2M mask / replacement / flag RNG states; exact resume unavailable: "
+                           "use a fresh run directory")
+    mech.load_state_dict(resume_extra["mech"])
+
+
 def save_ckpt():
-    trainer.save(modules, data_rng, extra={"corruption_rng": gen.get_state(), "policy_rng": policy_gen.get_state()})
+    trainer.save(modules, data_rng, extra={"corruption_rng": gen.get_state(), "policy_rng": policy_gen.get_state(),
+                                           **({"mech": mech.state_dict()} if mech else {})})
 
 
 accum = int(tc.get("grad_accum", 1))
 calib = Calib(a.run_dir, a.calib_steps, fl_step) if a.calib_steps else None
 every_s = int(sc.get("every", 0))
+at_s = {int(v) for v in sc.get("at", [])}
 t_last, s_last = time.time(), trainer.step
 while trainer.step < int(tc.steps):
     xb_full = torch.from_numpy(stream.batch(data_rng, int(tc.batch_size))).to(device)
     loss_sum, logs = 0.0, {}
+    plan = mech.draw_plan(len(xb_full)) if mech else None   # one mask stream, drawn for the whole batch
+    row0 = 0
     for xb in torch.chunk(xb_full, accum):
         with trainer.ctx:
-            loss, logs = compute_loss(xb, gen)
+            loss, logs = compute_loss_mech(xb, plan.rows(row0, row0 + len(xb))) if mech else compute_loss(xb, gen)
+        row0 += len(xb)
         trainer.backward(loss / accum)
         loss_sum += loss.item() / accum
     gn = trainer.step_opt(params)
@@ -337,11 +391,12 @@ while trainer.step < int(tc.steps):
         sps = (trainer.step - s_last) / max(time.time() - t_last, 1e-9)
         t_last, s_last = time.time(), trainer.step
         rec = trainer.log({"loss": round(loss_sum, 4), "gnorm": round(gn, 3), "steps_per_s": round(sps, 3),
-                           "tflops_eff": round(sps * fl_step / 1e12, 1), **logs})
+                           "tflops_eff": round(sps * fl_step / 1e12, 1), **logs,
+                           **({"realized": mech.realized()} if mech else {})})
         print(json.dumps(rec), flush=True)
     if trainer.step % int(tc.eval_every) == 0 or trainer.step == int(tc.steps):
         ev = val_nll()
-        if every_s and (trainer.step % every_s == 0 or trainer.step == int(tc.steps)):
+        if (trainer.step in at_s) if at_s else (every_s and (trainer.step % every_s == 0 or trainer.step == int(tc.steps))):
             sm, _, _ = sample_metrics(int(sc.get("n", 256)), [seed + 10_000])
             ev.update({k: v for k, v in sm.items() if not k.endswith(("per_group", "per_seed"))})
         print(json.dumps(trainer.log({"eval": ev})), flush=True)
@@ -358,7 +413,8 @@ if calib:
 if not a.eval_only:
     save_ckpt()
     torch.save({"model": net.state_dict(), "init": cfg.init, "model_cfg": OmegaConf.to_container(cfg.model) if "model" in cfg else {},
-                "level0_unigram": L0.cpu()}, os.path.join(a.run_dir, "final.pt"))
+                "level0_unigram": L0.cpu(), **({"flag": flagmod.state_dict()} if flagmod else {})},
+               os.path.join(a.run_dir, "final.pt"))
 res_path = os.path.join(a.run_dir, "result.json")
 final = {}
 if not a.skip_final_eval:
@@ -373,5 +429,8 @@ res = {"run": os.path.basename(a.run_dir.rstrip("/")), "config": OmegaConf.to_co
        "params_total": n_params(net), "steps": trainer.step, "flops_est_total": fl_step * trainer.step,
        "wall_s": wall, "device": device, "gpu": torch.cuda.get_device_name() if device == "cuda" else None,
        "torch": torch.__version__, "eval_precision": "fp32 sampling and scoring, TF32 off", "final_eval": final}
+if mech:
+    res.update({"w2m_arm": mech.arm, "proposal_forwards_per_step": mech.proposal_forwards,
+                "realized_disagreement": mech.realized(), "flag_vector_norm": float(flagmod.w.norm()) if flagmod else None})
 json.dump(res, open(res_path, "w"), indent=1)
 print(json.dumps({k: v for k, v in res.items() if k != "config"}, indent=1, default=str))

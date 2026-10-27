@@ -46,9 +46,14 @@ class CorruptionCfg:
 
 @torch.no_grad()
 def build_hierarchy(vqvae, x: torch.Tensor, cfg: CorruptionCfg, policy_codes: torch.Tensor | None = None,
-                    generator: torch.Generator | None = None):
+                    generator: torch.Generator | None = None, masks: list | None = None,
+                    canonical: torch.Tensor | None = None):
     """x: (B, L) token ids. policy_codes: (B, S) codes sampled from the generator given clean inputs (on-policy;
     level 0 = what inference uses there, e.g. unigram samples).
+    W2M (src/ncmr/w2m.py): `masks` = one (B, l_k) bool tensor per level, drawn by the caller from its own mask stream;
+    where True the code is replaced by `policy_codes` (which then holds the replacement codes of every slot, whatever
+    their source) and `generator` / the rates are not used. `canonical` = the caller's clean codes (B, S), so that the
+    replacement draws (which exclude the canonical code) and the labels use the same codes; it needs clean labels.
     Returns dict(inputs=(B, S - l_0, D) NCM inputs for levels 1.., targets=(B, S) labels for every level,
     canonical=(B, S) clean codes, used=(B, S) codes fed forward, z_used=(B, L, D) their full reconstruction,
     soft_idx/soft_w=(B, S, M) or None, corrupted_frac=float, corrupted_frac_per_level=list of K floats)."""
@@ -75,10 +80,14 @@ def build_hierarchy(vqvae, x: torch.Tensor, cfg: CorruptionCfg, policy_codes: to
                 d = vq._distances(u.reshape(-1, C), E).view(B, lk, -1)
                 return d
 
-            d_clean = nearest(z - z_clean)
-            c_canon = d_clean.argmin(-1)
-            d_lab = nearest(z - z_used) if cfg.retarget else d_clean
-            c_lab = d_lab.argmin(-1)
+            if canonical is not None:
+                assert not cfg.retarget and cfg.soft_tau <= 0, "a caller-supplied canonical needs clean hard labels"
+                c_canon = c_lab = canonical[:, acc:acc + lk]
+            else:
+                d_clean = nearest(z - z_clean)
+                c_canon = d_clean.argmin(-1)
+                d_lab = nearest(z - z_used) if cfg.retarget else d_clean
+                c_lab = d_lab.argmin(-1)
             canon.append(c_canon)
             targets.append(c_lab)
             if cfg.soft_tau > 0:
@@ -91,7 +100,10 @@ def build_hierarchy(vqvae, x: torch.Tensor, cfg: CorruptionCfg, policy_codes: to
                 s_w.append(torch.softmax(-(top_d - top_d[..., :1]) / (cfg.soft_tau * gap), -1))
                 s_idx.append(top_i)
             used = c_lab.clone()
-            if rates[k] > 0:
+            if masks is not None:
+                used = torch.where(masks[k], policy_codes[:, acc:acc + lk], used)
+                n_corr += int((used != c_lab).sum())
+            elif rates[k] > 0:
                 m = torch.rand(B, lk, device=x.device, generator=generator) < rates[k]
                 if cfg.mode == "onpolicy" and policy_codes is not None:
                     repl = policy_codes[:, acc:acc + lk]

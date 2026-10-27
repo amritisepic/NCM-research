@@ -107,6 +107,34 @@ for arm, what in L_ARMS.items():
         "gpu": "A100 (measured 2.2 s/step, ~67 min + eval) or L4", "units": 6, "needs": ["ts", "ckpt"], "seeds": [0],
         "cmds": cmds,
     }
+# ---- W2M (docs/preregistration.md, "W2M -- tier-L mechanism arms"): eight 600-step arms + the eval-only mechanism measures.
+W2M_ARMS = {
+    "m0": ("L_ts_m0_uniform", "M0 uniform replacement (control)", 2.9),
+    "m1": ("L_ts_m1_policy", "M1 current-policy replacement (A3's policy, fp32 policy forward)", 3.7),
+    "m2": ("L_ts_m2_frozen_pw", "M2 frozen plausible-wrong replacement (canonical code excluded)", 3.7),
+    "m3": ("L_ts_m3_uniform_wrong", "M3 uniform-wrong replacement", 2.9),
+    "m4": ("L_ts_m4_frozen_pw_flags", "M4 = M2 + truthful replacement flags", 3.7),
+    "m5": ("L_ts_m5_frozen_pw_shuffled", "M5 = M2 + flags shuffled within level", 3.7),
+    "m6": ("L_ts_m6_policy_usedparent", "M6 current policy, level >= 1 proposals given the level-0 codes actually used", 3.7),
+    "m7": ("L_ts_m7_uniform_a3rates", "M7 uniform replacement at A3's realized per-level disagreement", 2.9),
+}
+for key, (cfgname, what, units) in W2M_ARMS.items():
+    RUNS[f"w2m_L_ts_{key}"] = {
+        "desc": f"W2M (pre-registered, exploratory): tier L, fine-tune the released 88.6M TinyStories generator for 600 steps; "
+                f"arm = {what}. Common protocol: W1's recipe, canonical labels, 25% of every batch's rows left clean, one mask "
+                "stream shared by all arms, seed 0. Curve at steps 100 / 300 / 600; final eval 16 x 256 fp32 samples (W1b). "
+                "Run the eight arms in any order, then w2m_mech_eval. Needs bf16: A100 or L4 (not T4).",
+        "gpu": "A100 or L4 (bf16)", "units": units, "needs": ["ts", "ckpt"], "seeds": [0],
+        "cmds": [f"python scripts/train_gen.py --config configs/scale/{cfgname}.yaml --run_dir {{R}}/{cfgname}_s{{S}} --seed {{S}}"],
+    }
+RUNS["w2m_mech_eval"] = {
+    "desc": "W2M eval-only mechanism measures (no training): the released model and the eight W2M final checkpoints, same windows "
+            "and seeds for every model, fp32 with TF32 off. (a) coarse-context dependence KL per level j = 1..6, (b) logistic-probe "
+            "AUC for plausible-wrong and uniform-wrong contexts, (c) flag use for M4 / M5. Run after all eight w2m_L_ts_m* notebooks "
+            "finished on the same Drive (reads {R}/L_ts_m*_s0/final.pt).",
+    "gpu": "A100 or L4", "units": 1.0, "needs": ["ts", "ckpt"], "seeds": [0],
+    "cmds": ["python scripts/mech_eval_w2m.py --run_root {R} --run_dir {R}/w2m_mech_eval --seed {S}"],
+}
 RUNS["w1d_requant_diag"] = {
     "desc": "Eval-only diagnostic W1d (exploratory; registered before launch; no training): the released model (A0), the "
             "wave-1 control (A1) and the re-quantized-label arm (A2). (1) Temperature frontier at T = 0.8 / 0.9 / 1.0, "
