@@ -1326,6 +1326,8 @@ Cut 8, every item; R share = mean R_8 / mean N_8, bounds from the per-item beta-
 - Continuing sampling on the censored and wide items keeps the beta-mixture sequences valid (Ville's inequality holds
   under optional continuation), so a registered extension (E1b, ~1.5 CU) could read prediction 1 in WMT14 without new
   error. Proposed in `docs/plan_2026-10-27.md` section 10, not run.
+- Update (same day): PR 15 merged (`39c5f8d`) after a Codex review with no findings on `55eded2`; the readings above
+  are no longer provisional. A deep audit of `scripts/analyze_e1.py` is still required before any (c) claim rests on E1.
 
 ## R055 — Astra round 3 triaged; plan section 10: W2C stage 1, the M3 no-clean pilot and an expanded W2M-G; direction 1 gated on W2M-G (2026-10-27; process)
 - Triage in `docs/plan_2026-10-27.md` section 10 (adopt / change / reject with reasons) of
