@@ -1,7 +1,7 @@
 <!-- Paste everything below this comment into Codex (desktop app, or `scripts/review/codex_local.sh audit audit8
 docs/prompts/codex_audit8_w2m.md` from a checkout of the audited commit). Work in a new branch `codex/audit8` made
 from the audited commit, and commit only the audit doc and its tests there. -->
-Deep audit. Follow '## Deep audit protocol' and '## Code Review Rules' in AGENTS.md. Audited commit: 8b82b9cd64285807f7e5fcc1c3be86c414ce4b4e
+Deep audit. Follow '## Deep audit protocol' and '## Code Review Rules' in AGENTS.md. Audited commit: 2ede453bac101319b2871a873d275e45850d280e
 (head of `claude/wip-w2m`). Audit id: audit8. This repository is PUBLIC. Write no absolute local paths, usernames,
 emails, session links or credentials into any file or into your final message; refer to files by repo-relative path.
 Work on a new branch `codex/audit8` made from the audited commit; commit there and push it.
@@ -24,7 +24,7 @@ Head of branch `claude/wip-w2m`. Files: `src/ncmr/w2m.py` (new), `src/ncmr/corru
 micro-batch slicing, checkpoint `mech` state, `sample_eval.at`), `scripts/mech_eval_w2m.py` (new),
 `configs/scale/L_ts_m{0..7}_*.yaml`, `notebooks/make_notebooks.py` and `notebooks/w2m_*.ipynb`, tests
 `tests/test_w2m_arms.py`, `tests/test_w2m_old_arms.py`, `tests/test_w2m_train_loop.py`, `tests/w2m_support.py`,
-`tests/w2m_ref_corruption.py`. References: wave 1's arms in the same trainer (audited in audits 1-3) and their seed-0
+`tests/w2m_ref_corruption.py`, `tests/test_w2m_pr12.py`, and the PR 12 triage `docs/reviews/triage_pr12.md` (two P1s fixed). References: wave 1's arms in the same trainer (audited in audits 1-3) and their seed-0
 results `results/colab/w1_L_ts_*/`. Log entries to recompute: R039 (from `results/colab/w1d_requant_diag/`).
 
 ## Spec (what correct means)
