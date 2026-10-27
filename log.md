@@ -1145,3 +1145,17 @@ Human val windows: bigram gain 2.213, 2.9 duplicates per 1k. dup/1k and bigram g
 - **BLEU decomposition** (exploratory; the round-2 review predicted >= 50% in precision): J1's deficit vs J0 is
   n-gram precision, not length: with the brevity penalty set to 1, 92% (val) / 105% (test) of it remains (BP 0.952 vs
   0.956 on val). J2-F's smaller deficit is about half brevity (45% / 58% remains). `results/j1_bleu_decomposition.json`.
+
+## R051 — external research review, round 3 (2026-10-27; documentation)
+- Added `docs/research_review_round3_2026-10-27.md`, preserving the advisory response: W2M interpretation and
+  minimum-cost confirmation; hostile evaluation; training-context/channel theory; verified literature; ten ideas;
+  target-association and exact-decoder-fiber training directions; conditional 77-CU queue.
+- Read the earlier reviews, registrations and log through R050. Checked saved W2M final result JSONs: M2 minus M3
+  Gen-PPL = 20.9363, paired sample-group SE = 0.3740; clean NLL difference = 4.0354 nats/window. Rounded per-level
+  arrays give 1.69 nats across L1-L5 and a largest individual-level increase of 0.57 nat. These are checkpoint
+  comparisons, not training-seed replication or a comprehensive numerical audit.
+- Preserved the registered mixed W2M verdict and S0's failed gate. Proposed thresholds, budgets, criteria and queue
+  changes remain recommendations, not preregistration amendments or run approvals. No production code or model
+  experiment was changed or launched.
+- Publication requested by the user; prepared from the current research branch in a separate checkout, with only
+  this review and this log entry included. Checked document completeness, arithmetic, repository hygiene and diff.
