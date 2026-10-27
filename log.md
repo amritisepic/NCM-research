@@ -878,3 +878,16 @@ generator and share the dropout stream; the logged per-level corrupted fractions
   shortfall to A0 as a fine-level effect. (3) The T = 1 advantage plus the T = 0.8 reversal at equal entropy looks like
   a change in how the sampled tail is shaped rather than a better model; untested.
 - Compute: ~73 CU spent of ~200.
+
+## R040 — W2M built and merged (PR 12); deep audit 8 briefed (2026-10-27; process)
+- The W2M implementation left uncommitted in session 6 (`src/ncmr/w2m.py`, `build_hierarchy`'s `masks` / `canonical`,
+  `corruption.mode: mech` in `scripts/train_gen.py`, `scripts/mech_eval_w2m.py`, eight configs, nine notebooks, tests)
+  was tested (72 W2M tests; full suite 285 on CPU, torch 2.11) and opened as PR 12.
+- Codex round 1, two P1s, both reproduced and accepted (`docs/reviews/triage_pr12.md`): (1) the flag / contamination
+  footprint omitted the tokenizer's kernel-3 residual convolution, so flags were 0 at 305 positions the tokenizer
+  actually changes (24-row test); this is the registration's definition, now implemented exactly, not an amendment.
+  (2) measure (a) needed ~45 GiB at 512 windows; now batched, same value. Regression tests mutation-checked against
+  `8b82b9c`. Round 2 (`2ede453`): no P0/P1. Merged (`31827b8`); full suite 290 pass.
+- No wave-1 or WMT14 code path changed (`tests/test_w2m_old_arms.py`). **W2M notebooks are not cleared**: deep audit 8
+  (brief `docs/prompts/codex_audit8_w2m.md`, audited `2ede453`, also covers PR 5's text-trainer changes) comes first.
+  The Codex CLI is not installed on the laptop, so the audit runs in Codex desktop from that brief.
