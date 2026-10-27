@@ -440,3 +440,32 @@ Why: `docs/reviews/codex_audit4.md` (A4-1 to A4-5); triage `docs/reviews/triage_
   replicated. A follow-up that separates W2M's three protocol changes (fp32 policy, 25% clean rows, 600 steps) is not
   pre-approved; it goes to the user with its cost.
 - Unchanged: every arm, metric, threshold and reading not named here.
+
+## S0 — within-level left-neighbour dependence of the released TinyStories generator; gate for the coupled sampler (registered 2026-10-27, before the probe was built or run)
+- **Why:** `docs/plan_2026-10-27.md` section 4 (S0). Astra's direction 1 (a marginal-preserving coupled sampler) is funded
+  only if neighbouring codes of one level carry dependence that NCM's factorized head misses. The head predicts every
+  level-k code independently given the coarser levels: under block-diagonal attention no level-k position sees another
+  level-k code.
+- **Setup (laptop, no Colab):** the released TinyStories generator and tokenizer, frozen, eval mode, fp32 with TF32 off.
+  4096 packed training windows (random story openings of the training stream, `TrainStream.batch`, numpy seed 0); the
+  last 512 of them are a development split used only for early stopping. Reported on the first 1024 even-index val
+  windows (`examples("val", 1024)`). Canonical codes from the tokenizer in fp32; teacher-forced hidden states after the
+  final layer norm at every level-k position, k = 1..6.
+- **Term (one per level k = 1..6, trained separately):** at position p >= 1 of level k, with h the frozen hidden state
+  and n the frozen level-k codebook vector of the canonical left neighbour c*_{k,p-1}, the head's query z = proj(h)
+  becomes z + U[(A h) ⊙ (B n)] + U0 (B0 n) (⊙ elementwise, rank r = 64); logits keep the head's own distance form
+  and temperature. U and U0 start at zero, so step 0 is the released model exactly; A, B, B0 start random (torch seed
+  0). Position 0 has no neighbour and is unchanged. AdamW (lr 1e-3, weight decay 0.01), batches of 64 windows, at most
+  30 epochs over the 3584 training windows, stopping after 3 epochs without a lower development NLL; the best
+  development epoch is kept. Nothing is tuned on the val windows.
+- **Reported:** per level k = 1..6, the mean over val windows of the level's canonical NLL under the released head
+  (nats per window) and the gain (released minus with the term; positive = the left neighbour helps), ± SE over
+  windows, also per code.
+- **Gate (plan section 4):** a coupled-sampler pilot (<= 5 CU) is registered only if (1) the gain summed over levels 1-5
+  is >= 10 nats per window AND >= 5% of those levels' summed canonical NLL, and (2) E2's adjacent-pair interaction is
+  positive for the released model: its mean over windows, summed over levels 3-6 and scored by GPT-2 large, has a 95%
+  interval (± 1.96 SE, paired over windows) above 0. If (1) fails, direction 1 is dropped and reported without
+  waiting for E2. Level 6 is reported, not gated.
+- **Reading:** the gain is a lower bound on the within-level dependence the factorized head misses (one left
+  neighbour, a rank-64 term, 3584 training windows).
+- **Cost:** laptop, ~1-2 h; no Colab.
