@@ -1062,3 +1062,14 @@ on 3584 training windows (512 more for early stopping), scored on the first 1024
   the W2Ma row-level probe in `scripts/mech_eval_w2m.py`, `scripts/w2m_flag_power.py`, `scripts/s0_neighbour_probe.py`;
   notebooks `d1_batch1_wallclock`, `e1_equivalence`, `w2m_mech_eval` (regenerated; the W2M arm notebooks are unchanged).
   Full CPU suite: 381 passed. Codex review and deep audit 9 pending; nothing launched.
+
+## R047 — external research review, round 2 (2026-10-27; documentation)
+- Added `docs/research_review_2026-10-27.md`: review of E1 likelihood decomposition and censored estimation,
+  E2 identifiability and marginal-preserving interventions, J2-F stopping and cached-baseline costs, W2Ma
+  provenance controls, WMT likelihood/quality dissociation, and S0's interpretation.
+- The review incorporates the brief and repository-reported R044-R046 updates. It preserves S0's registered
+  failed verdict and separates already-observed pilot evidence from prospective predictions.
+- Proposed queue: a 92.5-CU post-W2M envelope including reserve, with conditional branches. Recommendations
+  are not changes to registrations or launch approvals. No production code or experiment was run or changed.
+- Checked the document's arithmetic, citations, public-repository hygiene, and publication diff. Existing
+  working-tree changes were excluded from this documentation-only publication.
