@@ -357,12 +357,24 @@ def plan_sel():
     return B.build_plan(str(REAL))
 
 
-def make_e1b(plan_sel, final=lambda e: e["e1"], skip=lambda e: False):
-    """A synthetic e1b result: every selected item continued with the given final counts (default: E1's own)."""
+E1_ROWS = {m: json.load(open(REAL / fn, encoding="utf-8"))["rows"][m] for m, _, fn in B.DOMAINS}
+
+
+def make_e1b(plan_sel, final=lambda e: [e["e1"][0], B.CAP], skip=lambda e: False, replay=lambda e: e["e1"][0]):
+    """A synthetic e1b result that follows the registered protocol, which the analysis checks (audit 11, A11-1): every
+    selected item not skipped is continued to the given final counts (default: no hit after E1's, up to the cap), its
+    replay reproduces E1's hit count unless `replay` gives another (a mismatch: the final counts are then E1b's own from
+    sample 1), and its stop is the registered rule's at its final counts."""
     plan, sel = plan_sel
-    items = [{"domain": e["domain"], "model": e["model"], "item": e["item"], "kind": e["kind"], "e1": e["e1"],
-              "replay_hits": e["e1"][0], "replay_n": e["e1"][1], "replay_match": True, "final": list(final(e)),
-              "stop": "cap", "wall_s": 1.0} for e in plan if not skip(e)]
+    items = []
+    for e in plan:
+        if skip(e):
+            continue
+        f, h = list(final(e)), replay(e)
+        width = B.interval_width(f[0], f[1], sum(E1_ROWS[e["model"]][e["item"]]["level_nll"][B.CUT:]), sel[e["model"]]["delta"])
+        items.append({"domain": e["domain"], "model": e["model"], "item": e["item"], "kind": e["kind"], "e1": e["e1"],
+                      "replay_hits": h, "replay_n": e["e1"][1], "replay_match": h == e["e1"][0], "final": f,
+                      "stop": "width" if width <= B.MAX_WIDTH else "cap", "wall_s": 1.0})
     nr = [[e["model"], e["item"]] for e in plan if skip(e)]
     return {"protocol": B.PROTOCOL, "selection": sel, "items": items, "minutes": 1.0, "not_reached": nr,
             "complete": not nr}
@@ -377,18 +389,23 @@ def _p1_numbers(p1):
 
 
 def test_with_e1b_counts_equal_to_e1_the_readings_equal_the_saved_e1_analysis(plan_sel):
+    # E1's own counts at every selected item are not a registered continuation (analyse refuses them, audit 11), so the
+    # reading is compared through readings + substitute, and analyse on a protocol-following run without a new hit
+    files = {d: json.load(open(REAL / fn, encoding="utf-8")) for d, fn in AE.FILES.items()}
     res = AB.analyse(make_e1b(plan_sel), str(REAL))
     for dom, model in (("tinystories", "A0"), ("wmt14", "J0"), ("sudoku", "S0")):
         want = _p1_numbers(E1_ANALYSIS["domains"][dom]["prediction1"])
-        got_e1b, got_e1 = _p1_numbers(res["models"][model]["e1b"]), _p1_numbers(res["models"][model]["e1"])
-        assert got_e1 == want and got_e1b == want
+        same = [{"model": e["model"], "item": e["item"], "e1": e["e1"], "final": e["e1"]} for e in plan_sel[0]]
+        got_e1b = _p1_numbers(AB.readings(dom, files[dom], AB.substitute(files[dom]["rows"][model], same, model))[0])
+        got_e1 = _p1_numbers(AB.readings(dom, files[dom])[0])
+        assert got_e1 == want and got_e1b == want and _p1_numbers(res["models"][model]["e1"]) == want
         for s in want:
             for k, v in want[s].items():
                 if isinstance(v, float):
                     assert got_e1b[s][k] == pytest.approx(v, rel=1e-9), (model, s, k)
     assert set(res["models"]["A0"]["e1b"]["sets"]) == {"all", "untouched"}
     assert res["models"]["A0"]["e1b"]["sets"]["untouched"]["items"] == 61
-    assert res["verdict"]["e1_replication_bar_met"] is False                # J0 fails E1's rule on E1's own counts
+    assert res["verdict"]["e1_replication_bar_met"] is False                # J0's censored items stay censored
 
 
 def test_substitution_changes_only_the_continued_items_and_never_the_saved_files(plan_sel):
@@ -396,12 +413,12 @@ def test_substitution_changes_only_the_continued_items_and_never_the_saved_files
     before = copy.deepcopy(files)
     plan, _ = plan_sel
     chosen = [e for e in plan if e["model"] == "A0" and e["item"] in (0, 7)]
-    e1b = make_e1b(plan_sel, final=lambda e: [1000, 2048] if e in chosen else e["e1"], skip=lambda e: e not in chosen)
+    e1b = make_e1b(plan_sel, final=lambda e: [1000, B.CAP], skip=lambda e: e not in chosen)
     rows = files["tinystories"]["rows"]["A0"]
     new = AB.substitute(rows, e1b["items"], "A0")
     for i, (a, b) in enumerate(zip(rows, new)):
         assert (a == b) == (i not in (0, 7)), i
-    assert new[0]["mc"]["8"] == [1000, 2048] and new[7]["mc"]["8"] == [1000, 2048]
+    assert new[0]["mc"]["8"] == [1000, B.CAP] and new[7]["mc"]["8"] == [1000, B.CAP]
     assert new[0]["mc"]["9"] == rows[0]["mc"]["9"] and new[0]["level_nll"] == rows[0]["level_nll"]
     assert files == before                                                  # the originals were not edited
     # records of another model are ignored (J0 item 2 has other E1 counts than A0's row 2)
@@ -422,7 +439,7 @@ def test_substitution_changes_only_the_continued_items_and_never_the_saved_files
 def test_item_zero_changes_the_all_set_but_not_the_untouched_set(plan_sel):
     plan, _ = plan_sel
     only0 = [e for e in plan if e["model"] == "A0" and e["item"] == 0]
-    e1b = make_e1b(plan_sel, final=lambda e: [1500, 2048], skip=lambda e: e not in only0)
+    e1b = make_e1b(plan_sel, final=lambda e: [1500, B.CAP], skip=lambda e: e not in only0)
     a0 = AB.analyse(e1b, str(REAL))["models"]["A0"]
     assert a0["e1b"]["sets"]["untouched"] == a0["e1"]["sets"]["untouched"]
     assert a0["e1b"]["sets"]["all"] != a0["e1"]["sets"]["all"]
@@ -430,15 +447,18 @@ def test_item_zero_changes_the_all_set_but_not_the_untouched_set(plan_sel):
 
 def test_replication_verdict_follows_the_rule(plan_sel):
     plan, _ = plan_sel
-    fixed = lambda e: [16384, 32768] if e["model"] == "J0" else e["e1"]          # rho = 0.5 on every continued J0 item
+    fixed = lambda e: [16384, 32768] if e["model"] == "J0" else [e["e1"][0], B.CAP]   # rho = 0.5 on every J0 item
     res = AB.analyse(make_e1b(plan_sel, final=fixed), str(REAL))
     v = res["verdict"]
     assert res["models"]["J0"]["e1b"]["sets"]["all"]["e1_rule"]["verdict"] == "holds"
     assert v["e1_rule_by_model"] == {"A0": True, "J0": True, "S0": True} and v["e1_replication_bar_met"] is True
     assert v["run_complete"] is True and v["items_not_reached"] == {}
-    # A0 fails E1's rule after the continuation (all 14 selected items at rho = e^-300, i.e. T = N): the bar is not met
+    # A0 fails E1's rule after the continuation (all 14 selected items at 0 hits in 32768, the wide ones on mismatched
+    # replays read from sample 1, so T = N): the bar is not met
     spoiled = lambda e: [16384, 32768] if e["model"] == "J0" else [0, 32768]
-    res = AB.analyse(make_e1b(plan_sel, final=spoiled), str(REAL))
+    res = AB.analyse(make_e1b(plan_sel, final=spoiled, replay=lambda e: 0 if e["model"] == "A0" else e["e1"][0]),
+                     str(REAL))
+    assert res["models"]["A0"]["continuation"]["replay_mismatched"] == A0_WIDE
     assert res["models"]["A0"]["e1_rule_holds_e1b"] is False
     assert res["verdict"]["e1_replication_bar_met"] is False
     assert res["verdict"]["e1_rule_by_model"] == {"A0": False, "J0": True, "S0": True}
@@ -446,7 +466,7 @@ def test_replication_verdict_follows_the_rule(plan_sel):
     p1 = res["models"]["J0"]["e1b"]
     assert AB.e1_rule_holds(p1) and not AB.e1_rule_holds({"sets": {"all": {"e1_rule": {"verdict": "holds"}},
                                                                    "untouched": {"e1_rule": {"verdict": "neither"}}}})
-    # J0 unfixed (E1's own counts): not met
+    # J0 without a hit after E1's (up to the cap): not met
     res = AB.analyse(make_e1b(plan_sel), str(REAL))
     assert res["verdict"]["e1_rule_by_model"] == {"A0": True, "J0": False, "S0": True}
 
@@ -471,6 +491,58 @@ def test_analysis_refuses_inconsistent_inputs(plan_sel):
     bad["selection"]["A0"]["wide"] = bad["selection"]["A0"]["wide"][:-1]
     with pytest.raises(ValueError):
         AB.analyse(bad, str(REAL))
+
+
+# ------------------------------------------------------------------------------------------------ audit 11 (A11-1)
+def _off_protocol(plan_sel, how):
+    """make_e1b's run with one defect; a changed final count gets the stop the rule gives there, so that only the
+    targeted check can refuse it."""
+    e1b = make_e1b(plan_sel, final=lambda e: [16384, 32768])
+    r = next(x for x in e1b["items"] if x["model"] == "J0" and x["kind"] == "wide")
+
+    def final(f):
+        width = B.interval_width(f[0], f[1], sum(E1_ROWS["J0"][r["item"]]["level_nll"][B.CUT:]), e1b["selection"]["J0"]["delta"])
+        r["final"], r["stop"] = f, "width" if width <= B.MAX_WIDTH else "cap"
+
+    if how == "stop":
+        r["stop"] = "cap"                                             # rho = 0.5 at 32768 samples stops on width
+    elif how == "fewer_hits_than_the_replay":
+        final([r["replay_hits"] - 1, 32768])
+    elif how == "more_new_hits_than_new_samples":
+        final([r["replay_hits"] + 32768 - r["replay_n"] + 1, 32768])
+    elif how == "over_the_cap":
+        final([16384, B.CAP + 512])
+    elif how == "wrong_kind":
+        r["kind"] = "censored"
+    elif how == "duplicate_record":
+        e1b["items"].append(copy.deepcopy(r))
+    elif how == "hidden_replay_mismatch":
+        r["replay_hits"] += 1                                         # the flag still says the replay matched
+    elif how == "float_index":
+        r["item"] = float(r["item"])
+    elif how == "no_A0_selection":
+        e1b["selection"] = copy.deepcopy(e1b["selection"])            # the fixture's selection is shared
+        del e1b["selection"]["A0"]
+        e1b["items"] = [x for x in e1b["items"] if x["model"] != "A0"]
+    elif how == "listed_and_continued":
+        e1b["not_reached"], e1b["complete"] = [[r["model"], r["item"]]], False
+    elif how == "complete_not_a_bool":
+        e1b["complete"] = 1
+    elif how == "protocol":
+        e1b["protocol"] = {**e1b["protocol"], "round": 256}
+    return e1b
+
+
+@pytest.mark.parametrize("how", ["stop", "fewer_hits_than_the_replay", "more_new_hits_than_new_samples", "over_the_cap",
+                                 "wrong_kind", "duplicate_record", "hidden_replay_mismatch", "float_index",
+                                 "no_A0_selection", "listed_and_continued", "complete_not_a_bool", "protocol"])
+def test_analysis_refuses_records_off_the_registered_protocol(plan_sel, how):
+    """Audit 11, A11-1 (beyond tests/test_audit11_integrity.py): each record must be a registered continuation of its
+    pinned item (counts extend E1's replay within the cap, the replay flag agrees with its counts, the stop is the
+    registered rule's), and the completion account must match the records."""
+    assert AB.analyse(make_e1b(plan_sel, final=lambda e: [16384, 32768]), str(REAL))["verdict"]["e1_replication_bar_met"]
+    with pytest.raises(ValueError):
+        AB.analyse(_off_protocol(plan_sel, how), str(REAL))
 
 
 def test_analysis_cli_writes_json_without_absolute_paths(plan_sel, tmp_path):

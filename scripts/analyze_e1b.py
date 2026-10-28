@@ -51,15 +51,21 @@ def readings(domain, data, rows=None):
 
 
 def substitute(rows, items, model):
-    """A copy of `rows` with the continued items' final E1b counts at cut 8. `items`: the e1b result's records."""
-    out = copy.deepcopy(rows)
+    """A copy of `rows` with the continued items' final E1b counts at cut 8. `items`: the e1b result's records. An item
+    index must be an int in range and appear once, and its E1 counts are compared with the unmodified rows (audit 11,
+    A11-1: a second record could match the first one's substituted counts)."""
+    out, seen = copy.deepcopy(rows), set()
     for r in items:
         if r["model"] != model:
             continue
-        cur = out[r["item"]]["mc"][str(CUT)]
+        i = r["item"]
+        if type(i) is not int or not 0 <= i < len(rows) or i in seen:
+            raise ValueError(f"{model} item {i!r}: not an item of the saved E1 file, or continued twice")
+        seen.add(i)
+        cur = rows[i]["mc"][str(CUT)]
         if list(cur) != list(r["e1"]):
-            raise ValueError(f"{model} item {r['item']}: e1b's E1 counts {r['e1']} differ from the saved E1 file's {cur}")
-        out[r["item"]]["mc"][str(CUT)] = [int(r["final"][0]), int(r["final"][1])]
+            raise ValueError(f"{model} item {i}: e1b's E1 counts {r['e1']} differ from the saved E1 file's {cur}")
+        out[i]["mc"][str(CUT)] = [int(r["final"][0]), int(r["final"][1])]
     return out
 
 
@@ -85,6 +91,48 @@ def check_selection(e1b, files, digests=None):
             raise ValueError(f"{model}: the e1b run's selection differs from the recomputation from the saved E1 file")
 
 
+def check_records(e1b, files):
+    """Audit 11, A11-1: the records must be the pinned plan's continuations, and the plan must be accounted for. The
+    run's protocol is the registered one; the selection covers every continued model (J0, A0), so each record's source
+    digest is checked; each record is a selected (model, item) of its domain and kind, once, with the saved E1 counts,
+    integer counts that extend E1's replay up to at most the cap, a replay flag that agrees with its counts and the stop
+    the registered rule gives at its final counts; `not_reached` lists exactly the selected items without a record and
+    `complete` says whether there are none. This detects misassembled or partial evidence, not fabricated counts."""
+    if e1b["protocol"] != B.PROTOCOL:
+        raise ValueError("the e1b run's protocol is not the registered one (scripts/e1b_continue.py PROTOCOL)")
+    domain_of = {model: dom for model, dom, _ in B.DOMAINS}
+    if set(e1b["selection"]) != set(domain_of):
+        raise ValueError(f"the e1b selection covers {sorted(e1b['selection'])}, not the continued models {sorted(domain_of)}")
+    plan = {(model, i): kind for model, s in e1b["selection"].items() for kind in ("censored", "wide") for i in s[kind]}
+    done = set()
+    for r in e1b["items"]:
+        key = (r["model"], r["item"])
+        if (type(r["item"]) is not int or key not in plan or key in done or r["domain"] != domain_of[r["model"]]
+                or r.get("kind") != plan[key]):
+            raise ValueError(f"e1b record {key}: not a selected item of its domain and kind, or continued twice")
+        done.add(key)
+        data = files[r["domain"]]
+        row = data["rows"][r["model"]][r["item"]]
+        e1, final = list(row["mc"][str(CUT)]), list(r["final"])
+        if list(r["e1"]) != e1:
+            raise ValueError(f"e1b record {key}: E1 counts {r['e1']} differ from the saved E1 file's {e1}")
+        hr, nr = r["replay_hits"], r["replay_n"]
+        if not (len(final) == 2 and all(type(x) is int for x in final + [hr, nr]) and nr == e1[1]
+                and 0 <= hr <= final[0] <= final[1] <= B.CAP and final[0] - hr <= final[1] - nr):
+            raise ValueError(f"e1b record {key}: counts {final} do not extend E1's replay ({hr}, {nr}) within the cap")
+        if bool(r["replay_match"]) != (hr == e1[0]):
+            raise ValueError(f"e1b record {key}: replay flag {r['replay_match']} contradicts its replay count {hr} vs {e1[0]}")
+        width = B.interval_width(final[0], final[1], sum(row["level_nll"][CUT:]), B.e1_delta(data))
+        stop = "width" if width <= B.MAX_WIDTH else "cap"
+        if r["stop"] != stop or (stop == "cap" and final[1] != B.CAP):
+            raise ValueError(f"e1b record {key}: stop {r['stop']!r} is not the registered rule's at {final}")
+    raw = e1b.get("not_reached", [])
+    listed = [tuple(x) for x in raw]
+    if len(set(listed)) != len(listed) or set(listed) != set(plan) - done or e1b.get("complete") is not (not listed):
+        raise ValueError(f"the e1b run's completion account (complete {e1b.get('complete')!r}, not_reached {raw}) does "
+                         f"not match its records: {len(set(plan) - done)} selected items have no record")
+
+
 def analyse(e1b, e1_dir=E1_DIR):
     files, digests = {}, {}
     for dom, fn in AE.FILES.items():
@@ -92,6 +140,7 @@ def analyse(e1b, e1_dir=E1_DIR):
             raw = f.read()
         files[dom], digests[dom] = json.loads(raw.decode("utf-8")), hashlib.sha256(raw).hexdigest()
     check_selection(e1b, files, digests)
+    check_records(e1b, files)
     items = e1b["items"]
     out = {"protocol": {"alpha": AE.ALPHA, "registered_cut_min": AE.REG_CUT_MIN, "untouched_from_item": AE.UNTOUCHED_FROM,
                         "delta": "analyze_e1.delta_for per model, unchanged from E1a",
