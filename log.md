@@ -1477,3 +1477,42 @@ burn). `scripts/analyze_e1b.py` -> `results/e1b_analysis.json`.
   (brief). Scope: at cut 8, at least 80% (lower bound) of each released model's canonical code NLL is spent choosing
   among code paths that decode to the same output. It does not explain generation quality (E1 measures fibers at
   canonical prefixes; R055), and the 0.90 version holds only in Sudoku.
+
+## R061 — Deep audit 11 (E1 claim): no P0; one P1 in analyze_e1b's record checks, fixed on PR 17 (not merged); every R054 / R060 number recomputes; claim drafted for the user (2026-10-28; review)
+- Codex deep audit of `scripts/analyze_e1.py` and of how `scripts/analyze_e1b.py` reuses it, at `8bc61b8` (local Codex
+  CLI, gpt-6.1-sol / ultra; `docs/reviews/codex_audit11.md`, branch `codex/audit11` at `2d9f31c`; brief
+  `docs/prompts/codex_audit11_e1claim.md`; triage `docs/reviews/triage_audit11_2026-10-28.md`). Its sandbox could not run
+  Python, so its suite was run here: 6 passed, and the 7 strict xfails failed on the audited commit, as they should.
+- **No P0.** The beta-mixture confidence sequence and its roots, the exp(-N_k) floor, the per-model Bonferroni deltas,
+  the aggregation, E1's and E1a's rules, the untouched set and the integrity checks are as registered. The reading is
+  valid at E1's stopping rule and after E1b's continuation: the sequences are anytime-valid, so choosing items after
+  E1's aggregate result needs no new delta. "Holds in all three models" is a level-0.05 intersection-union test.
+- **A11-1 (P1, accepted, reproduced):** analyze_e1b checked the selection header but not the records against it.
+  Dropping a censored J0 record from the real result still printed "bar met" and "every selected item was continued".
+  Fixed on PR 17: `check_records`, a hardened `substitute`, Codex's 13 tests ported and 12 new cases, every check
+  mutation-killed. The real result passes every check and `results/e1b_analysis.json` is unchanged, so R060's reading
+  stands. **Not merged:** the fix changes `scripts/`, and notebooks refuse to resume across such a commit, so it waits
+  for the user to confirm that no Colab run is mid-flight.
+- **Recomputation:** every number of R054 and R060 agrees. Codex checked 6,590 values (max difference 5e-11). I
+  checked the cut-8 tables with an independent 50-digit implementation and the exploratory numbers from
+  `results/e1_analysis.json`. Corrections (the log is append-only): R054's cost is ~4.4 CU (155.8 L4-min at 1.71 CU/h),
+  not ~4.3. Sudoku's minimum share over cuts 5-11 is 93.78% (R054: "at least 93.8%"). The cut-5 T lower bound is 5.07
+  nats (R054: "T >= 5.1"). R060's scope sentence means the NLL of levels 8 and finer given canonical levels 0-7, not
+  all code NLL.
+- Limits the audit adds. (1) The registered fallback for a replay mismatch reads a fresh stream, which needs its own
+  error allocation: with m mismatched items the family error is at most 0.05 + m x delta. Unused here: 72 of 72
+  replays matched, and the replay flag is now checked against the counts. (2) The JSON keeps no logits, so no GPU
+  bound on the sampler's float32 arithmetic can be measured. Bounded Gumbel noise can raise the hit rate only by a
+  factor of about (1 + tail mass) per position. A logit error of 1e-4 would move the canonical log-probability by at
+  most 0.08 nats, against margins of 7.7-37.9 nats above 0.8 mean N_8. (3) The three bounds are modelwise 95%, not
+  simultaneous.
+- **Exploratory (labelled): item resampling.** The registered bounds cover Monte Carlo error on the registered items
+  only. I resampled items with replacement (20,000 draws, numpy seed 20261028, statistic sum R_lo / sum N_8 on E1b's
+  counts). The 5% quantile of the lower bound is 0.819 TinyStories (all 64), 0.808 (61 untouched), 0.800 WMT14 and
+  0.993 Sudoku (2.5%: 0.804 / 0.792 / 0.788 / 0.993; P(< 0.8): 0.021 / 0.032 / 0.050 / 0). As a population statement
+  the text margins over 0.8 are thin. The censored items carry most of the gap: 5 TinyStories windows and 9 WMT14
+  pairs have 0 hits in 32,768 samples. Separately, N_8 is 46% / 46% / 74% of the total canonical code NLL, so the lower
+  bounds are 0.41 / 0.39 / 0.73 of all canonical code NLL.
+- **Claim:** drafted in `docs/claim_e1_2026-10-28.md` for the user. Scope: the registered items; levels 8 and finer
+  given canonical levels 0-7; modelwise 95%; Monte Carlo error only; the 0.90 version only in Sudoku; nothing about
+  generation quality; prior art Cao and Rimell 2021. Not claimed until the user decides.

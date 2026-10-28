@@ -1,14 +1,20 @@
 # STATE — read this first
 
-_Last updated: 2026-10-28, session 9 continued (R058-R060: W2M-G, M3-0, E1b read). Before that, session 10 (R057: R056 package registered, built, merged in PR 16 after Codex and deep audit 10; user bought 100 CU). Before that, session 9 (R052-R055; plan `docs/plan_2026-10-27.md`; handoff `docs/prompts/handoff_2026-10-27.md`). Branches: `claude/ncm-research` (notebooks clone it) and
+_Last updated: 2026-10-28, deep audit 11 (R061: E1 claim audit; claim drafted for the user). Before that, session 9 continued (R058-R060: W2M-G, M3-0, E1b read). Before that, session 10 (R057: R056 package registered, built, merged in PR 16 after Codex and deep audit 10; user bought 100 CU). Before that, session 9 (R052-R055; plan `docs/plan_2026-10-27.md`; handoff `docs/prompts/handoff_2026-10-27.md`). Branches: `claude/ncm-research` (notebooks clone it) and
 `claude/ncm-phase2-analysis-finetune-pkh64d` (older mirror). Repo is PUBLIC: commit nothing identifying (no
 personal names/emails, no absolute local paths, no session links, no credentials). Goals, success bar and rules:
 `docs/brief.md`._
 
 ## Current phase
-**Latest (R058-R060, 2026-10-28):** **E1b: E1's registered (c) replication bar is met**: at cut 8 the lower bound of
+**Latest (R061, 2026-10-28):** **deep audit 11 (E1 claim): no P0; every R054 / R060 number recomputes.** One P1
+(A11-1: `scripts/analyze_e1b.py` did not check the e1b records against the pinned plan; R060's reading is unchanged) is
+fixed on PR 17, **not merged** until the user confirms no Colab run is mid-flight. **The E1 criterion-(c) claim is
+drafted for the user** (`docs/claim_e1_2026-10-28.md`): levels 8 and finer given canonical levels 0-7, the registered
+items, modelwise 95%, Monte Carlo error only. Resampling items leaves thin text margins (5% quantiles 0.82 TinyStories,
+0.80 WMT14).
+**R058-R060 (2026-10-28):** **E1b: E1's registered (c) replication bar is met**: at cut 8 the lower bound of
 R_8 / N_8 is 0.894 (TinyStories), 0.859 (WMT14, was 0.763) and 0.993 (Sudoku); E1a's 0.90 bar only in Sudoku. Not yet
-claimed: `scripts/analyze_e1.py` needs a deep audit first. **W2M-G:** M2 and M3 diverge 5.5-6.9x more on generated
+claimed: audited in R061, the claim waits for the user. **W2M-G:** M2 and M3 diverge 5.5-6.9x more on generated
 contexts than on real data; the damage forms at levels 2-5 and is amplified by M2's own later levels (interaction
 0.43-0.47), not at L1 (pi_2 = 0.009), so **the L1R gate fails and L1R is not run**; M2's L1 leans 41% less on the root
 as the channel model predicted, at no cost; M4's flag is a regime switch (f = 1 reproduces M2). **M3-0:** without clean
@@ -64,6 +70,9 @@ reassignment kill gated on W2M-G, E1b (continue sampling on censored items, ~1.5
   environment for the repo, which does not exist: run audits locally (`scripts/review/codex_local.sh` with the Codex
   desktop CLI, or Codex desktop). Usage limits: hit 2026-10-24 ~02:35 UTC, reset ~06:52 UTC; **hit again at 16:36 UTC**
   (PR 7's re-request) and not reset at the time of writing: no gated merge until it resets. PR 15 (E1 analysis) merged 2026-10-27 (R054). PR 14 (D1 / E1 / W2Ma eval code) merged 2026-10-27 (R048). PR 12 (W2M) merged 2026-10-27 (R040). Merged: PRs 2-11 (5, 6, 7, 9, 10, 11 in session 5, R037-R038). Limit reset by 22:57 UTC 2026-10-24.
+- Local Codex CLI (audit 11): the Codex desktop app bundles `codex.exe` in its `resources` folder next to a Linux
+  `codex` binary, which Git Bash picks first ("Exec format error"). Put a `codex` shim that execs `codex.exe` first on
+  PATH (in MSYS form, `/c/...`) before `scripts/review/codex_local.sh`.
 - `scripts/review/codex_pr.py wait` on this Windows laptop: crashes decoding the bot's emoji (cp1252) unless run with
   `PYTHONUTF8=1`, and returns early (gate FAIL) when Codex posts its "review running" status comment. Workaround used:
   poll the `codex-review-state` comment, then `codex_pr.py status`. `scripts/review/` is edit-protected: the user fixes.
@@ -102,8 +111,10 @@ reassignment kill gated on W2M-G, E1b (continue sampling on censored items, ~1.5
 - Throughput (A100): tier L 39-41 TFLOPS (2.1 s/step uniform, 3.0 on-policy, 3.7 two-pass), tier M NCM 24.7, AR 44.2.
 
 ## Live hypotheses / bets (ranked: significance x chance of a clean result / CU; plan `docs/plan_2026-10-27.md`)
-0. **E1 run (R054):** prediction 1 holds for released TinyStories and Sudoku, not established for WMT14 (censoring);
-   (c) bar missed as registered; E1b (optional continuation, ~1.5 CU) could settle WMT14. Original entry: E1, how much of the code NLL is representation choice (codes that decode to
+0. **E1 (R054, R060, R061):** after E1b, prediction 1 holds in all three released models (lower bounds 0.894 / 0.859 /
+   0.993), so E1's (c) replication bar is met as registered. Deep audit 11 found no P0 (A11-1 fixed on PR 17). The
+   claim is drafted (`docs/claim_e1_2026-10-28.md`) and waits for the user. R054 (before E1b): WMT14 not established
+   (censoring). Original entry: E1, how much of the code NLL is representation choice (codes that decode to
    the same text): `R_k = N_k - T_k` at cuts >= 8 (cuts 5-7 rarely hit: prototype), released TinyStories / WMT14 /
    Sudoku + A1 / A2 / A4 / J1 / J2-F, ~2-3 CU, primary criterion-(c) candidate. D1, batch-1 wall-clock gate for (d)
    (~1.5 CU; text prior ~20%). S0 failed (R045): coupled sampler dropped.
@@ -142,6 +153,11 @@ reassignment kill gated on W2M-G, E1b (continue sampling on censored items, ~1.5
 - P1b withdrawn (R023).
 
 ## Compute
+- **2026-10-28 (user-reported): balance 118.61 CU; both W2C stage 1 notebooks running at 10.6 CU/h combined (5.3 CU/h
+  per A100-40GB, as the repo's assumed 5.4).** W2M-G, M3-0, E1b and W2C's first minutes used 9.3 CU against 7.4 of
+  logged run time: the per-hour rates did not change, so R056's ~2x gap came from runtimes left connected or other
+  use, and the runtime-release cell plus the user's checks removed it. Plan CU figures return to run-time rates plus
+  ~25%: W2C stage 1 is ~22 CU, not 44.
 - **R057: the user bought 100 CU (2026-10-28): ~128 CU available (27.93 + 100); the brief's budget rises accordingly.** Ready to launch (PR 16): W2M-G ~5, M3-0 ~5.4, E1b ~6, then W2C stage 1 ~44, L1R ~10 if gated in (CU at R056's doubled burn; caps in GPU-minutes in `docs/colab_runs.md`).
 - Colab: ~116 CU spent (p1, c4, w0 ~12.5; wave 1 ~46 incl. ~6.5 lost to restarts, R030; WMT14 pair ~11.9, R036;
   W1d ~3, R039; J2-F ~6.5, R042; W2M ~26, R049; D1 ~5.6, mech eval ~0.5, E1 ~4.3, R052-R054), **estimated from run
@@ -154,11 +170,12 @@ reassignment kill gated on W2M-G, E1b (continue sampling on censored items, ~1.5
 - CPU: ~13.5 CPU-h before session 5; session 5 ~1.2 h (Sudoku paired rerun, test suites).
 
 ## Next 3 actions
-1. **User (Colab):** launch `w2c1_L_ts_m2` and `w2c1_L_ts_m3` (A100-40GB; `SEEDS = [1, 2, 3]` by default, or one seed
-   per session). **Do not run `l1r_L_ts_m2r`** (R058: its gate failed). Do not merge code while they run. Copy each
-   results folder into `results/colab/`; report the Colab panel balance.
-2. **E1 claim audit** (no Colab compute): deep audit of `scripts/analyze_e1.py`, recompute R054 / R060, then write the
-   criterion-(c) claim and its scope for the user (brief: the user hears of a success-bar result before more compute).
+1. **User (Colab): `w2c1_L_ts_m2` and `w2c1_L_ts_m3` are running** (launched 2026-10-28; A100-40GB, seeds 1-3, ~1.5-2.6 h
+   per notebook, possibly over several sessions). **Do not run `l1r_L_ts_m2r`** (R058: its gate failed). Merge no code
+   until the user reports them finished. Copy each results folder into `results/colab/`.
+2. **User: the E1 criterion-(c) claim** (`docs/claim_e1_2026-10-28.md`, R061): claim it as scoped, or hold. Then merge
+   PR 17 (analyze_e1b record checks, A11-1) with `python scripts/review/codex_pr.py merge 17`, once no Colab run
+   is mid-flight (the merge changes `scripts/`).
 3. After W2C: read it (`scripts/w1_sample_stats.py --set w2c1`, `scripts/analyze_w2c.py`). Then decide with the user:
    the 0%-clean factorial (M3-0's condition met; Delta_0 needs M2 without clean rows, unregistered) and W2M-G on the
    seed 1-3 checkpoints (eval-only replication of R058's localization).
