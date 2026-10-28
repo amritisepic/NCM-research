@@ -52,8 +52,8 @@ Final eval per W1 arm: 16 x 256 samples in fp32 (~5-10 min on an A100).
 | `w2_Mc_ar15` | M1 conditional: AR at 1.5x steps, seed 0 | A100 / L4 | ~6.4 | only when asked (before a criterion-(b) claim) |
 | `calib_t4` | old calibration (superseded by w0) | T4 | 0.6 | skip |
 
-Budget: ~200 CU (raised 2026-10-23). Spent: ~116 CU (p1, c4, w0 ~12.5; wave 1 ~46 incl. restarts, R030; WMT14 pair ~11.9, R036; W1d ~3, R039; J2-F ~6.5, R042; W2M ~26, R049; D1 ~5.6, mech eval ~0.5, E1 ~4.3, R052-R053). This month: ~66 left of the user's 103.56 (estimate; the Colab panel is authoritative).
-Next (`docs/plan_2026-10-27.md` section 10, awaiting the user): W2M-G (~4), M3 without clean rows (~2.7), W2C stage 1 (~22), E1b (~1.5), a gated direction-1 kill (<= 5), once registered and built; J1d dropped (D1 failed, R052). Reasons and
+Budget: ~200 CU (raised 2026-10-23), raised again by the user's 100-CU purchase (R057). Spent: ~116 CU logged from run time (p1, c4, w0 ~12.5; wave 1 ~46; WMT14 pair ~11.9; W1d ~3; J2-F ~6.5; W2M ~26; D1 ~5.6, mech eval ~0.5, E1 ~4.3), but actual burn ran ~2x (R056). Available now: ~128 CU (27.93 on the panel + 100 bought). Ready queue at the doubled burn: W2M-G ~5, M3-0 ~5.4, E1b ~6, W2C stage 1 ~44, L1R ~10 if gated in (~70-76 total).
+Next (R057): launch `w2mg_eval`, `w2p_L_ts_m3_c0` and `e1b_continue` first (they can run in parallel), then `w2c1_L_ts_m2` / `w2c1_L_ts_m3`; `l1r_L_ts_m2r` only if `w2mg_eval`'s gate passes (its first command checks). Reasons and
 ranking: `log.md` R031 and `STATE.md`. Every notebook now records the git SHA and each session's resume point
 (`_meta.json`, `<run>__provenance.jsonl`) and refuses to resume a run directory under changed code (PR 3). Progress check: the notebook prints `{"step": ..., "steps_per_s": ...,
 "tflops_eff": ...}`; remaining steps / steps_per_s = time left.
