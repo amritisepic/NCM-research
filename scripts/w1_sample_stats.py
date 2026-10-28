@@ -2,7 +2,11 @@
 
   python scripts/w1_sample_stats.py [--root results/colab] [--train_tokens 20000000] [--read 30 --read_seed 2026]
   python scripts/w1_sample_stats.py --set w2m       (W2M's registered bigram gain / adjacent duplicates: A0 + M0-M7,
-                                                     writes results/w2m_sample_stats.json; audit 8, question 8)
+                                                     writes results/w2m_sample_stats.json; audit 8, question 8; an arm whose
+                                                     samples are absent, e.g. M5, is skipped with a printed note)
+  python scripts/w1_sample_stats.py --set w2c1      (W2C stage 1: A0 + M2 / M3 at seeds 1-3, from results/colab/w2c1_L_ts_m{2,3})
+  python scripts/w1_sample_stats.py --set w2p       (M3-0: A0, W2M's seed-0 M3 and the M3-0 pilot, results/colab/w2p_L_ts_m3_c0)
+  python scripts/w1_sample_stats.py --set l1r       (L1R: A0, W2M's seed-0 M2 and M3 and M2R, results/colab/l1r_L_ts_m2r)
 
 For every arm and for 4096 human validation windows (the MAUVE reference set):
   - unigram fit: mean log p_train(token) (bag-of-words content; add-one unigram from the first `train_tokens` training
@@ -37,7 +41,15 @@ W2M_ARMS = {"A0": ("w1_L_ts_ctrl", "L_ts_released16"), "M0": ("w2m_L_ts_m0", "L_
             "M3": ("w2m_L_ts_m3", "L_ts_m3_uniform_wrong_s0"), "M4": ("w2m_L_ts_m4", "L_ts_m4_frozen_pw_flags_s0"),
             "M5": ("w2m_L_ts_m5", "L_ts_m5_frozen_pw_shuffled_s0"), "M6": ("w2m_L_ts_m6", "L_ts_m6_policy_usedparent_s0"),
             "M7": ("w2m_L_ts_m7", "L_ts_m7_uniform_a3rates_s0")}
-SETS = {"w1": ARMS, "w2m": W2M_ARMS}
+_A0 = ("w1_L_ts_ctrl", "L_ts_released16")
+_M2, _M3 = ("w2m_L_ts_m2", "L_ts_m2_frozen_pw_s0"), ("w2m_L_ts_m3", "L_ts_m3_uniform_wrong_s0")
+# R056 package: result directories as the notebooks name them under results/colab/<notebook name>/
+W2C1_ARMS = {"A0": _A0, **{f"M{m}_s{s}": (f"w2c1_L_ts_m{m}", f"{cfg}_s{s}")
+                           for m, cfg in ((2, "L_ts_m2_frozen_pw"), (3, "L_ts_m3_uniform_wrong")) for s in (1, 2, 3)}}
+W2P_ARMS = {"A0": _A0, "M3": _M3, "M3-0": ("w2p_L_ts_m3_c0", "L_ts_m3_uniform_wrong_c0_s0")}
+L1R_ARMS = {"A0": _A0, "M2": _M2, "M3": _M3, "M2R": ("l1r_L_ts_m2r", "L_ts_m2r_frozen_pw_l1reassign_s0")}
+SETS = {"w1": ARMS, "w2m": W2M_ARMS, "w2c1": W2C1_ARMS, "w2p": W2P_ARMS, "l1r": L1R_ARMS}
+SKIP_ABSENT = {"w2m", "w2c1", "w2p", "l1r"}     # W1 stays strict: all its arms exist, and a missing one is an error
 V, W, LAM = 8192, 128, 0.1
 
 
@@ -98,7 +110,11 @@ def main():
     p_uni, uni, keys, cnt = bigram_model(a.train_tokens, a.data_dir)
     sets = {"human_val": [[t for t in cut_at_eos(r) if t != PAD] for r in examples("val", 4096).tolist()]}
     for arm, (d, prefix) in SETS[a.set].items():
-        sets[arm] = json.load(open(os.path.join(a.root, d, f"{prefix}__samples_final.json")))["ids"]
+        path = os.path.join(a.root, d, f"{prefix}__samples_final.json")
+        if a.set in SKIP_ABSENT and not os.path.exists(path):
+            print(f"{arm:9} skipped: no samples at {d}/{prefix}__samples_final.json", flush=True)
+            continue
+        sets[arm] = json.load(open(path))["ids"]
     ref_counts = np.bincount(np.concatenate([np.asarray(s, dtype=np.int64) for s in sets["human_val"]]), minlength=V)
     out = {"train_tokens": a.train_tokens, "bigram_interpolation": LAM, "sets": {}}
     for name, seqs in sets.items():
@@ -133,7 +149,9 @@ def main():
             f.write(f"# {a.set} samples, {a.read} per arm, drawn with numpy default_rng({a.read_seed}) from each arm's "
                     "4096 final samples (same indices for every arm)\n\n")
             idx = rng.choice(4096, a.read, replace=False)
-            for arm in (("A0", "A1", "A2", "A3", "A4", "A5") if a.set == "w1" else tuple(W2M_ARMS)):
+            for arm in (("A0", "A1", "A2", "A3", "A4", "A5") if a.set == "w1" else tuple(SETS[a.set])):
+                if arm not in sets:
+                    continue
                 f.write(f"## {arm}\n\n")
                 for i in idx:
                     f.write(f"- [{int(i)}] {' '.join(dec(sets[arm][i]).split())}\n")
