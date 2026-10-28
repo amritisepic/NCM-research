@@ -1,8 +1,8 @@
 <!-- Paste everything below this comment into Codex (desktop app, or `scripts/review/codex_local.sh audit audit10
 docs/prompts/codex_audit10_r056.md` from a checkout of the audited commit). Work in a new branch `codex/audit10` made
 from the audited commit, and commit only the audit doc and its tests there. -->
-Deep audit. Follow '## Deep audit protocol' and '## Code Review Rules' in AGENTS.md. Audited commit: __SHA__
-(head of `claude/wip-r056-package`, PR __PR__). Audit id: audit10. This repository is PUBLIC. Write no absolute local
+Deep audit. Follow '## Deep audit protocol' and '## Code Review Rules' in AGENTS.md. Audited commit: 4fcf520e707dc8d853b93c339e83f3202da8ef43
+(head of `claude/wip-r056-package`, PR 16). Audit id: audit10. This repository is PUBLIC. Write no absolute local
 paths, usernames, emails, session links or credentials into any file or into your final message; refer to files by
 repo-relative path. Work on a new branch `codex/audit10` made from the audited commit; commit there.
 If your sandbox cannot run Python, say so in the audit doc and still write the tests; they will be run for you.
@@ -16,7 +16,7 @@ W2C is the route to a criterion-(c) claim from a training arm: M2 / M3 at fresh 
 W2M-G locates the M2 damage (crossed replay) and gates the L1R kill. E1b continues E1's Monte Carlo on censored items
 under an anytime-valid confidence sequence, the cheapest route to a (c) claim. L1R changes the trainer (a new arm
 that must equal M2 in every input and differ only in some L1 targets). Audits 8 and 9 covered W2M's trainer and E1;
-this audit covers what changed since: everything in `git diff b1b5fc5..__SHA__`.
+this audit covers what changed since: everything in `git diff b1b5fc5..4fcf520e707dc8d853b93c339e83f3202da8ef43`.
 
 ## Subject
 Files: `src/ncmr/w2m.py` (arm m2r, refactored frozen-wrong draws), `src/ncmr/l1r.py` (new: replay, circulation LP,
