@@ -321,11 +321,17 @@ def gate_ii(pi2_large: float, pi2_ts: float) -> bool:
     return bool(pi2_large >= 0.25 and pi2_ts > 0)
 
 
-def sanity_ii(g22: float, se22: float, g33: float, se33: float) -> dict:
-    """G(M2, M2), G(M3, M3) (GPT-2 large) within 3 SE of W2M's 42.62 and 21.69; a miss is reported, not fatal."""
-    z22, z33 = (g22 - W2M_GENPPL["m2"]) / se22, (g33 - W2M_GENPPL["m3"]) / se33
-    return {"G_m2m2": g22, "z_m2m2": float(z22), "G_m3m3": g33, "z_m3m3": float(z33), "ref": dict(W2M_GENPPL),
-            "within_3se": bool(abs(g22 - W2M_GENPPL["m2"]) <= 3 * se22 and abs(g33 - W2M_GENPPL["m3"]) <= 3 * se33)}
+def sanity_ii(g22: float, se22: float, g33: float, se33: float, ref: dict | None = None, source: dict | None = None) -> dict:
+    """G(M2, M2), G(M3, M3) (GPT-2 large) within 3 SE of the reference {"m2", "m3"}: W2M's 42.62 and 21.69 by default
+    (W2M-G); W2M-GR passes W2C's final-eval Gen-PPL of the seed (`source`: where each value was read, recorded). A miss is
+    reported, not fatal."""
+    r = W2M_GENPPL if ref is None else ref
+    z22, z33 = (g22 - r["m2"]) / se22, (g33 - r["m3"]) / se33
+    out = {"G_m2m2": g22, "z_m2m2": float(z22), "G_m3m3": g33, "z_m3m3": float(z33), "ref": dict(r),
+           "within_3se": bool(abs(g22 - r["m2"]) <= 3 * se22 and abs(g33 - r["m3"]) <= 3 * se33)}
+    if source is not None:
+        out["source"] = dict(source)
+    return out
 
 
 def read_iii(lo: float, hi: float) -> str:
