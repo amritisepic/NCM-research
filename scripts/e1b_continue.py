@@ -51,6 +51,7 @@ REPLAY_ROUND = 64                    # E1's round
 ROUND = 512
 CAP = 2 ** 15                        # total samples per item, replay included
 MAX_WIDTH = 2.0                      # nats of T_8
+TICK_S = 30.0                        # elapsed-time checkpoint inside an item (audit 10, A10-2)
 SEED = 0
 E1_DIR = os.path.join(ROOT, "results", "colab", "e1_equivalence")
 DOMAINS = [("J0", "wmt14", "e1_wmt__result.json"), ("A0", "tinystories", "e1_ts__result.json")]   # run order
@@ -103,7 +104,8 @@ def build_plan(e1_dir=E1_DIR, only=("J0", "A0")):
         delta = e1_delta(data)
         rows = data["rows"][model]
         cens, wide = select_items(rows, delta)
-        sel[model] = {"domain": dom, "delta": delta, "n_items": len(rows), "censored": cens, "wide": wide, "e1_file": fn}
+        sel[model] = {"domain": dom, "delta": delta, "n_items": len(rows), "censored": cens, "wide": wide, "e1_file": fn,
+                      "e1_sha256": _sha256(os.path.join(e1_dir, fn))}      # the source rows (N_8, E1 counts) are pinned too
         for i in sorted(cens + wide):
             plan.append({"domain": dom, "model": model, "item": i, "e1": list(rows[i]["mc"][str(CUT)]),
                          "kind": "censored" if i in cens else "wide"})
@@ -113,10 +115,11 @@ def build_plan(e1_dir=E1_DIR, only=("J0", "A0")):
 # ------------------------------------------------------------------------------------------------ one item
 @torch.no_grad()
 def continue_item(dom, prefix_ids, canon, target, seed, e1_hits, e1_n, N, delta, cut=CUT, replay_round=REPLAY_ROUND,
-                  round_=ROUND, cap=CAP, max_width=MAX_WIDTH):
+                  round_=ROUND, cap=CAP, max_width=MAX_WIDTH, on_round=None):
     """E1b for one item: replay E1's generator in rounds of `replay_round` up to e1_n, then rounds of `round_` on the
     same generator until the interval is no wider than `max_width` or `cap` samples in total. Returns
-    {replay_hits, replay_n, replay_match, final: [hits, n], stop}."""
+    {replay_hits, replay_n, replay_match, final: [hits, n], stop}. `on_round()` is called after every round (the
+    driver's elapsed-time checkpoint, audit 10 A10-2)."""
     net = dom.net
     cache = CD.PrefixCache(net, *CD.prefix_inputs(net, prefix_ids))
     g = torch.Generator(device=canon.device).manual_seed(int(seed))
@@ -124,7 +127,10 @@ def continue_item(dom, prefix_ids, canon, target, seed, e1_hits, e1_n, N, delta,
 
     def draw(m):
         codes = CD.sample_from_cut(net, cache, canon, cut, m, g, 1.0)
-        return sum(dom.key(r) == target for r in dom.decode_ids(codes).tolist())
+        h = sum(dom.key(r) == target for r in dom.decode_ids(codes).tolist())
+        if on_round is not None:
+            on_round()
+        return h
 
     while n < e1_n:                                    # mc_hits's loop
         m = min(replay_round, e1_n - n)
@@ -170,6 +176,10 @@ def run(plan, sel, runner_for, run_dir, max_minutes=150.0, max_items=None, clock
         for key in ("protocol", "selection", "identity"):
             if res.get(key) != json.loads(json.dumps(manifest[key])):
                 raise SystemExit(f"{path}: {key} differs from this run's; refusing to resume")
+        for key, v in (extra or {}).items():          # the runtime (GPU, torch) is pinned too: audit 10, A10-1
+            if key in res and res[key] != v:
+                raise SystemExit(f"{path}: {key} {res[key]!r} differs from this session's {v!r}; refusing to resume "
+                                 "(use the same GPU type and runtime, or a fresh run directory)")
     else:
         res = {"protocol": manifest["protocol"], "selection": sel, "identity": manifest["identity"], "items": [], "minutes": 0.0}
     res.update(extra or {})
@@ -179,29 +189,43 @@ def run(plan, sel, runner_for, run_dir, max_minutes=150.0, max_items=None, clock
     def cumulative():
         return prior + (clock() - t0) / 60.0
 
-    for entry in plan:
-        key = (entry["domain"], entry["model"], entry["item"])
-        if key in done:
-            continue
-        if cumulative() >= max_minutes or (max_items is not None and processed >= max_items):
-            break
-        if entry["domain"] not in runners:
-            runners[entry["domain"]] = runner_for(entry["domain"])
-        t = clock()
-        rec = {"domain": entry["domain"], "model": entry["model"], "item": entry["item"], "kind": entry["kind"],
-               "e1": entry["e1"]}
-        rec.update(runners[entry["domain"]](entry))
-        rec["wall_s"] = clock() - t
-        res["items"].append(rec)
-        done.add(key)
-        processed += 1
+    def checkpoint():
+        """Elapsed time and status on disk (audit 10, A10-2): after every item, every TICK_S seconds of sampling inside
+        an item, and on any exit, so an interrupted session's time stays charged to the cumulative cap (a hard kill
+        loses at most TICK_S)."""
         res["minutes"] = cumulative()
+        res["not_reached"] = [[e["model"], e["item"]] for e in plan if (e["domain"], e["model"], e["item"]) not in done]
+        res["complete"] = not res["not_reached"]
+        res["max_minutes"] = max_minutes
         _write(path, res)
-    res["minutes"] = cumulative()
-    res["not_reached"] = [[e["model"], e["item"]] for e in plan if (e["domain"], e["model"], e["item"]) not in done]
-    res["complete"] = not res["not_reached"]
-    res["max_minutes"] = max_minutes
-    _write(path, res)
+
+    last = [clock()]
+
+    def tick():
+        if clock() - last[0] >= TICK_S:
+            last[0] = clock()
+            checkpoint()
+
+    try:
+        for entry in plan:
+            key = (entry["domain"], entry["model"], entry["item"])
+            if key in done:
+                continue
+            if cumulative() >= max_minutes or (max_items is not None and processed >= max_items):
+                break
+            if entry["domain"] not in runners:
+                runners[entry["domain"]] = runner_for(entry["domain"])
+            t = clock()
+            rec = {"domain": entry["domain"], "model": entry["model"], "item": entry["item"], "kind": entry["kind"],
+                   "e1": entry["e1"]}
+            rec.update(runners[entry["domain"]]({**entry, "on_round": tick}))
+            rec["wall_s"] = clock() - t
+            res["items"].append(rec)
+            done.add(key)
+            processed += 1
+            checkpoint()
+    finally:
+        checkpoint()
     return res
 
 
@@ -265,7 +289,8 @@ def make_runner_factory(data_path, e1_dir, device):
             nll = dom.level_nll(pre, canon)
             N = float(sum(rows[i]["level_nll"][CUT:]))       # E1's saved N_8 (what the analysis uses), not the recomputed
             out = continue_item(dom, pre, canon, target, SEED * 1_000_003 + i * 101 + CUT, entry["e1"][0], entry["e1"][1],
-                                N, delta, cut=CUT, replay_round=REPLAY_ROUND, round_=ROUND, cap=CAP, max_width=MAX_WIDTH)
+                                N, delta, cut=CUT, replay_round=REPLAY_ROUND, round_=ROUND, cap=CAP, max_width=MAX_WIDTH,
+                                on_round=entry.get("on_round"))
             out["nll_max_abs_diff_vs_e1"] = float(np.max(np.abs(np.array(nll) - np.array(rows[i]["level_nll"]))))
             out["gpu"] = torch.cuda.get_device_name() if device == "cuda" else "cpu"
             out["torch"] = torch.__version__

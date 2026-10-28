@@ -510,3 +510,21 @@ def test_input_identity_hashes_the_released_model_val_data_and_saved_e1():
     ts = ident["released_sha256"]["tinystories"]
     assert {"generator.pt", "tokenizer.pt", "config.yaml"} <= set(ts) and all(len(v) == 64 for v in ts.values())
     assert set(ident["data_sha256"]) == {"valid_bpe_8192.pickle"} and set(ident["e1_sha256"]) == {"e1_ts__result.json"}
+
+
+def test_elapsed_time_reaches_disk_inside_an_item_before_a_hard_kill(tmp_path):
+    """Audit 10, A10-2: a Colab disconnect cannot be caught, so elapsed time is checkpointed every TICK_S of sampling."""
+    plan, sel = _plan(2)
+    clock, seen_on_disk = Clock(), []
+
+    def runner_for(domain):
+        def one(entry):
+            for _ in range(3):                                   # three rounds of 40 s each
+                clock.t += 40.0
+                entry["on_round"]()
+                seen_on_disk.append(json.load(open(tmp_path / "result.json", encoding="utf-8"))["minutes"])
+            return {"replay_hits": 0, "replay_n": 2048, "replay_match": True, "final": [0, 2048], "stop": "cap"}
+        return one
+
+    B.run(plan, sel, runner_for, str(tmp_path), max_items=1, clock=clock)
+    assert seen_on_disk == pytest.approx([40 / 60, 80 / 60, 2.0])   # on disk while the item is still running
