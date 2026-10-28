@@ -166,6 +166,7 @@ reassignment kill gated on W2M-G, E1b (continue sampling on censored items, ~1.5
 - P1b withdrawn (R023).
 
 ## Compute
+- **Paper-scale costs (2026-10-28):** measured training throughput of the 88.6M generator on an A100-40GB is 37.9 TFLOPS effective (~26 PFLOP per CU), about half what `docs/compute_model.md` / `docs/phase1b_scaleup.md` assumed. The paper's full TinyStories training (~34 EFLOP) is ~650-1,300 CU per run, not 400+; its ablation protocol (10k x 1024, ~3.5 EFLOP) ~70-135 CU per run. The user offered +500-1000 CU for a warranted paper-scale experiment; the Astra round-4 prompt asks for a verdict per tier.
 - **2026-10-28 (user-reported, at `w2mgr_eval`'s launch): 98.94 CU left.** W2C stage 1 and the idle time since used 19.7 CU (118.61 -> 98.94), against ~21 estimated at run-time rates: the run-time rate holds. `w2mgr_eval` ~2-2.5 CU.
 - **R062 (2026-10-28): W2C stage 1 done, 239 A100-min, ~21 CU at run-time rates (~26 at the ~1.25x burn). Expected
   balance ~95 CU (118.61 at W2C's start); ask the user for the panel number before planning spend.** Nothing queued.
