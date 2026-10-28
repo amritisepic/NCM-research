@@ -1402,3 +1402,78 @@ Cut 8, every item; R share = mean R_8 / mean N_8, bounds from the per-item beta-
   M0-M7, W2M-G, analyze_w2c or the notebooks. Its recomputation of W2M's seed-0 numbers and E1b's selection agrees.
 - Launch order: `w2mg_eval` (L4), `w2p_L_ts_m3_c0` (A100-40GB), `e1b_continue` (L4, same GPU type each session); then
   `w2c1_L_ts_m2` / `w2c1_L_ts_m3` (A100-40GB); `l1r_L_ts_m2r` only if W2M-G's gate passes.
+
+## R058 — W2M-G: M2 and M3 diverge 5.5-6.9x more on generated contexts than on real data; the damage builds over levels 2-5 with a large prefix-suffix interaction, not at L1 (L1R gate fails); M2's L1 leans 41% less on the root, as the channel model predicted, at no cost to generation; no M4 flag setting rescues (2026-10-28; registered W2M-G)
+Run `w2mg_eval`, L4, torch 2.11.0+cu130, at `b9eeec2` (code identical to PR 16's merge `5ad74b5`, audited in deep audit
+10). Two sessions: the first exited with an error after 25.6 min (the notebook's output is not saved); the second
+resumed the cached cells under the pinned manifest (checkpoints, released assets, val data, device, runtime) and
+finished in 5.6 min. ~31 L4-min (~0.9 CU at run-time rates, ~1.8 at R056's burn). `results/colab/w2mg_eval/`.
+
+**Registered readings**
+- Sanity: G(M2, M2) 41.90 ± 0.75 and G(M3, M3) 21.47 ± 0.21 (8 groups of 256) are within 3 SE of W2M's 42.62 / 21.69
+  (z -0.96 / -1.06).
+- **(i) holds.** M2-M3 Jensen-Shannon divergence at L2-L5: clean bank 0.0126 nats; released samples 0.0797, r = 6.34
+  [6.08, 6.63]; M2 samples 0.0863, r = 6.86 [6.57, 7.17]; M3 samples 0.0696, r = 5.53 [5.29, 5.78]. Every r >= 3 with
+  every lower bound > 1.2.
+- **(ii) distributed** (both scorers). Shares of the M2-M3 log-loss contrast (GPT-2 large, Delta = 0.668 nats/token;
+  TinyStories-33M, 1.000), ± jackknife SE over the 8 groups:
+  | cut (prefix through) | pi (M2 prefix -> M3 suffix) | sigma (M3 prefix -> M2 suffix) | interaction | TS-33M pi / sigma |
+  |---|---|---|---|---|
+  | 2 (L1) | 0.009 ± 0.011 | 0.868 ± 0.019 | 0.123 ± 0.014 | 0.012 / 0.879 |
+  | 4 (L3) | 0.220 ± 0.015 | 0.311 ± 0.015 | 0.469 ± 0.018 | 0.198 / 0.312 |
+  | 6 (L5) | 0.511 ± 0.010 | 0.061 ± 0.009 | 0.428 ± 0.014 | 0.487 / 0.055 |
+  Neither early-state selection (needs pi_4 >= 0.5 and pi_6 >= 0.75) nor conditional rendering (sigma_6 >= 0.8).
+- **L1R run gate fails:** pi_2 = 0.009 ± 0.011 under GPT-2 large (needs >= 0.25; TinyStories-33M 0.012). Per L1R, the
+  kill is not run; direction 1's L1 version is dropped without GPU spend (~10 CU saved at R056's burn).
+- **(iii) holds.** L1 root reliance (nats per window): released 3.04 ± 0.13, M0 3.38 ± 0.15, M2 2.00 ± 0.11, M3 3.39 ±
+  0.16, M4 3.42 ± 0.17; M3 - M2 = 1.39 [1.28, 1.52].
+- **(iv) holds:** no flag setting recovers 80% of the gap. R(f) under GPT-2 large / TinyStories-33M: f = 0 (M4's
+  default) 0.53 / 0.57; f = 0.5 0.38 / 0.43; f = 1 -0.05 / -0.06. Fresh seeds 8-15 were not needed.
+
+**Exploratory (labelled; one seed)**
+- **Where the damage forms.** M2's own L0-L1 prefix completed by M3 is healthy (21.60 vs 21.47), and M3's prefix
+  through L1 completed by M2 keeps 87% of the damage. Through L5, M2's prefix alone carries 51% and M2's suffix (L6-L11)
+  alone 6%, yet the two together carry all of it: the interaction is 0.43-0.47 at cuts 4 and 6. The damage is created at
+  levels 2-5 and amplified by M2's own later levels, which are nearly harmless on M3's prefixes. This matches Astra's
+  finite-horizon disturbance amplification, not early-state selection or rendering alone.
+- **Channel smoothing is real but harmless here.** The root posterior (R055: 0.43 under M2 vs 0.63 under M3) predicts
+  M2's L1 root reliance at ~0.69x M3's; measured 0.59x. Yet the L1 prefix carries ~1% of the damage: a correct
+  prediction of where conditional information is lost did not locate the generation damage. M4 keeps full root
+  reliance (3.42): with the flag, a replaced root no longer has to be smoothed.
+- **The flag acts as a regime switch.** f = 1 on every position turns M4 into M2 (43.0 Gen-PPL; clean NLL +28 nats);
+  f = 0 is M4's best setting. Its largest effect is on M4's own samples (KL 0.123 nats per position at f = 1, vs 0.045 on
+  clean and 0.040 on corrupted contexts). With (i): the collapsed models treat generated contexts as corrupted ones.
+
+## R059 — M3-0: without clean rows the uniform-wrong control returns to the released model's quality (16.50 vs 21.69 Gen-PPL) while its canonical NLL gets 106 nats worse; the 25% clean rows caused W2M's control drift (2026-10-28; registered M3-0)
+Run `w2p_L_ts_m3_c0`, A100-SXM4-40GB, at `b9eeec2`, one session, 600 steps, 30.3 min (~2.7 CU at run-time rates, ~5.5
+at R056's burn). `results/colab/w2p_L_ts_m3_c0/`.
+- **Registered reading: I = G(M3, seed 0) - G(M3-0) = 21.69 - 16.50 = +5.19 ± 0.09** (GPT-2 large, paired over the 16
+  sample groups). Prediction I >= 3 **holds**. TinyStories-33M 18.65 -> 12.21 (+6.44 ± 0.14); MAUVE 0.865 -> 0.871;
+  adjacent duplicates 11.2 -> 9.5 per 1k; entropy 3.992 -> 3.967. References: A0 16.16, W1's A1 16.60.
+- **Exploratory:** canonical val NLL 753.9 -> 859.8 (+106 nats/window). By level 1-11: +0.3, +2.4, +2.8, +3.4, +4.0,
+  +6.3, +4.2, +13.9, +25.7, +35.9, +7.1: 78% at L8-L11, where E1 finds >= 84% of code NLL is path choice. The clean
+  rows buy 106 nats of canonical NLL and cost 5.2 Gen-PPL: the cleanest instance yet of code NLL moving against quality
+  (one protocol switch, one seed).
+- Consequences: the drift of W2M's uniform arms (M0, M3, M7: 21.7-22.1) is explained by the clean rows (seed 0). The
+  factorial's second half (M2 / M3 at 0% clean, seeds 1-3) meets its first condition (>= 3 recovered); the second ("the
+  clean-row mechanism is claimed") is the user's decision. Delta_0 needs M2 at 0% clean rows, which is not registered.
+
+## R060 — E1b: continued sampling settles WMT14; E1's prediction 1 holds in all three released models (lower bounds TinyStories 0.894, WMT14 0.859, Sudoku 0.993): E1's registered (c) replication bar is met; E1a's 0.90 bar only in Sudoku (2026-10-28; registered E1b)
+Run `e1b_continue`, L4, at `b9eeec2`, one session, 133.8 min (cap 150; ~3.8 CU at run-time rates, ~7.6 at R056's
+burn). `scripts/analyze_e1b.py` -> `results/e1b_analysis.json`.
+- Integrity: all 72 selected items (58 WMT14 J0, 14 TinyStories A0) were continued; every replay reproduced E1's hit
+  count exactly; none unreached. J0: 39 items reached a T_8 width <= 2 nats, 19 hit the 2^15 cap.
+  | released model | censored (E1 -> E1b) | R_8 / N_8 bounds, E1 | after E1b | T_8 width <= 2 nats | E1 rule | E1a rule |
+  |---|---|---|---|---|---|---|
+  | TinyStories A0, 64 | 6 -> 5 | [0.875, 0.997] | [0.894, 0.997] | 78% -> 89% | holds | neither |
+  | A0, 61 untouched | 6 -> 5 | [0.868, 0.997] | [0.888, 0.997] | 79% -> 89% | holds | neither |
+  | WMT14 J0, 128 | 18 -> 9 | [0.763, 0.984] | [0.859, 0.981] | 55% -> 85% | **neither -> holds** | neither |
+  | Sudoku S0, 128 (not continued) | 0 | [0.993, 1.000] | same | 100% | holds | holds |
+- **Registered reading: E1's (c) replication bar is met.** E1's rule holds in all three released models (R044's
+  replication unit). E1a's stronger rule holds only in Sudoku (TinyStories 0.888 and WMT14 0.859 are below 0.90).
+- **Status: believed to meet criterion (c) as registered; not yet claimed.** Before a claim: a deep audit of
+  `scripts/analyze_e1.py` (Codex-reviewed in PR 15, never deep-audited; `scripts/e1b_continue.py` and
+  `scripts/analyze_e1b.py` were audited in audit 10) with a recomputation of R054 / R060; the user is told first
+  (brief). Scope: at cut 8, at least 80% (lower bound) of each released model's canonical code NLL is spent choosing
+  among code paths that decode to the same output. It does not explain generation quality (E1 measures fibers at
+  canonical prefixes; R055), and the 0.90 version holds only in Sudoku.

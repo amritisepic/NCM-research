@@ -1,0 +1,33 @@
+{
+ "run": "w2p_L_ts_m3_c0",
+ "gpu": "NVIDIA A100-SXM4-40GB",
+ "finished_utc": "2026-10-28T05:34:34Z",
+ "git_sha": "b9eeec2c7d7ed43f48eddbc85e6669346563b31d",
+ "git_shas_all_sessions": [
+  "b9eeec2c7d7ed43f48eddbc85e6669346563b31d"
+ ],
+ "sessions": {
+  "L_ts_m3_uniform_wrong_c0_s0": [
+   {
+    "event": "start",
+    "git_sha": "b9eeec2c7d7ed43f48eddbc85e6669346563b31d",
+    "utc": "2026-10-28T05:04:14Z",
+    "gpu": "NVIDIA A100-SXM4-40GB",
+    "cmd": "python scripts/train_gen.py --config configs/scale/L_ts_m3_uniform_wrong_c0.yaml --run_dir {R}/L_ts_m3_uniform_wrong_c0_s{S} --seed {S}",
+    "seed": 0,
+    "local_data_copy": true,
+    "micro_batch_64": true,
+    "had_ckpt": false,
+    "last_logged_step": null
+   },
+   {
+    "event": "end",
+    "git_sha": "b9eeec2c7d7ed43f48eddbc85e6669346563b31d",
+    "utc": "2026-10-28T05:34:34Z",
+    "exit": 0,
+    "minutes": 30.34,
+    "last_logged_step": 600
+   }
+  ]
+ }
+}

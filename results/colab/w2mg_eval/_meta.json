@@ -1,0 +1,53 @@
+{
+ "run": "w2mg_eval",
+ "gpu": "NVIDIA L4",
+ "finished_utc": "2026-10-28T15:35:31Z",
+ "git_sha": "b9eeec2c7d7ed43f48eddbc85e6669346563b31d",
+ "git_shas_all_sessions": [
+  "b9eeec2c7d7ed43f48eddbc85e6669346563b31d"
+ ],
+ "sessions": {
+  "w2mg_eval": [
+   {
+    "event": "start",
+    "git_sha": "b9eeec2c7d7ed43f48eddbc85e6669346563b31d",
+    "utc": "2026-10-28T05:03:19Z",
+    "gpu": "NVIDIA L4",
+    "cmd": "python scripts/w2mg_eval.py --run_root {R} --run_dir {R}/w2mg_eval --seed 0",
+    "seed": 0,
+    "local_data_copy": false,
+    "micro_batch_64": false,
+    "had_ckpt": false,
+    "last_logged_step": null
+   },
+   {
+    "event": "end",
+    "git_sha": "b9eeec2c7d7ed43f48eddbc85e6669346563b31d",
+    "utc": "2026-10-28T05:28:57Z",
+    "exit": 1,
+    "minutes": 25.62,
+    "last_logged_step": null
+   },
+   {
+    "event": "start",
+    "git_sha": "b9eeec2c7d7ed43f48eddbc85e6669346563b31d",
+    "utc": "2026-10-28T15:29:58Z",
+    "gpu": "NVIDIA L4",
+    "cmd": "python scripts/w2mg_eval.py --run_root {R} --run_dir {R}/w2mg_eval --seed 0",
+    "seed": 0,
+    "local_data_copy": false,
+    "micro_batch_64": false,
+    "had_ckpt": false,
+    "last_logged_step": null
+   },
+   {
+    "event": "end",
+    "git_sha": "b9eeec2c7d7ed43f48eddbc85e6669346563b31d",
+    "utc": "2026-10-28T15:35:31Z",
+    "exit": 0,
+    "minutes": 5.56,
+    "last_logged_step": null
+   }
+  ]
+ }
+}

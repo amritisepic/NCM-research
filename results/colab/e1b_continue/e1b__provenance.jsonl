@@ -1,0 +1,2 @@
+{"event": "start", "git_sha": "b9eeec2c7d7ed43f48eddbc85e6669346563b31d", "utc": "2026-10-28T05:04:33Z", "gpu": "NVIDIA L4", "cmd": "python scripts/e1b_continue.py --run_dir {R}/e1b --data {R}/../data/wmt14_train_pairs.npz --max_minutes 150", "seed": 0, "local_data_copy": false, "micro_batch_64": false, "had_ckpt": false, "last_logged_step": null}
+{"event": "end", "git_sha": "b9eeec2c7d7ed43f48eddbc85e6669346563b31d", "utc": "2026-10-28T07:18:24Z", "exit": 0, "minutes": 133.84, "last_logged_step": null}

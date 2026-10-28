@@ -1,11 +1,20 @@
 # STATE — read this first
 
-_Last updated: 2026-10-28, session 10 (R057: R056 package registered, built, merged in PR 16 after Codex and deep audit 10; user bought 100 CU). Before that, session 9 (R052-R055; plan `docs/plan_2026-10-27.md`; handoff `docs/prompts/handoff_2026-10-27.md`). Branches: `claude/ncm-research` (notebooks clone it) and
+_Last updated: 2026-10-28, session 9 continued (R058-R060: W2M-G, M3-0, E1b read). Before that, session 10 (R057: R056 package registered, built, merged in PR 16 after Codex and deep audit 10; user bought 100 CU). Before that, session 9 (R052-R055; plan `docs/plan_2026-10-27.md`; handoff `docs/prompts/handoff_2026-10-27.md`). Branches: `claude/ncm-research` (notebooks clone it) and
 `claude/ncm-phase2-analysis-finetune-pkh64d` (older mirror). Repo is PUBLIC: commit nothing identifying (no
 personal names/emails, no absolute local paths, no session links, no credentials). Goals, success bar and rules:
 `docs/brief.md`._
 
 ## Current phase
+**Latest (R058-R060, 2026-10-28):** **E1b: E1's registered (c) replication bar is met**: at cut 8 the lower bound of
+R_8 / N_8 is 0.894 (TinyStories), 0.859 (WMT14, was 0.763) and 0.993 (Sudoku); E1a's 0.90 bar only in Sudoku. Not yet
+claimed: `scripts/analyze_e1.py` needs a deep audit first. **W2M-G:** M2 and M3 diverge 5.5-6.9x more on generated
+contexts than on real data; the damage forms at levels 2-5 and is amplified by M2's own later levels (interaction
+0.43-0.47), not at L1 (pi_2 = 0.009), so **the L1R gate fails and L1R is not run**; M2's L1 leans 41% less on the root
+as the channel model predicted, at no cost; M4's flag is a regime switch (f = 1 reproduces M2). **M3-0:** without clean
+rows the control returns to 16.50 Gen-PPL (I = +5.19 ± 0.09) while canonical NLL worsens by 106 nats (78% at L8-L11):
+the clean rows caused W2M's control drift. One seed for W2M-G and M3-0.
+
 Phase 2. Wave 1 (W1/W1a/W1b, seed 0, 6 arms) is analysed: registered verdicts in R030, exploratory analysis in R031.
 No arm beats the control by the registered bar (A2 re-quantized labels is closest: -0.31 Gen-PPL, bar 0.35). Every
 on-policy arm collapsed (Gen-PPL 32-41 vs 16.6); two independent defect hunts (Codex audit 3 and mine) found no defect
@@ -145,11 +154,11 @@ reassignment kill gated on W2M-G, E1b (continue sampling on censored items, ~1.5
 - CPU: ~13.5 CPU-h before session 5; session 5 ~1.2 h (Sudoku paired rerun, test suites).
 
 ## Next 3 actions
-1. **User (Colab):** launch `w2mg_eval` (L4), `w2p_L_ts_m3_c0` (A100-40GB) and `e1b_continue` (L4; every session on the
-   same GPU type); then `w2c1_L_ts_m2` / `w2c1_L_ts_m3` (A100-40GB, one seed per session is fine). `l1r_L_ts_m2r` only if
-   `w2mg_eval`'s direction-1 gate passes. Do not merge code while one of them is mid-flight. Copy each results folder
-   into `results/colab/`.
-2. **Next session:** read W2M-G (registered readings; the gate), M3-0, E1b (`scripts/analyze_e1b.py`), then W2C
-   (`scripts/w1_sample_stats.py --set w2c1`, `scripts/analyze_w2c.py`). A W2C or E1b result meeting a (c) bar goes to the
-   user before more compute (brief).
-3. Known debt: `scripts/analyze_j1.py`'s bootstrap runs out of memory (low priority).
+1. **User (Colab):** launch `w2c1_L_ts_m2` and `w2c1_L_ts_m3` (A100-40GB; `SEEDS = [1, 2, 3]` by default, or one seed
+   per session). **Do not run `l1r_L_ts_m2r`** (R058: its gate failed). Do not merge code while they run. Copy each
+   results folder into `results/colab/`; report the Colab panel balance.
+2. **E1 claim audit** (no Colab compute): deep audit of `scripts/analyze_e1.py`, recompute R054 / R060, then write the
+   criterion-(c) claim and its scope for the user (brief: the user hears of a success-bar result before more compute).
+3. After W2C: read it (`scripts/w1_sample_stats.py --set w2c1`, `scripts/analyze_w2c.py`). Then decide with the user:
+   the 0%-clean factorial (M3-0's condition met; Delta_0 needs M2 without clean rows, unregistered) and W2M-G on the
+   seed 1-3 checkpoints (eval-only replication of R058's localization).
