@@ -742,3 +742,46 @@ Why: `docs/reviews/codex_audit4.md` (A4-1 to A4-5); triage `docs/reviews/triage_
   quality advance over the healthy model and is not reported as one.
 - **Cost:** ~55 A100-minutes (M2's 51 plus the replay; ~5 CU; ~10 at R056's burn); cap 75 A100-minutes. Waits for the
   run gate and the user's compute purchase.
+
+## W2M-GR — W2M-G's localization at W2C's seeds 1-3 (registered 2026-10-28, after W2C stage 1's result (R062) and before any code or run; criterion (c) candidate, with W2C)
+- **Why:** W2C stage 1 replicated M2's damage and the dissociation at seeds 1-3 (R062). That is a finding about which
+  wrong codes damage generation. Criterion (c) asks for a finding about what the levels encode. The link to the levels is
+  W2M-G's crossed replay (R058): the damage forms at levels 2-5 and is amplified by M2's own later levels, not at L1. That
+  rests on seed 0 only, and its pattern was read after the run. W2M-GR replicates it with thresholds fixed now, before any
+  seed 1-3 measurement exists. Approved by the user (2026-10-28).
+- **Models:** for each training seed s in {1, 2, 3}: the released generator and W2C's final checkpoints M2_s and M3_s
+  (`L_ts_m2_frozen_pw_s<s>/final.pt`, `L_ts_m3_uniform_wrong_s<s>/final.pt`). No M0 or M4 exists at these seeds.
+- **Protocol:** W2M-G's, unchanged, restricted to (i), (ii) and (iii): the same sampler, the same noise (banks seeds 900
+  and 901; replay seeds 0-7; roots seed 2027; bootstrap seed 0), the same clean bank, the same scorers, fp32, TF32 off,
+  eval mode. (iii)'s models are the released generator, M2_s and M3_s. (iv), the M4 bank and the corrupted bank are not
+  run. One run per training seed, each on an **L4** (as W2M-G; the Gumbel streams depend on the device). Seed 0 stays
+  exploratory and is reported beside, never pooled.
+- **Sanity (per seed):** G(M2_s, M2_s) and G(M3_s, M3_s) under GPT-2 large within 3 SE of W2C's final-eval G(M2_s) and
+  G(M3_s) (R062). A miss is reported; the shares are still computed within W2M-GR.
+- **Quantities (per seed, GPT-2 large log loss primary, TinyStories-33M beside):** W2M-G's shares pi_c (M2 prefix, M3
+  suffix), sigma_c (M3 prefix, M2 suffix) and the interaction 1 - pi_c - sigma_c at cuts c = 2, 4, 6, jackknife SE over
+  the 8 groups; (i)'s ratios r_b; (iii)'s rho(M3) - rho(M2) with its paired CI. Across seeds: the mean and seed SD of
+  every share.
+- **Readings (seeds 1-3 only):**
+  - **Localization replicates** if, in every seed under GPT-2 large log loss: (a) pi_2 <= 0.10 (the L0-L1 prefix carries
+    little), (b) pi_6 >= 0.30 (M2's prefix through L5 carries a substantial share), (c) sigma_6 <= 0.20 (M2's levels
+    6-11 alone carry little), and (d) the interaction >= 0.20 at both cut 4 and cut 6 (M2's later levels amplify what
+    its levels 2-5 produce); and (a)-(d) hold on the seed means under TinyStories-33M. **Overturned** if, on the GPT-2
+    large seed means, pi_2 >= 0.25 (L1 carries the damage), or sigma_6 >= 0.50 (the late levels carry it), or the
+    interaction is < 0.05 at both cuts 4 and 6 (additive, no amplification). Anything else: mixed. Seed 0's values
+    (0.009, 0.511, 0.061, 0.469 / 0.428) set the pattern; the thresholds leave room for seed variation while still
+    separating "L1", "late levels" and "levels 2-5 with amplification".
+  - **(i) replicates** if W2M-G's (i) rule holds in every seed (every r_b >= 3 with every lower CI bound > 1.2).
+  - **(iii) replicates** if the paired 95% CI of rho(M3_s) - rho(M2_s) lies above 0 in every seed.
+  - W2M-G's own (ii) reading per seed (early-state selection / conditional rendering / distributed) is reported.
+  - "Localization replicates", together with W2C's "damage replicates" and "dissociation holds", is the criterion-(c)
+    candidate: under W2C's continuation protocol, plausible-wrong replacement damages generation through levels 2-5,
+    amplified by the damaged model's own later levels, not through L1. If met, the user is told before any further
+    compute is spent on it, and the claim audit covers it.
+- **Code (to build, one PR with Codex review and a delta deep audit, since eval code changes):** `scripts/w2mg_eval.py`
+  takes the arm set (M2, M3 only) and skips what needs M0 or M4; its sanity reference for seed s >= 1 comes from W2C's
+  saved results; a script reads the three runs into the readings above. Tests check that the reduced run's (i)-(iii)
+  equal the full run's on the same models (tiny CPU models), and the reading functions at their boundaries.
+- **Cost:** per seed 8 cells x 2048 samples, three 512-sample banks, the bank forwards and (iii) for three models: ~20-25
+  L4-minutes per seed (seed 0's full run took ~31 L4-minutes with 11 cells, four banks and (iv)); cap 40 L4-minutes per
+  seed; ~2 CU at run-time rates for three seeds (~2.5 at the ~1.25x burn).
