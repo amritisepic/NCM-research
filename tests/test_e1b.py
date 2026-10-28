@@ -120,7 +120,7 @@ def _manual_stream(dom, pre, canon, k, seed, sizes, target):
     return out
 
 
-@pytest.mark.parametrize("item,cut,seed", [(0, 11, 11), (2, 11, 2 * 101 + 11)])
+@pytest.mark.parametrize("item,cut,seed", [(0, 10, 10), (2, 11, 2 * 101 + 11)])
 def test_replay_equals_mc_hits_and_the_stream_continues(ts_model, item, cut, seed):
     dom, pre, canon, target = _item(ts_model, item)
     n_e1 = 128
@@ -209,9 +209,9 @@ def test_selection_from_the_saved_e1_files_is_58_j0_and_14_a0_items():
 def test_selection_rule_on_synthetic_rows():
     nll = [1.0] * 8 + [10.0] * 4                          # N_8 = 40
     row = lambda h, n: {"level_nll": nll, "mc": {"8": [h, n]}}
-    rows = [row(0, 2048), row(3, 64), row(1000, 2048), row(0, 0)]
+    rows = [row(0, 2048), row(3, 64), row(1000, 2048), row(0, 0), row(1, 2048)]
     cens, wide = B.select_items(rows, DELTA)
-    assert cens == [0] and wide == [1]                    # (0, 0) = x^ invalid: excluded; 1000/2048 is narrow
+    assert cens == [0] and wide == [1, 4]                    # (0, 0) = x^ invalid: excluded; 1000/2048 is narrow
 
 
 # ------------------------------------------------------------------------------------------------ AC4: mismatch
@@ -404,6 +404,10 @@ def test_substitution_changes_only_the_continued_items_and_never_the_saved_files
     assert new[0]["mc"]["8"] == [1000, 2048] and new[7]["mc"]["8"] == [1000, 2048]
     assert new[0]["mc"]["9"] == rows[0]["mc"]["9"] and new[0]["level_nll"] == rows[0]["level_nll"]
     assert files == before                                                  # the originals were not edited
+    # records of another model are ignored (J0 item 2 has other E1 counts than A0's row 2)
+    other = make_e1b(plan_sel, final=lambda e: [1000, 2048])["items"]
+    again = AB.substitute(rows, other, "A0")
+    assert [i for i, (a, b) in enumerate(zip(rows, again)) if a != b] == sorted(A0_CENSORED + A0_WIDE)
     res = AB.analyse(e1b, str(REAL))
     a0, e0 = res["models"]["A0"]["e1b"]["sets"], res["models"]["A0"]["e1"]["sets"]
     assert a0["all"]["censored"] == e0["all"]["censored"] - 1

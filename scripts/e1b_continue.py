@@ -134,7 +134,7 @@ def continue_item(dom, prefix_ids, canon, target, seed, e1_hits, e1_n, N, delta,
         if interval_width(hits, n, N, delta) <= max_width:
             stop = "width"
             break
-        if n > cap:
+        if n >= cap:
             stop = "cap"
             break
         m = min(round_, cap - n)
