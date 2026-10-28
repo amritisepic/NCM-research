@@ -695,7 +695,7 @@ Why: `docs/reviews/codex_audit4.md` (A4-1 to A4-5); triage `docs/reviews/triage_
   seeded 1_000_003 * seed + 101 i + k (seed 0), drawn in rounds of 64 samples, each round drawing its Gumbel noise level
   by level with fixed shapes, stopping at 20 hits or 2048 samples. E1 ran on an L4 (torch 2.11.0+cu130).
 - **Items:** cut 8 only, in the released models. WMT14 J0: every item whose E1 count is censored (0 hits) or whose E1a
-  interval for T_8 (delta = 0.05 / (128 x 4)) is wider than 2 nats: 18 + 40 = 58 of 128. TinyStories A0: the same rule
+  interval for T_8 (delta = 0.05 / (128 x 3); erratum 2026-10-28, before any E1b code ran: WMT14 has three registered cuts, 8-10, so E1a's delta is 0.05 / 384, as `scripts/analyze_e1.py` computes and R054 used; the counts below were computed with it) is wider than 2 nats: 18 + 40 = 58 of 128. TinyStories A0: the same rule
   (delta = 0.05 / (64 x 4)): 6 + 8 = 14 of 64. Sudoku has no censored item and no wide interval and is not continued.
   The code recomputes the lists from the saved E1 results.
 - **Sampling:** per item, E1's generator and seed: first a replay in rounds of 64 up to E1's sample count n_E1, checking
