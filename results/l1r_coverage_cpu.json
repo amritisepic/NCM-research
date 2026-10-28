@@ -1,0 +1,15 @@
+{
+ "what": "CPU estimate of the L1R coverage on the seed-0 data stream (real windows and masks, simulated replacement roots)",
+ "steps": 600,
+ "batch_size": 256,
+ "seed": 0,
+ "canonical_encode_device": "cuda",
+ "coverage_min": 0.8,
+ "passes_gate": true,
+ "wall_s": 665.1,
+ "coverage": 0.8795453757125183,
+ "n_root_corrupted_rows": 86489,
+ "n_selected": 76071,
+ "n_roots": 2642,
+ "plan_sha256": "5bb81b78928eea061780cfc40ec4397f27517bdbb83b3eb11d666e073e45f4ae"
+}

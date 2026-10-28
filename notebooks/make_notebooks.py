@@ -246,6 +246,71 @@ for name, cfg, extra in [("w2_Mc_ar", "M_ar_c", "FLOP-matched to w2_Mc_ncm (27,3
         "gpu": "A100 (or L4)", "units": 4.3 if cfg == "M_ar_c" else 6.4, "needs": ["ts", "ckpt"], "seeds": [0], "cmds": cmds,
     }
 
+# ---- R056 package (docs/preregistration.md: W2C stage 1, M3-0, W2M-G, E1b, L1R). Units = the registration's run-time CU
+# estimate at R056's observed burn (twice the nominal 5.4 CU/h figure); the cap is in GPU-minutes, as registered.
+W2C1_SEEDS_NOTE = ("Each seed is one run (M2 ~51, M3 ~30 A100-minutes); SEEDS is [1, 2, 3] and can be edited to run one seed "
+                   "per session (every run resumes from its Drive checkpoint). A100-40GB only, as W2M's seed 0 (the "
+                   "notebook adds --micro_batch 64 on > 39 GB GPUs). Seed 0 is not part of the reading.")
+for key, (cfgname, what, mins, cap, units) in {
+        "m2": ("L_ts_m2_frozen_pw", "M2 frozen plausible-wrong replacement (canonical code excluded)", 51, 70, 27.6),
+        "m3": ("L_ts_m3_uniform_wrong", "M3 uniform-wrong replacement", 30, 45, 16.2)}.items():
+    RUNS[f"w2c1_L_ts_{key}"] = {
+        "desc": f"W2C stage 1 (pre-registered, criterion (c) candidate): W2M's {key.upper()} protocol unchanged ({what}; "
+                "25% clean rows, W1's rates, one mask stream, canonical labels, 600 steps, fp32 proposal forwards) at fresh "
+                "training seeds 1-3; final eval as W2M (16 x 256 fp32 samples, sample seeds 42 and 0-14 for every training seed). "
+                f"{W2C1_SEEDS_NOTE} Cost: ~{mins} A100-minutes per seed, cap {cap} A100-minutes per run (every run < 15 CU); "
+                "run both w2c1_L_ts_m2 and w2c1_L_ts_m3 on the same Drive. Waits for the user's compute purchase.",
+        "gpu": "A100-40GB", "units": units, "needs": ["ts", "ckpt"], "seeds": [1, 2, 3],
+        "cmds": [f"python scripts/train_gen.py --config configs/scale/{cfgname}.yaml --run_dir {{R}}/{cfgname}_s{{S}} --seed {{S}}"],
+        "cap": f"{cap} A100-minutes per run",
+    }
+RUNS["w2p_L_ts_m3_c0"] = {
+    "desc": "M3-0 (pre-registered pilot, exploratory): M3 seed 0 without clean rows (clean_row_frac 0.0, config "
+            "L_ts_m3_uniform_wrong_c0.yaml), 600 steps; the mask stream still draws the clean-row key, so every slot masked in M3 "
+            "is masked here, plus the slots of the rows M3 left clean. W2M's final evaluation. Reading: I = G(M3, seed 0) - "
+            "G(M3-0) (prediction I >= 3). Cost: ~30 A100-minutes, cap 45 A100-minutes. A100-40GB only, as W2M's seed 0. Waits "
+            "for the user's compute purchase.",
+    "gpu": "A100-40GB", "units": 5.4, "needs": ["ts", "ckpt"], "seeds": [0],
+    "cmds": ["python scripts/train_gen.py --config configs/scale/L_ts_m3_uniform_wrong_c0.yaml "
+             "--run_dir {R}/L_ts_m3_uniform_wrong_c0_s{S} --seed {S}"],
+    "cap": "45 A100-minutes",
+}
+RUNS["w2mg_eval"] = {
+    "desc": "W2M-G (pre-registered, eval-only, no training, exploratory): shared context banks, crossed replay, L1 root reliance "
+            "and M4 flag routing for the released generator and W2M's seed-0 checkpoints M0, M2, M3, M4 (reads "
+            "{R}/L_ts_m{0,2,3,4}_*_s0/final.pt, so run it on the same Drive as the w2m_L_ts_m* notebooks). fp32, TF32 off. The "
+            "crossed replay's cut-2 result is the direction-1 run gate for l1r_L_ts_m2r. Cost: ~60-90 L4-minutes, cap 120 "
+            "L4-minutes.",
+    "gpu": "L4", "units": 5.0, "needs": ["ts", "ckpt"], "seeds": [0],
+    "cmds": ["python scripts/w2mg_eval.py --run_root {R} --run_dir {R}/w2mg_eval --seed 0"],
+    "cap": "120 L4-minutes",
+}
+RUNS["e1b_continue"] = {
+    "desc": "E1b (pre-registered, eval-only, no training; criterion (c) candidate C1): continued E1 sampling at cut 8 on the "
+            "censored and wide items of the released models (WMT14 J0 and TinyStories A0; the item lists are recomputed from the "
+            "saved E1 results). Replays E1's streams, then rounds of 512 samples until the item's interval is no wider than 2 "
+            "nats or 2^15 samples. Needs the released WMT14 and TinyStories checkpoints and the WMT14 data, as e1_equivalence. "
+            "fp32, TF32 off. Cost: ~60-100 L4-minutes, cap 150 L4-minutes (checked between items; items not reached keep E1's "
+            "counts).",
+    "gpu": "L4", "units": 6.0, "needs": ["ts", "ckpt", "wmt14"], "seeds": [0],
+    "cmds": ["python scripts/e1b_continue.py --run_dir {R}/e1b --data {R}/../data/wmt14_train_pairs.npz --max_minutes 150"],
+    "cap": "150 L4-minutes",
+}
+RUNS["l1r_L_ts_m2r"] = {
+    "desc": "L1R (pre-registered, exploratory; direction-1 kill): M2R = M2 at seed 0 with balanced reassignment of L1's targets "
+            "on root-corrupted rows (config L_ts_m2r_frozen_pw_l1reassign.yaml; inputs, masks and replacement codes are M2's). "
+            "RUN ONLY AFTER w2mg_eval's direction-1 gate passes AND the user has approved the compute: the first command is the "
+            "gate script, so this notebook stops if the gate fails (exit 2) or w2mg_eval's result is missing (exit 3). A100-40GB "
+            "only: the notebook refuses to run on any other GPU, because the micro-batch partition must equal M2 seed 0's "
+            "(--micro_batch 64). The run stops before training if the selection covers < 80% of the root-corrupted rows. Cost: "
+            "~55 A100-minutes, cap 75 A100-minutes. Reading: rescue against W2M's seed-0 M2 and M3.",
+    "gpu": "A100-40GB only", "units": 10.0, "needs": ["ts", "ckpt"], "seeds": [0], "require_a100": True,
+    "cmds": ["python scripts/w2mg_gate.py --result {R}/w2mg_eval/result.json",
+             "python scripts/train_gen.py --config configs/scale/L_ts_m2r_frozen_pw_l1reassign.yaml "
+             "--run_dir {R}/L_ts_m2r_frozen_pw_l1reassign_s{S} --seed {S}"],
+    "cap": "75 A100-minutes",
+}
+
 SETUP = r'''
 import os, subprocess, sys, json, shutil, time
 T_START = time.time()
@@ -396,6 +461,27 @@ if len(shas) > 1:
     print('NOTE: this run spans several commits:', shas)
 '''
 
+# Only for specs with "require_a100": the micro-batch partition (and with it the float reductions and the dropout / corruption
+# draws) must equal W2M seed 0's, which ran on an A100-40GB with --micro_batch 64. Runs before anything is downloaded.
+GUARD = r'''
+import torch
+_name = torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'none'
+_mem = torch.cuda.get_device_properties(0).total_memory if torch.cuda.is_available() else 0
+if 'A100' not in _name or _mem <= 39e9:
+    raise SystemExit(f'This run needs an A100 with more than 39 GB (the micro-batch partition must equal M2 seed 0 on an '
+                     f'A100-40GB); this runtime has {_name} ({_mem / 1e9:.0f} GB). Runtime > Change runtime type > A100.')
+print('GPU guard passed:', _name, f'{_mem / 1e9:.0f} GB')
+'''
+
+# Last cell of every notebook (R056): once the results are on Drive, give the Colab GPU back. Run all stops at a failing
+# cell, so this cell runs only if every earlier cell succeeded.
+RELEASE = r'''
+RELEASE_RUNTIME = True   # set False to keep the runtime (e.g. to inspect files)
+if RELEASE_RUNTIME:
+    from google.colab import runtime
+    runtime.unassign()   # results are already copied to Drive by the previous cell
+'''
+
 
 def cell(src: str, kind: str = "code") -> dict:
     lines = src.strip("\n").splitlines(keepends=True)
@@ -407,7 +493,8 @@ def cell(src: str, kind: str = "code") -> dict:
 
 def make(name: str, spec: dict) -> dict:
     head = (f"# NCM research run: `{name}`\n\n{spec['desc']}\n\n"
-            f"- Recommended GPU: **{spec['gpu']}**. Estimated cost: **{spec['units']} compute units**.\n"
+            f"- Recommended GPU: **{spec['gpu']}**. Estimated cost: **{spec['units']} compute units**"
+            + (f" (cap: {spec['cap']}).\n" if spec.get("cap") else ".\n") +
             "- Runtime > Change runtime type > GPU, then Runtime > Run all.\n"
             "- If Colab disconnects, just Run all again: every command resumes from its last Drive checkpoint.\n"
             f"- When done, copy `MyDrive/ncm-research/results/{name}/` into the repo's `results/colab/`.")
@@ -421,9 +508,11 @@ def make(name: str, spec: dict) -> dict:
                  .replace("__CMDS__", json.dumps(spec["cmds"], indent=1))
                  .replace("__SEEDS__", json.dumps(spec.get("seeds", [0])))
                  .replace("__NEEDS__", json.dumps(spec.get("needs", [])))),
+            *([cell(GUARD)] if spec.get("require_a100") else []),
             cell(DATA),
             cell(RUN),
             cell(COLLECT.replace("__NAME__", name)),
+            cell(RELEASE),
         ],
     }
 

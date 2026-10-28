@@ -39,6 +39,10 @@ ARMS = {
     "m6": ("policy_used_parent", None),
     "m7": ("uniform", None),
 }
+# L1R (docs/preregistration.md, "L1R"): M2's proposals exactly, plus the target reassignment of src/ncmr/l1r.py. Kept out of
+# `ARMS` so that the M0-M7 sets enumerated by the W2M tests and notebooks are unchanged; `MechArm` accepts both.
+L1R_ARMS = {"m2r": ("frozen_wrong", None)}
+ALL_ARMS = {**ARMS, **L1R_ARMS}
 # A3's mean logged per-level disagreement over its logged steps <= 600 (as registered; tests recompute it from
 # results/colab/w1_L_ts_onpol/L_ts_onpol_s0__metrics.jsonl)
 A3_DISAGREEMENT = (0.735, 0.691, 0.601, 0.505, 0.398, 0.304, 0.239, 0.103, 0.171, 0.167, 0.145, 0.0)
@@ -119,18 +123,19 @@ def shuffle_within_level(flags: torch.Tensor, sizes: list, gen: torch.Generator)
 class MaskPlan:
     """The slots of one optimizer step: `clean` (B,) bool rows left clean; `masks` one (B, l_k) bool tensor per level."""
 
-    def __init__(self, clean, masks):
-        self.clean, self.masks = clean, masks
+    def __init__(self, clean, masks, row0: int = 0):
+        # row0: this slice's first row within the optimizer step's full batch (M2R's plan is keyed by (step, row))
+        self.clean, self.masks, self.row0 = clean, masks, row0
 
     def rows(self, a: int, b: int) -> "MaskPlan":
-        return MaskPlan(self.clean[a:b], [m[a:b] for m in self.masks])
+        return MaskPlan(self.clean[a:b], [m[a:b] for m in self.masks], self.row0 + a)
 
 
 class MechArm:
     def __init__(self, arm: str, tok, net, L0, prefix_emb, device: str, seed: int, rates, clean_frac: float = 0.25,
-                 policy_temp: float = 1.0, frozen=None, fwd=None):
-        assert arm in ARMS, arm
-        self.arm, (self.prop, self.flag_mode) = arm, ARMS[arm]
+                 policy_temp: float = 1.0, frozen=None, fwd=None, dry: bool = False):
+        assert arm in ALL_ARMS, arm
+        self.arm, (self.prop, self.flag_mode) = arm, ALL_ARMS[arm]
         self.tok, self.net, self.L0, self.prefix_emb, self.device = tok, net, L0, prefix_emb, device
         self.fwd = fwd if fwd is not None else net
         self.levels = [int(l) for l in tok.vq.levels]
@@ -138,9 +143,11 @@ class MechArm:
         self.vocab = [int(v) for v in tok.vq.vqvae_vocab_sizes]
         self.rates, self.clean_frac, self.policy_temp = [float(r) for r in rates], float(clean_frac), float(policy_temp)
         assert len(self.rates) == self.K and self.rates[-1] == 0.0, "the finest level is never corrupted"
-        if self.prop == "frozen_wrong":
+        # dry: an arm that only replays the mask / replacement generators (src/ncmr/l1r.py); it never calls `proposals`
+        if self.prop == "frozen_wrong" and not dry:
             assert frozen is not None, "M2 / M4 / M5 need the frozen copy of the released generator"
-        self.frozen = frozen
+        self.frozen, self.dry = frozen, dry
+        self.l1r = None            # M2R: the L1RPlan (set by scripts/train_gen.py); None for every other arm
         base = int(seed) * 7919
         mk = lambda off: torch.Generator(device=device).manual_seed(base + off)
         self.mask_gen, self.repl_gen, self.flag_gen = mk(2), mk(104729), mk(15485863)
@@ -179,6 +186,27 @@ class MechArm:
 
     # ------------------------------------------------------------------ proposals
     @torch.no_grad()
+    def draw_root(self, canon):
+        """Frozen-wrong level 0 (M2 / M4 / M5 / M2R): (B, l0) replacement codes ~ the unigram without the canonical code.
+        Shared by `proposals` and the M2R replay (src/ncmr/l1r.py), so both draw identically from `repl_gen`."""
+        B, l0 = canon.shape[0], self.l0
+        probs0 = self.L0[None].expand(B * l0, -1).clone()
+        probs0.scatter_(1, canon[:, :l0].reshape(-1, 1), 0.0)               # level 0: unigram without the canonical code
+        return torch.multinomial(probs0, 1, generator=self.repl_gen).view(B, l0)
+
+    @torch.no_grad()
+    def draw_fine(self, probs):
+        """Frozen-wrong levels >= 1: one sample per position from probs (B, S - l0, V) (fp32), from `repl_gen`."""
+        return torch.multinomial(probs.flatten(0, 1), 1, generator=self.repl_gen).view(probs.shape[:-1])
+
+    @torch.no_grad()
+    def skip_fine(self, B: int, V: int):
+        """Advance `repl_gen` exactly as `draw_fine` does for B rows over a V-wide output, without the generator: the
+        draw consumes the generator by the probability tensor's shape (and dtype), not its values, so a dummy of the
+        same shape / dtype / device is enough (the M2R replay checks this against the real stream at every micro-batch)."""
+        self.draw_fine(torch.full((B, self.S - self.l0, V), 1.0 / V, dtype=torch.float32, device=self.device))
+
+    @torch.no_grad()
     def canonical(self, x):
         # the canonical codes are the labels: fp32 with TF32 off, like every teacher used as a target (audit 8, A8-2)
         with fp32_eval(self.tok, self.device):
@@ -206,13 +234,10 @@ class MechArm:
                     parts.append((c + torch.randint(1, self.vocab[k], (B, lk), device=dev, generator=g)) % self.vocab[k])
             return torch.cat(parts, 1)
         if self.prop == "frozen_wrong":
-            probs0 = self.L0[None].expand(B * l0, -1).clone()
-            probs0.scatter_(1, canon[:, :l0].reshape(-1, 1), 0.0)           # level 0: unigram without the canonical code
-            r0 = torch.multinomial(probs0, 1, generator=g).view(B, l0)
+            r0 = self.draw_root(canon)
             logits = self._logits(self.frozen, self.frozen, canon)
             logits.scatter_(-1, canon[:, l0:, None], float("-inf"))
-            probs = torch.softmax(logits / self.policy_temp, -1)
-            samp = torch.multinomial(probs.flatten(0, 1), 1, generator=g).view(logits.shape[:-1])
+            samp = self.draw_fine(torch.softmax(logits / self.policy_temp, -1))
             return torch.cat([r0, samp], 1)
         # policy / policy_used_parent: A3's policy (level 0 from the unigram, T = 1, one step given clean coarser levels)
         lv0 = torch.multinomial(self.L0, B * l0, replacement=True, generator=g).view(B, l0)
