@@ -1373,3 +1373,32 @@ Cut 8, every item; R share = mean R_8 / mean N_8, bounds from the per-item beta-
   (~$10; same price per unit, no bulk discount) when W2C needs it, more only when a follow-on gate passes.
 - Staging under the current balance: W2M-G, the M3 pilot and E1b first (~16 CU at the corrected burn), which also
   decides the kill; W2C stage 1 (~44) and the kill (~10) when more compute is available.
+
+## R057 — R056 package registered, built and merged (PR 16; Codex 4 rounds, deep audit 10); user buys 100 CU (2026-10-28; process)
+- **Decision (user, 2026-10-28):** buy 100 CU, so about 128 CU are available (27.93 + 100); the brief's ~200-CU budget
+  rises accordingly. W2C stage 1 and the gated L1R kill no longer wait for a purchase (their registrations' condition is
+  met). The ~2x burn gap of R056 is still unexplained: caps stay in GPU-minutes; every notebook now ends with a cell that
+  releases the Colab runtime after the results are copied.
+- **Registered before any code** (`docs/preregistration.md`, b1b5fc5): W2C stage 1 (M2 / M3, seeds 1-3, W2M's protocol;
+  replication and dissociation readings), M3-0 (M3 without clean rows, seed 0), W2M-G (JS by bank, crossed replay with
+  common random numbers, L1 root reliance, M4 flag routing; direction-1 gate pi_2 >= 0.25), E1b (continued E1 sampling
+  on censored / wide cut-8 items of the released models), L1R (balanced L1 target reassignment, coverage gate 0.80).
+  Erratum 7d91f87: E1b's WMT14 delta is 0.05 / (128 x 3) (three registered cuts), as analyze_e1 and R054 used.
+- **Built** (PR 16, merged 5ad74b5): `src/ncmr/l1r.py` + arm `m2r` in `src/ncmr/w2m.py` / `scripts/train_gen.py` (replay of
+  the run's own streams before training, max circulation, root / block check at every micro-batch, plan sha in the
+  checkpoint; M0-M7 unchanged, tested bit for bit); `src/ncmr/w2mg.py`, `scripts/w2mg_eval.py`, `scripts/w2mg_gate.py`;
+  `scripts/e1b_continue.py`, `scripts/analyze_e1b.py`; `scripts/analyze_w2c.py`; `scripts/w1_sample_stats.py` skips absent
+  arms (the M5 debt) and reads the new sets; configs M3-0 and M2R; six notebooks. Full suite 735 passed (CPU).
+- **L1R coverage estimate** (`results/l1r_coverage_cpu.json`, seed-0 data stream and masks, simulated replacement roots):
+  0.880 (76,071 of 86,489 root-corrupted rows, 2,642 roots), above the 0.80 gate (60 steps alone gave 0.588). The run
+  recomputes it on the GPU before training.
+- **Codex review:** round 1 P1 (W2M-G resume manifest did not pin released assets, val data, device, runtime), round 2 P1
+  (E1b resume did not pin models, data, E1 files), round 3 P1 (analyze_e1b did not verify the pinned E1 digest): all
+  accepted, reproduced, fixed with regression tests (mutation-checked); round 4 clean (`docs/reviews/triage_pr16.md`).
+- **Deep audit 10** (local Codex CLI on 5f0c689; `docs/reviews/codex_audit10.md`): two P1s, both E1b: A10-1 resume under
+  changed inputs / runtime (GPU and torch now pinned too), A10-2 interrupted time not charged to the cumulative cap
+  (elapsed time now written after every item, every 30 s inside an item and on exit). Strict xfails failed on the
+  audited commit, pass after the fixes; tests ported (`docs/reviews/triage_audit10_2026-10-28.md`). No P0 / P1 in L1R,
+  M0-M7, W2M-G, analyze_w2c or the notebooks. Its recomputation of W2M's seed-0 numbers and E1b's selection agrees.
+- Launch order: `w2mg_eval` (L4), `w2p_L_ts_m3_c0` (A100-40GB), `e1b_continue` (L4, same GPU type each session); then
+  `w2c1_L_ts_m2` / `w2c1_L_ts_m3` (A100-40GB); `l1r_L_ts_m2r` only if W2M-G's gate passes.

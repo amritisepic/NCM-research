@@ -1,6 +1,6 @@
 # STATE — read this first
 
-_Last updated: 2026-10-27, session 9 (R052-R055; plan `docs/plan_2026-10-27.md`; handoff `docs/prompts/handoff_2026-10-27.md`). Branches: `claude/ncm-research` (notebooks clone it) and
+_Last updated: 2026-10-28, session 10 (R057: R056 package registered, built, merged in PR 16 after Codex and deep audit 10; user bought 100 CU). Before that, session 9 (R052-R055; plan `docs/plan_2026-10-27.md`; handoff `docs/prompts/handoff_2026-10-27.md`). Branches: `claude/ncm-research` (notebooks clone it) and
 `claude/ncm-phase2-analysis-finetune-pkh64d` (older mirror). Repo is PUBLIC: commit nothing identifying (no
 personal names/emails, no absolute local paths, no session links, no credentials). Goals, success bar and rules:
 `docs/brief.md`._
@@ -133,6 +133,7 @@ reassignment kill gated on W2M-G, E1b (continue sampling on censored items, ~1.5
 - P1b withdrawn (R023).
 
 ## Compute
+- **R057: the user bought 100 CU (2026-10-28): ~128 CU available (27.93 + 100); the brief's budget rises accordingly.** Ready to launch (PR 16): W2M-G ~5, M3-0 ~5.4, E1b ~6, then W2C stage 1 ~44, L1R ~10 if gated in (CU at R056's doubled burn; caps in GPU-minutes in `docs/colab_runs.md`).
 - Colab: ~116 CU spent (p1, c4, w0 ~12.5; wave 1 ~46 incl. ~6.5 lost to restarts, R030; WMT14 pair ~11.9, R036;
   W1d ~3, R039; J2-F ~6.5, R042; W2M ~26, R049; D1 ~5.6, mech eval ~0.5, E1 ~4.3, R052-R054), **estimated from run
   time; actual burn is ~2x (R056)**: the panel shows **27.93 CU** left this month (75.6 used since 103.56, vs 36.9
@@ -144,9 +145,11 @@ reassignment kill gated on W2M-G, E1b (continue sampling on censored items, ~1.5
 - CPU: ~13.5 CPU-h before session 5; session 5 ~1.2 h (Sudoku paired rerun, test suites).
 
 ## Next 3 actions
-1. **User:** the purchase decision (R056: 100 CU, ~$10, when W2C stage 1 is ready; not 500) and closing runtimes once
-   a notebook finishes. Package approved (R056): W2M-G, M3 no-clean pilot, W2C stage 1, E1b, gated direction-1 kill.
-2. **Fresh session** (`docs/prompts/handoff_2026-10-28.md`): register the package, then build it in one PR (Codex
-   review, delta audit), including a notebook cell that releases the runtime when a run ends.
-3. Launch W2M-G, the M3 pilot and E1b first (~16 CU at the corrected burn; fits the balance); W2C stage 1 (~44) and
-   the kill (~10) after. Never merge code while a run is mid-flight.
+1. **User (Colab):** launch `w2mg_eval` (L4), `w2p_L_ts_m3_c0` (A100-40GB) and `e1b_continue` (L4; every session on the
+   same GPU type); then `w2c1_L_ts_m2` / `w2c1_L_ts_m3` (A100-40GB, one seed per session is fine). `l1r_L_ts_m2r` only if
+   `w2mg_eval`'s direction-1 gate passes. Do not merge code while one of them is mid-flight. Copy each results folder
+   into `results/colab/`.
+2. **Next session:** read W2M-G (registered readings; the gate), M3-0, E1b (`scripts/analyze_e1b.py`), then W2C
+   (`scripts/w1_sample_stats.py --set w2c1`, `scripts/analyze_w2c.py`). A W2C or E1b result meeting a (c) bar goes to the
+   user before more compute (brief).
+3. Known debt: `scripts/analyze_j1.py`'s bootstrap runs out of memory (low priority).
