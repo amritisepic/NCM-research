@@ -1,0 +1,164 @@
+{
+ "w2c_stage1": {
+  "seeds_present": [
+   1,
+   2,
+   3
+  ],
+  "per_seed": {
+   "1": {
+    "D_gpt2": 18.36492824487985,
+    "D_gpt2_se_paired": 0.3246654696388909,
+    "D_ts33m": 28.54637069551514,
+    "D_ts33m_se_paired": 0.4983916599295046,
+    "dNLL": 3.8617656249999754,
+    "dMAUVE": -0.413763295901172,
+    "dDup": 12.378174651964565,
+    "G_m2": 39.790341371937075,
+    "G_m3": 21.425413127057226,
+    "m2": {
+     "file": "results/colab/w2c1_L_ts_m2/L_ts_m2_frozen_pw_s1__result.json",
+     "steps": 600,
+     "gpt2": 39.790341371937075,
+     "ts33m": 46.817954242445744,
+     "val_nll": 758.0851953125,
+     "entropy": 4.0104412050846605,
+     "mauve": 0.4457642041650093,
+     "dup_eval": 19.619483584865176
+    },
+    "m3": {
+     "file": "results/colab/w2c1_L_ts_m3/L_ts_m3_uniform_wrong_s1__result.json",
+     "steps": 600,
+     "gpt2": 21.425413127057226,
+     "ts33m": 18.271583546930604,
+     "val_nll": 754.2234296875,
+     "entropy": 3.982220144309456,
+     "mauve": 0.8595275000661813,
+     "dup_eval": 11.075591264003622
+    }
+   },
+   "2": {
+    "D_gpt2": 19.505983480903076,
+    "D_gpt2_se_paired": 0.30563694905005995,
+    "D_ts33m": 31.101490537443638,
+    "D_ts33m_se_paired": 0.5289399314021034,
+    "dNLL": 3.9097031249999645,
+    "dMAUVE": -0.4189546497902805,
+    "dDup": 12.28834993978944,
+    "G_m2": 41.30791192128558,
+    "G_m3": 21.8019284403825,
+    "m2": {
+     "file": "results/colab/w2c1_L_ts_m2/L_ts_m2_frozen_pw_s2__result.json",
+     "steps": 600,
+     "gpt2": 41.30791192128558,
+     "ts33m": 49.88870244472395,
+     "val_nll": 757.5997265625,
+     "entropy": 4.012648637714074,
+     "mauve": 0.4392569404450576,
+     "dup_eval": 19.81529889904406
+    },
+    "m3": {
+     "file": "results/colab/w2c1_L_ts_m3/L_ts_m3_uniform_wrong_s2__result.json",
+     "steps": 600,
+     "gpt2": 21.8019284403825,
+     "ts33m": 18.7872119072803,
+     "val_nll": 753.6900234375,
+     "entropy": 3.9865513790294242,
+     "mauve": 0.8582115902353381,
+     "dup_eval": 10.807604863422188
+    }
+   },
+   "3": {
+    "D_gpt2": 18.757255496307174,
+    "D_gpt2_se_paired": 0.32042041047383507,
+    "D_ts33m": 29.78307006860512,
+    "D_ts33m_se_paired": 0.5738730457931092,
+    "dNLL": 4.322515624999937,
+    "dMAUVE": -0.39110745340999403,
+    "dDup": 12.206726387745741,
+    "G_m2": 40.56038277086411,
+    "G_m3": 21.803127274556942,
+    "m2": {
+     "file": "results/colab/w2c1_L_ts_m2/L_ts_m2_frozen_pw_s3__result.json",
+     "steps": 600,
+     "gpt2": 40.56038277086411,
+     "ts33m": 48.603866417601424,
+     "val_nll": 757.5131328125,
+     "entropy": 4.015322250117228,
+     "mauve": 0.4527231060385127,
+     "dup_eval": 19.68733148493684
+    },
+    "m3": {
+     "file": "results/colab/w2c1_L_ts_m3/L_ts_m3_uniform_wrong_s3__result.json",
+     "steps": 600,
+     "gpt2": 21.803127274556942,
+     "ts33m": 18.820796348996296,
+     "val_nll": 753.1906171875,
+     "entropy": 3.9884063425283647,
+     "mauve": 0.8438305594485067,
+     "dup_eval": 11.052796546059996
+    }
+   }
+  },
+  "missing": [],
+  "available": true,
+  "pooled_seed_sd": 0.5582127099528249,
+  "mean_D_gpt2": 18.8760557406967,
+  "mean_D_ts33m": 29.810310433854635,
+  "mean_dNLL": 4.031328124999959,
+  "mean_dMAUVE": -0.40794179970048217,
+  "damage": {
+   "reading": "replicates",
+   "mean_D": 18.8760557406967,
+   "replicates_conditions": {
+    "every_D_ge_10": true,
+    "mean_D_gt_2sp": true,
+    "every_D_ts_gt_0": true,
+    "every_dDup_gt_0": true
+   },
+   "overturned_conditions": {
+    "mean_D_lt_5": false,
+    "ts33m_reversed": false,
+    "mauve_reversed": false
+   }
+  },
+  "dissociation": "holds",
+  "criterion_c_candidate_claim": true
+ },
+ "m3_0": {
+  "available": true,
+  "I_gpt2": 5.189515509258097,
+  "I_gpt2_se_paired": 0.0892871953409507,
+  "reading": "prediction",
+  "I_ts33m": 6.44284553058749,
+  "I_ts33m_se_paired": 0.13718761036176544,
+  "G_m3": 21.685751521329436,
+  "G_m3_0": 16.496236012071343,
+  "mauve": {
+   "m3": 0.8653978107993214,
+   "m3_0": 0.8705643479998437
+  },
+  "entropy": {
+   "m3": 3.991797690541272,
+   "m3_0": 3.9673968066991736
+  },
+  "val_nll": {
+   "m3": 753.85003125,
+   "m3_0": 859.792375
+  },
+  "dup_per_1k": {
+   "m3": null,
+   "m3_0": null
+  },
+  "references_descriptive": {
+   "A0_gpt2": 16.164382846075473,
+   "W1_A1_gpt2": 16.604238305949796
+  }
+ },
+ "l1r": {
+  "available": false,
+  "missing": [
+   "results/colab/l1r_L_ts_m2r/L_ts_m2r_frozen_pw_l1reassign_s0__result.json"
+  ]
+ }
+}

@@ -1519,3 +1519,40 @@ burn). `scripts/analyze_e1b.py` -> `results/e1b_analysis.json`.
 - Update (same day): Codex's review of PR 17 at `85e304f` found no issues, in one round. The first request sat at
   "Running" for 90 min; a re-request completed in 2 min. The merge gate passes. Not merged: W2C stage 1 is running, and
   no code merges until the user reports it finished.
+
+
+## R062 — W2C stage 1: plausible-wrong replacement damage replicates at seeds 1-3 (D = 18.4 / 19.5 / 18.8 Gen-PPL, s_p 0.56) and the dissociation holds (mean dNLL 4.03 nats/window); believed to meet criterion (c) as registered, not claimed (2026-10-28; registered W2C)
+Notebooks `w2c1_L_ts_m2` (at `6be0690`) and `w2c1_L_ts_m3` (at `8bc61b8`), A100-SXM4-40GB, one session per run, 600
+steps, exit 0. Both SHAs are docs-only descendants of PR 16's merge `5ad74b5`
+(`git diff --stat 5ad74b5 <sha> -- src scripts configs assets notebooks` is empty). Run configs equal
+`configs/scale/L_ts_m2_frozen_pw.yaml` / `L_ts_m3_uniform_wrong.yaml` except `train.seed` and `grad_accum` 4 (the
+notebook's `--micro_batch 64`, as at seed 0). Time: M2 51.9 / 50.1 / 50.1 min, M3 30.3 / 28.3 / 28.3 min, 239.0
+A100-min, ~21 CU at 5.3 CU/h (~26 at the ~1.25x burn). Raw results: commit `97b2536`.
+`scripts/w1_sample_stats.py --set w2c1` -> `results/w2c1_sample_stats.json`; `scripts/analyze_w2c.py` ->
+`results/w2c_analysis.json`. Recomputed independently from the raw `final_eval` per-group values: every number agrees.
+  | seed | G(M2) | G(M3) | D_s, GPT-2 large (± paired SE) | D_s, TinyStories-33M | dNLL (nats/window) | dDup per 1k | dMAUVE |
+  |---|---|---|---|---|---|---|---|
+  | 1 | 39.79 | 21.43 | +18.36 ± 0.32 | +28.55 ± 0.50 | +3.86 | +12.4 (20.5 vs 8.1) | -0.414 |
+  | 2 | 41.31 | 21.80 | +19.51 ± 0.31 | +31.10 ± 0.53 | +3.91 | +12.3 (20.4 vs 8.2) | -0.419 |
+  | 3 | 40.56 | 21.80 | +18.76 ± 0.32 | +29.78 ± 0.57 | +4.32 | +12.2 (20.8 vs 8.6) | -0.391 |
+  | mean | 40.55 | 21.68 | **+18.88** (s_p 0.56; 2 s_p 1.12) | +29.81 | **+4.03** (seed SD 0.25) | +12.3 | -0.408 |
+  | seed 0 (W2M, exploratory, not pooled) | 42.62 | 21.69 | +20.94 ± 0.37 | +33.08 | +4.04 | — | -0.454 |
+- **Registered readings: damage replicates; dissociation holds.** Every D_s >= 10 (min 18.36), mean D 18.88 > 2 s_p
+  (1.12), every seed has D_s > 0 under TinyStories-33M and dDup_s > 0; nothing overturns (mean D >= 5; M2 is worse on
+  the seed mean under both scorers and MAUVE). |mean dNLL| = 4.03 <= 10. In each seed all 16 paired sample groups have
+  M2 > M3 under both scorers.
+- **Status: believed to meet criterion (c) as registered (W2C's "damage replicates" + "dissociation holds"); not
+  claimed.** The user is told before any further compute is spent on it (brief); a claim audit (CLAUDE.md Tier 2)
+  comes before any claim.
+- What the numbers say beyond the readings, for the claim's wording:
+  - Canonical NLL does rank M2 worse in every seed (+3.86 to +4.32 nats/window, about 0.5% of ~755 nats/window; spread
+    over all 11 levels, 0.18-0.64 per level). "Barely distinguishes" means small relative to the generation gap
+    (Gen-PPL +87%), not zero.
+  - M2's samples have slightly higher entropy (+0.027 nats) and more adjacent duplicates: the damage is not a
+    low-entropy collapse.
+  - Both arms sit above the released control (A0 16.16) because of the 25% clean rows (M3-0, R059); the comparison is
+    M2 against M3 under one protocol, not against the released model.
+  - Scope: one protocol (continuation of the released TinyStories generator, 25% clean rows, W1's rates, 600 steps), one
+    domain, one model. Criterion (c) asks for a finding about what the levels encode. W2C replicates a training-signal
+    effect (which wrong codes damage generation); the level localization (R058: damage builds over levels 2-5, not
+    L1) is one seed. Replicating R058's localization on the seed 1-3 checkpoints would tie the claim to the levels.
