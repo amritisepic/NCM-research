@@ -486,3 +486,27 @@ def test_analysis_cli_writes_json_without_absolute_paths(plan_sel, tmp_path):
     res = json.loads(out.read_text(encoding="utf-8"))
     assert res["verdict"]["e1_replication_bar_met"] is False and "A0" in res["models"]
     assert str(ROOT) not in out.read_text(encoding="utf-8")
+
+
+# ------------------------------------------------------------------------------------------------ Codex PR 16 (id 4396397569)
+@pytest.mark.parametrize("field,value", [("released_sha256", {"wmt14": {"generator.pt": "other"}}),
+                                         ("data_sha256", {"wmt14_pairs": "other"}),
+                                         ("e1_sha256", {"e1_wmt__result.json": "other"})])
+def test_resume_refuses_changed_models_data_or_saved_e1(tmp_path, field, value):
+    plan, sel = _plan(3)
+    clock = Clock()
+    ident = {"released_sha256": {"wmt14": {"generator.pt": "g"}}, "data_sha256": {"wmt14_pairs": "d"},
+             "e1_sha256": {"e1_wmt__result.json": "e"}}
+    B.run(plan, sel, _runner(clock, []), str(tmp_path), max_items=1, clock=clock, identity=ident)
+    with pytest.raises(SystemExit, match="identity"):
+        B.run(plan, sel, _runner(clock, []), str(tmp_path), clock=clock, identity={**ident, field: value})
+    seen = []
+    res = B.run(plan, sel, _runner(clock, seen), str(tmp_path), clock=clock, identity=dict(ident))
+    assert seen == [1, 2] and res["complete"] is True                       # the same identity resumes
+
+
+def test_input_identity_hashes_the_released_model_val_data_and_saved_e1():
+    ident = B.input_identity("", str(REAL), only=("A0",))
+    ts = ident["released_sha256"]["tinystories"]
+    assert {"generator.pt", "tokenizer.pt", "config.yaml"} <= set(ts) and all(len(v) == 64 for v in ts.values())
+    assert set(ident["data_sha256"]) == {"valid_bpe_8192.pickle"} and set(ident["e1_sha256"]) == {"e1_ts__result.json"}

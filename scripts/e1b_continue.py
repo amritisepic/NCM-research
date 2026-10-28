@@ -20,6 +20,7 @@ a rerun resumes, refusing a run directory whose protocol or selection differs.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import math
@@ -152,22 +153,25 @@ def _write(path, res):
     os.replace(tmp, path)
 
 
-def run(plan, sel, runner_for, run_dir, max_minutes=150.0, max_items=None, clock=time.time, extra=None):
+def run(plan, sel, runner_for, run_dir, max_minutes=150.0, max_items=None, clock=time.time, extra=None, identity=None):
     """Process `plan` in order, writing `<run_dir>/result.json` after every item. Finished items (same domain, model,
     item) are skipped on a rerun; the run directory must match the saved protocol and selection. The cumulative minutes
     (all sessions) are checked between items: at or above `max_minutes` the run stops cleanly. `runner_for(domain)` ->
-    callable(entry) -> dict of the item's fields. Returns the result dict."""
+    callable(entry) -> dict of the item's fields. `identity` (SHA-256 of the released models, the input data and the saved
+    E1 files, `input_identity`) is pinned like the protocol: a resume under other models or items is refused (Codex PR 16).
+    The device is not pinned: each item is its own seeded stream, read on its own E1b counts (registration), and every item
+    records the GPU and torch it ran on. Returns the result dict."""
     os.makedirs(run_dir, exist_ok=True)
     path = os.path.join(run_dir, "result.json")
-    manifest = {"protocol": PROTOCOL, "selection": sel}
+    manifest = {"protocol": PROTOCOL, "selection": sel, "identity": identity or {}}
     if os.path.exists(path):
         with open(path, encoding="utf-8") as f:
             res = json.load(f)
-        for key in ("protocol", "selection"):
+        for key in ("protocol", "selection", "identity"):
             if res.get(key) != json.loads(json.dumps(manifest[key])):
                 raise SystemExit(f"{path}: {key} differs from this run's; refusing to resume")
     else:
-        res = {"protocol": manifest["protocol"], "selection": sel, "items": [], "minutes": 0.0}
+        res = {"protocol": manifest["protocol"], "selection": sel, "identity": manifest["identity"], "items": [], "minutes": 0.0}
     res.update(extra or {})
     done = {(r["domain"], r["model"], r["item"]) for r in res["items"]}
     prior, t0, processed, runners = res["minutes"], clock(), 0, {}
@@ -202,6 +206,30 @@ def run(plan, sel, runner_for, run_dir, max_minutes=150.0, max_items=None, clock
 
 
 # ------------------------------------------------------------------------------------------------ models
+def _sha256(path):
+    with open(path, "rb") as f:
+        return hashlib.file_digest(f, "sha256").hexdigest()
+
+
+def input_identity(data_path, e1_dir, only=("J0", "A0")):
+    """What a cached item depends on besides the protocol: every file of the released checkpoint directories of the domains
+    run, the WMT14 pairs file, TinyStories' validation stories and the saved E1 results the selection and N_8 come from."""
+    from ncmr.data import DATA_DIR
+    out = {"released_sha256": {}, "data_sha256": {}, "e1_sha256": {}}
+    for m, d, f in DOMAINS:
+        if m not in only:
+            continue
+        art = os.path.join(ROOT, "artifacts", E1.ART[d])
+        out["released_sha256"][d] = {n: _sha256(os.path.join(art, n)) for n in sorted(os.listdir(art))
+                                     if os.path.isfile(os.path.join(art, n))}
+        out["e1_sha256"][f] = _sha256(os.path.join(e1_dir, f))
+        if d == "wmt14":
+            out["data_sha256"]["wmt14_pairs"] = _sha256(data_path)
+        if d == "tinystories":
+            out["data_sha256"]["valid_bpe_8192.pickle"] = _sha256(os.path.join(DATA_DIR, "valid_bpe_8192.pickle"))
+    return out
+
+
 def make_runner_factory(data_path, e1_dir, device):
     """runner_for(domain): loads the released model and items once per domain (the previous domain is released)."""
     from ncmr.ncm_ref_loader import load_ncm
@@ -239,6 +267,8 @@ def make_runner_factory(data_path, e1_dir, device):
             out = continue_item(dom, pre, canon, target, SEED * 1_000_003 + i * 101 + CUT, entry["e1"][0], entry["e1"][1],
                                 N, delta, cut=CUT, replay_round=REPLAY_ROUND, round_=ROUND, cap=CAP, max_width=MAX_WIDTH)
             out["nll_max_abs_diff_vs_e1"] = float(np.max(np.abs(np.array(nll) - np.array(rows[i]["level_nll"]))))
+            out["gpu"] = torch.cuda.get_device_name() if device == "cuda" else "cpu"
+            out["torch"] = torch.__version__
             return out
         return one
     return runner_for
@@ -259,7 +289,8 @@ def main():
     plan, sel = build_plan(a.e1_dir, only)
     print(f"E1b: {len(plan)} items " + str({m: (len(s['censored']), len(s['wide'])) for m, s in sel.items()}), flush=True)
     res = run(plan, sel, make_runner_factory(a.data, a.e1_dir, device), a.run_dir, a.max_minutes, a.max_items,
-              extra={"gpu": torch.cuda.get_device_name() if device == "cuda" else "cpu", "torch": torch.__version__})
+              extra={"gpu": torch.cuda.get_device_name() if device == "cuda" else "cpu", "torch": torch.__version__},
+              identity=input_identity(a.data, a.e1_dir, only))
     mism = [(r["model"], r["item"]) for r in res["items"] if not r["replay_match"]]
     print(f"done {len(res['items'])}/{len(plan)} items, {res['minutes']:.1f} min, replay mismatches {mism}, "
           f"not reached {res['not_reached']}")
