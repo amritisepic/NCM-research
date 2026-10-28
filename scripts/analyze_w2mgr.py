@@ -53,7 +53,13 @@ SANITY_SE = 3.0
 REGISTERED = {"n_clean": 512, "group_n": 256, "bank_seeds": [900, 901], "replay_seeds": list(range(8)), "cuts": [2, 4, 6],
               "js_levels": [2, 3, 4, 5], "n_boot": 2000, "boot_seed": 0, "root_seed": 2027, "n_roots": 8,
               "precision": "fp32, TF32 off, eval mode",
-              "scorers": {"gpt2-large": "gpt2-large", "TinyStories-33M": "roneneldan/TinyStories-33M"}}
+              "scorers": {"gpt2-large": "gpt2-large", "TinyStories-33M": "roneneldan/TinyStories-33M"},
+              # the protocol block's fixed descriptions (scripts/w2mg_eval.py protocol_block; audit 13, A13-1)
+              "clean_bank": 'examples("val", 512)',
+              "cells": {"groups_per_cell": 8, "samples_per_group": 256, "crossed_cuts": [2, 4, 6],
+                        "cut_meaning": "prefix model samples levels 1..c-1, suffix model c..11"},
+              "sampler": "ancestral, T=1, Gumbel-max, one generator per group seeded with the group seed (common random numbers)",
+              "ci": "percentile bootstrap over windows, both banks resampled"}
 GPU_REQUIRED = "L4"
 CELL_KEYS = ("m2_m2", "m3_m3", *[f"{p}_c{c}" for c in CUTS for p in ("m2to3", "m3to2")])
 CELL_GROUPS, CELL_N = 8, 2048
@@ -196,6 +202,43 @@ def _finite(x):
     return isinstance(x, (int, float)) and not isinstance(x, bool) and math.isfinite(x)
 
 
+def expected_cell_spec(key):
+    """The spec scripts/w2mg_eval.py writes for registered cell `key` (seeds 0-7, 256 per group; A13-1)."""
+    if key in ("m2_m2", "m3_m3"):
+        kind, prefix, suffix, cut = "pure", key[:2], key[:2], None
+    else:
+        pair, c = key.rsplit("_c", 1)
+        prefix, suffix = {"m2to3": ("m2", "m3"), "m3to2": ("m3", "m2")}[pair]
+        kind, cut = "crossed", int(c)
+    return {"key": key, "kind": kind, "prefix": prefix, "suffix": suffix, "cut": cut, "f": None,
+            "seeds": list(REGISTERED["replay_seeds"]), "group_n": REGISTERED["group_n"]}
+
+
+def check_cell_scores(cell):
+    """Eight finite paired group scores per scorer, log losses = log Gen-PPL, and the stored mean / SD / SE equal to theirs
+    (A13-1: the shares are read from these vectors, so they must be the registered eight groups)."""
+    bad = []
+    for sc in SCORERS:
+        m = cell.get("genppl_" + sc)
+        if not isinstance(m, dict):
+            bad.append(f"no {sc} metrics")
+            continue
+        ppl, ll = m.get("per_group"), m.get("log_loss_per_group")
+        if not all(isinstance(v, list) and len(v) == CELL_GROUPS and all(_finite(x) for x in v) for v in (ppl, ll)):
+            bad.append(f"{sc}: needs {CELL_GROUPS} finite group Gen-PPLs and log losses")
+            continue
+        if any(x <= 0 for x in ppl):
+            bad.append(f"{sc}: non-positive group Gen-PPL")
+            continue
+        if not np.allclose(np.log(ppl), ll, atol=1e-12, rtol=0):
+            bad.append(f"{sc}: log losses differ from the log of the group Gen-PPLs")
+        sd = float(np.std(ppl, ddof=1))
+        for q, v in (("mean", float(np.mean(ppl))), ("sd", sd), ("se", sd / math.sqrt(CELL_GROUPS))):
+            if not _finite(m.get(q)) or not math.isclose(m[q], v, rel_tol=1e-12, abs_tol=1e-12):
+                bad.append(f"{sc}: {q} differs from the {CELL_GROUPS} group scores")
+    return bad
+
+
 def check_result(r, seed):
     """The reasons a seed's result.json cannot be read as W2M-GR's run of that seed (empty: acceptable)."""
     bad = []
@@ -227,8 +270,16 @@ def check_result(r, seed):
         bad.append(f"cells {sorted(cells)} != the 8 registered cells")
     for k in CELL_KEYS:
         c = cells.get(k)
-        if isinstance(c, dict) and (c.get("n_groups") != CELL_GROUPS or c.get("n") != CELL_N):
+        if k not in cells:
+            continue
+        if not isinstance(c, dict):
+            bad.append(f"cell {k}: not an object")
+            continue
+        if c.get("spec") != expected_cell_spec(k):
+            bad.append(f"cell {k}: spec {c.get('spec')} differs from the registered replay {expected_cell_spec(k)}")
+        if c.get("n_groups") != CELL_GROUPS or c.get("n") != CELL_N:
             bad.append(f"cell {k}: n_groups {c.get('n_groups')}, n {c.get('n')} != {CELL_GROUPS}, {CELL_N}")
+        bad.extend(f"cell {k}: {why}" for why in check_cell_scores(c))
     if "iv" in r:
         bad.append("an (iv) section is present")
     for sec in ("ii", "i", "iii"):
@@ -275,8 +326,15 @@ def check_result(r, seed):
 
 
 def summarise_seed(r):
-    """The per-seed quantities and readings of one accepted result (or of seed 0's, descriptively)."""
-    sh = r["ii"]["shares"]
+    """The per-seed quantities and readings of one accepted result (or of seed 0's, descriptively). The share points are
+    recomputed from the cells' group log losses (A13-1), so admission's tolerance is not a second decision boundary; the
+    stored jackknife SEs are kept."""
+    sh = {sc: {str(c): dict(r["ii"]["shares"][sc][str(c)]) for c in CUTS} for sc in SCORERS}
+    for sc in SCORERS:
+        ll = {k: r["cells"][k]["genppl_" + sc]["log_loss_per_group"] for k in CELL_KEYS}
+        for c in CUTS:
+            pts = point_shares(ll["m2_m2"], ll["m3_m3"], ll[f"m2to3_c{c}"], ll[f"m3to2_c{c}"])
+            sh[sc][str(c)].update(zip(("pi", "sigma", "interaction"), pts))
     ratios = {b: {k: r["i"]["ratios"][b][k] for k in ("r", "lo", "hi")} for b in BANKS}
     d = r["iii"]["m3_minus_m2"]
     sblk = r["ii"].get("sanity_vs_w2c_final_eval") or r["ii"].get("sanity_vs_w2m")

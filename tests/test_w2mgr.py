@@ -318,6 +318,10 @@ GOOD = {2: (0.009, 0.868), 4: (0.25, 0.50), 6: (0.511, 0.061)}          # (pi_c,
 GOOD_RATIOS = {b: {"r": 4.0, "lo": 2.0, "hi": 6.0, "per_level": []} for b in AN.BANKS}
 
 
+# the specs scripts/w2mg_eval.py writes for the reduced run's cells, as they appear in result.json
+EVAL_SPECS = {sp["key"]: json.loads(json.dumps(sp)) for sp in S.cell_specs(G.Protocol(), arms=REDUCED)}
+
+
 def cells_for(shares_gpt2, shares_ts, delta=0.6):
     """Eight registered cells whose per-group log losses give exactly the wanted shares (group jitter cancels in the means)."""
     cells = {}
@@ -331,7 +335,7 @@ def cells_for(shares_gpt2, shares_ts, delta=0.6):
             ll[f"m3to2_c{c}"] = base + sh[c][1] * delta + jit
         for k, v in ll.items():
             pg = np.exp(v)
-            m = cells.setdefault(k, {"spec": {}, "n": 2048, "entropy": 4.0, "len_tokens": 100.0, "dup_adj1_per_1k": 10.0,
+            m = cells.setdefault(k, {"spec": json.loads(json.dumps(EVAL_SPECS[k])), "n": 2048, "entropy": 4.0, "len_tokens": 100.0, "dup_adj1_per_1k": 10.0,
                                      "dup_adj2_per_1k": 1.0, "n_groups": 8})
             sd = float(np.std(pg, ddof=1))
             m[f"genppl_{key}"] = {"mean": float(pg.mean()), "sd": sd, "se": sd / math.sqrt(8), "per_group": list(map(float, pg)),
@@ -625,7 +629,7 @@ def test_end_to_end_replicates_with_seed_means_sds_and_seed0_beside(tmp_path):
                                           "3": {"gpt2-large": "distributed", "TinyStories-33M": "distributed"}}
     assert out["sanity_within_3se_per_seed"] == {"1": True, "2": True, "3": True}
     b = AN.analyze_seed0(str(tmp_path))
-    assert b["available"] and b["pooled"] is False and b["shares"]["gpt2-large"]["2"]["pi"] == 0.9
+    assert b["available"] and b["pooled"] is False and b["shares"]["gpt2-large"]["2"]["pi"] == pytest.approx(0.9, abs=1e-12)
     assert b["ii_reading"]["gpt2-large"] == "early-state selection"
     assert out["per_seed"]["1"]["file"].endswith("w2mgr_eval_s1__result.json") and "tmp" not in out["per_seed"]["1"]["file"].lower()
 
@@ -829,3 +833,79 @@ def test_no_other_notebook_has_the_new_guard_and_the_a100_guard_is_unchanged():
             assert "require_gpu" not in spec
     assert MK.RUNS["w2mg_eval"]["cmds"] == ["python scripts/w2mg_eval.py --run_root {R} --run_dir {R}/w2mg_eval --seed 0"]   # no --arms: W2M-G
     assert MK.RUNS["w2mg_eval"]["seeds"] == [0]
+
+
+# ------------------------------------------------------------------------------------------------ audit 13 (A13-1)
+def test_admission_fields_equal_what_the_eval_script_writes():
+    """A13-1's fix compares the protocol block's descriptions and each cell's spec: they must equal what a registered
+    reduced run of scripts/w2mg_eval.py writes, or every real result would be rejected."""
+    from types import SimpleNamespace
+    env = SimpleNamespace(runs={}, ckpt_sha256={}, identity={})
+    pb = json.loads(json.dumps(S.protocol_block(env, G.Protocol(), 1, REDUCED)))
+    for k in ("clean_bank", "cells", "sampler", "ci", "precision", "scorers"):
+        assert pb[k] == AN.REGISTERED[k], k
+    assert pb["corrupted_bank"] is None
+    assert set(EVAL_SPECS) == set(AN.CELL_KEYS)
+    for k in AN.CELL_KEYS:
+        assert AN.expected_cell_spec(k) == EVAL_SPECS[k], k
+
+
+@pytest.mark.parametrize("name", ["spec_cut", "spec_seeds", "spec_group_n", "spec_prefix", "seven_groups", "sd_mismatch",
+                                  "log_loss_mismatch", "nonpositive", "clean_bank", "sampler"])
+def test_admission_rejects_declared_departures(name):
+    r = make_result(2)
+    assert AN.check_result(r, 2) == []
+    c = r["cells"]["m2to3_c4"]
+    m = c["genppl_gpt2-large"]
+    if name == "spec_cut":
+        c["spec"]["cut"] = 6
+    elif name == "spec_seeds":
+        c["spec"]["seeds"] = list(range(8, 16))
+    elif name == "spec_group_n":
+        c["spec"]["group_n"] = 128
+    elif name == "spec_prefix":
+        c["spec"]["prefix"] = "m3"
+    elif name == "seven_groups":
+        m["per_group"], m["log_loss_per_group"] = m["per_group"][:7], m["log_loss_per_group"][:7]
+    elif name == "sd_mismatch":
+        m["sd"] *= 1.01
+    elif name == "log_loss_mismatch":
+        m["log_loss_per_group"][0] += 1e-6
+    elif name == "nonpositive":
+        m["per_group"][0] = 0.0
+    elif name == "clean_bank":
+        r["protocol"]["clean_bank"] = 'examples("test", 512)'
+    elif name == "sampler":
+        r["protocol"]["sampler"] = "ancestral, T=0.9"
+    assert AN.check_result(r, 2), name
+
+
+def test_readings_use_shares_recomputed_from_the_cells():
+    """Stored share points within admission's 1e-9 tolerance cannot move a reading: the points are recomputed."""
+    r = make_result(1)
+    sh = r["ii"]["shares"]["gpt2-large"]["2"]
+    true_pi = sh["pi"]
+    sh["pi"] = true_pi + 5e-10
+    assert AN.check_result(r, 1) == []
+    out = AN.summarise_seed(r)
+    assert out["shares"]["gpt2-large"]["2"]["pi"] == pytest.approx(true_pi, abs=1e-14)
+
+
+def test_admission_layers_that_other_checks_do_not_cover():
+    """Departures invisible to the share and summary-statistic checks: (a) every log loss of one scorer shifted by one
+    constant (shares unchanged), caught only by log loss = log Gen-PPL; (b) every cell cut to 7 groups with consistent
+    statistics (shares unchanged, the jitter cancels across cells), caught only by the group count."""
+    r = make_result(2)
+    for c in r["cells"].values():
+        c["genppl_TinyStories-33M"]["log_loss_per_group"] = [v + 0.5 for v in c["genppl_TinyStories-33M"]["log_loss_per_group"]]
+    assert AN.check_result(r, 2) and all("log losses differ" in w for w in AN.check_result(r, 2))
+    r = make_result(2)
+    for c in r["cells"].values():
+        for sc in AN.SCORERS:
+            m = c["genppl_" + sc]
+            m["per_group"], m["log_loss_per_group"] = m["per_group"][:7], m["log_loss_per_group"][:7]
+            sd = float(np.std(m["per_group"], ddof=1))
+            m["mean"], m["sd"], m["se"] = float(np.mean(m["per_group"])), sd, sd / math.sqrt(8)
+    why = AN.check_result(r, 2)
+    assert why and all("finite group" in w or "se differs" in w for w in why)
+
