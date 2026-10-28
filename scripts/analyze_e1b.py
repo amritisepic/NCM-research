@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import importlib.util
 import json
 import math
@@ -67,11 +68,16 @@ def e1_rule_holds(p1):
     return bool(p1) and all(v["e1_rule"]["verdict"] == "holds" for v in p1["sets"].values())
 
 
-def check_selection(e1b, files):
-    """The e1b run's saved selection must equal the one recomputed from the saved E1 files."""
+def check_selection(e1b, files, digests=None):
+    """The e1b run's saved selection must equal the one recomputed from the saved E1 files, and each source file must be
+    the one the run pinned (`e1_sha256`, Codex PR 16 round 3): equal counts and indices do not pin the NLLs."""
     for model, dom, fn in B.DOMAINS:
         if model not in e1b["selection"]:
             continue
+        pinned = e1b["selection"][model].get("e1_sha256")
+        if digests is not None and pinned != digests[dom]:
+            raise ValueError(f"{model}: the saved E1 file {fn} is not the one the e1b run pinned (sha256 {pinned!r} vs "
+                             f"{digests[dom]!r}): refusing to combine them")
         data = files[dom]
         cens, wide = B.select_items(data["rows"][model], B.e1_delta(data))
         got = e1b["selection"][model]
@@ -80,11 +86,12 @@ def check_selection(e1b, files):
 
 
 def analyse(e1b, e1_dir=E1_DIR):
-    files = {}
+    files, digests = {}, {}
     for dom, fn in AE.FILES.items():
-        with open(os.path.join(e1_dir, fn), encoding="utf-8") as f:
-            files[dom] = json.load(f)
-    check_selection(e1b, files)
+        with open(os.path.join(e1_dir, fn), "rb") as f:
+            raw = f.read()
+        files[dom], digests[dom] = json.loads(raw.decode("utf-8")), hashlib.sha256(raw).hexdigest()
+    check_selection(e1b, files, digests)
     items = e1b["items"]
     out = {"protocol": {"alpha": AE.ALPHA, "registered_cut_min": AE.REG_CUT_MIN, "untouched_from_item": AE.UNTOUCHED_FROM,
                         "delta": "analyze_e1.delta_for per model, unchanged from E1a",

@@ -528,3 +528,18 @@ def test_elapsed_time_reaches_disk_inside_an_item_before_a_hard_kill(tmp_path):
 
     B.run(plan, sel, runner_for, str(tmp_path), max_items=1, clock=clock)
     assert seen_on_disk == pytest.approx([40 / 60, 80 / 60, 2.0])   # on disk while the item is still running
+
+
+def test_analysis_refuses_an_e1_file_other_than_the_pinned_one(plan_sel, tmp_path):
+    """Codex PR 16 round 3 (id 4396534288): same indices and counts, changed N_8 -> refused, not silently combined."""
+    import shutil
+    e1_dir = tmp_path / "e1"
+    shutil.copytree(REAL, e1_dir)
+    AB.analyse(make_e1b(plan_sel), str(e1_dir))                                  # the pinned files: accepted
+    p = e1_dir / "e1_wmt__result.json"
+    d = json.loads(p.read_text(encoding="utf-8"))
+    d["rows"]["J0"][11]["level_nll"][8] += 100.0                                 # censored item 11: counts unchanged
+    p.write_text(json.dumps(d), encoding="utf-8")
+    assert B.build_plan(str(e1_dir), only=("J0",))[1]["J0"]["censored"] == plan_sel[1]["J0"]["censored"]
+    with pytest.raises(ValueError, match="pinned"):
+        AB.analyse(make_e1b(plan_sel), str(e1_dir))
