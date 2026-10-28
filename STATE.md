@@ -166,6 +166,7 @@ reassignment kill gated on W2M-G, E1b (continue sampling on censored items, ~1.5
 - P1b withdrawn (R023).
 
 ## Compute
+- **2026-10-28 (user-reported, at `w2mgr_eval`'s launch): 98.94 CU left.** W2C stage 1 and the idle time since used 19.7 CU (118.61 -> 98.94), against ~21 estimated at run-time rates: the run-time rate holds. `w2mgr_eval` ~2-2.5 CU.
 - **R062 (2026-10-28): W2C stage 1 done, 239 A100-min, ~21 CU at run-time rates (~26 at the ~1.25x burn). Expected
   balance ~95 CU (118.61 at W2C's start); ask the user for the panel number before planning spend.** Nothing queued.
 - **2026-10-28 (user-reported): balance 118.61 CU; both W2C stage 1 notebooks running at 10.6 CU/h combined (5.3 CU/h
@@ -185,7 +186,7 @@ reassignment kill gated on W2M-G, E1b (continue sampling on censored items, ~1.5
 - CPU: ~13.5 CPU-h before session 5; session 5 ~1.2 h (Sudoku paired rerun, test suites).
 
 ## Next 3 actions
-1. **User (Colab): launch `w2mgr_eval`** (R064: PR 18 merged at `17a4bf4` after Codex x2 and deep audit 13, A13-1
+1. **User (Colab): `w2mgr_eval` is running** (launched 2026-10-28, ~23:00 UTC) (R064: PR 18 merged at `17a4bf4` after Codex x2 and deep audit 13, A13-1
    fixed). L4 only, seeds 1-3, ~2-2.5 CU; same Drive as the `w2c1_*` notebooks. Then copy `results/colab/w2mgr_eval/`
    and run `python scripts/analyze_w2mgr.py`. The W2C claim (wording in R063) waits for its reading. Merge no code
    while it runs.
