@@ -585,3 +585,160 @@ Why: `docs/reviews/codex_audit4.md` (A4-1 to A4-5); triage `docs/reviews/triage_
 - **Prediction 3** (rank order by U_8 vs quality): reported descriptively, no longer read as a test.
 - **Integrity:** per item, R_k should not increase with k and U_k should not decrease; violations beyond the intervals
   are reported as estimation or implementation problems.
+
+## W2C — stage 1: M2 / M3 at fresh seeds 1-3 (registered 2026-10-28, before any code or run; criterion (c) candidate)
+- **Why:** W2M seed 0 (R049) found plausible-wrong replacement (M2) damaging and uniform-wrong replacement in the same
+  slots (M3) healthy, with canonical NLL barely distinguishing them (M2 - M3: +20.94 ± 0.37 Gen-PPL, 4.04 nats/window
+  clean NLL; R055). One seed establishes nothing (R044). Approved by the user as part of the package (R056); stage 2
+  (flag controls) is cut. Seed 0 stays exploratory and is not part of this reading.
+- **Protocol:** W2M's, unchanged: configs `configs/scale/L_ts_m2_frozen_pw.yaml` and `L_ts_m3_uniform_wrong.yaml` as run at
+  seed 0 (25% clean rows, W1's rates, one mask stream, canonical labels, 600 steps, W1's recipe, fp32 proposal forwards),
+  `scripts/train_gen.py --seed s` for s = 1, 2, 3. Within a seed both arms see the same data order and the same masked
+  slots. A100-40GB, as seed 0 (the notebook's `--micro_batch 64`). Final evaluation as W2M: 16 x 256 fp32 samples,
+  sample seeds 42 and 0-14 (the same for every training seed), Gen-PPL under GPT-2 large (primary) and TinyStories-33M,
+  entropy, MAUVE (fp32), adjacent duplicates per 1k and bigram gain (`scripts/w1_sample_stats.py`, R031), clean val NLL.
+- **Quantities:** per seed s, D_s = G(M2_s) - G(M3_s), Gen-PPL under GPT-2 large, paired over the 16 sample groups
+  (± SE); the same under TinyStories-33M; dNLL_s = clean val NLL(M2_s) - NLL(M3_s) (nats/window); dDup_s = duplicates
+  per 1k, M2_s - M3_s. Pooled seed SD s_p = sqrt((var_s G(M2_s) + var_s G(M3_s)) / 2), sample variances over s = 1..3
+  (the brief's "pooled seed SD").
+- **Readings** (seeds 1-3 only):
+  - **Damage replicates** if every D_s >= 10, mean D > 2 s_p, and every seed moves the same way under TinyStories-33M
+    and duplicates per 1k (D_s > 0 and dDup_s > 0). **Overturned** if mean D < 5, or if the seed-mean M2 - M3 difference
+    has the opposite sign (M2 better) under either scorer or MAUVE. Anything else: mixed.
+  - **Dissociation:** holds if |mean dNLL| <= 10 nats/window; removed if mean dNLL > 20 (M2's clean NLL worse by more
+    than 20 nats/window); between: not established.
+  - "Damage replicates" + "dissociation holds" is the criterion-(c) candidate claim: under this continuation protocol,
+    frozen-model plausible-wrong replacement damages generation that uniform-wrong replacement in the same slots does
+    not, while canonical teacher-forced NLL barely distinguishes the two. If met, the user is told before any further
+    compute is spent on it (brief).
+- **Cost:** M2 ~51 and M3 ~30 A100-minutes per seed (seed 0, R049), ~245 A100-minutes in total (~22 CU at 5.4 CU/h;
+  ~44 at R056's observed burn). Caps: 70 A100-minutes per M2 run, 45 per M3 run; every run < 15 CU. Waits for the
+  user's compute purchase (R056).
+
+## M3-0 — pilot: M3 without clean rows (registered 2026-10-28, before any code or run; exploratory)
+- **Why:** W2M's control drifted (M0 21.71 vs A0 16.16; M3 21.69); prime suspect the 25% clean rows (R049). Astra A1
+  (`docs/research_review_round3_2026-10-27.md`) proposes M3 without clean rows as the missing cell of a clean-fraction x
+  replacement factorial; it replaces the earlier M0-without-clean-rows control (R055, R056).
+- **Protocol:** M3 seed 0 (`L_ts_m3_uniform_wrong.yaml`) with `clean_row_frac: 0.0` (config
+  `L_ts_m3_uniform_wrong_c0.yaml`), seed 0, 600 steps, A100-40GB. The mask stream draws the same uniforms as M3 seed 0
+  (the clean-row key is still drawn), so every slot masked in M3 is masked here, plus the slots of the rows M3 left
+  clean. W2M's final evaluation.
+- **Reading:** I = G(M3, seed 0) - G(M3-0) (GPT-2 large; 21.69 minus the pilot; paired over the 16 sample groups).
+  Prediction (Astra A1): I >= 3. I < 1 weakens the clean rows as the principal cause of the control's drift. Between:
+  inconclusive. TinyStories-33M, MAUVE, duplicates and clean NLL are reported beside it; A0 (16.16) and W1's A1 (16.60;
+  no clean rows, uniform replacement, 1800 steps) are descriptive references. Delta_0 = G(P_0) - G(U_0) needs M2
+  without clean rows, which is not funded: no reading is registered for it.
+- **Cost:** ~30 A100-minutes (~2.7 CU; ~5.4 at R056's burn); cap 45 A100-minutes.
+
+## W2M-G — eval-only: shared context banks, crossed replay, root reliance, M4 flag routing (registered 2026-10-28, before any code or run; exploratory)
+- **Why:** R053 / R055: the collapsed arms keep the control's canonical NLL, so the damage has to be located in which
+  contexts generation visits and how the models respond to them. Astra A2 / A4 supply the measurements and predictions.
+  W2M-G also decides the direction-1 kill (L1R below).
+- **Models:** the released generator and W2M's seed-0 final checkpoints M0, M2, M3, M4 (`L_ts_m*_s0/final.pt`); M4 with
+  zero flags unless stated. fp32, TF32 off, eval mode, for every forward, sample and score.
+- **Sampler:** ancestral, level by level, T = 1, Gumbel-max: level 0 from the released unigram, then each level
+  j = 1..11 from the model's level-j call (`src/ncmr/cached_decode.py`; a level attends to the prefix and itself, so its
+  logits equal the teacher-forced ones, which the tests check). Noise: one generator per sample group, seeded with the
+  group's seed and drawn in level order with fixed shapes, so every cell of a comparison sees the same level-0 codes and
+  the same Gumbel noise (common random numbers). Samples are decoded, cut at EOS, pads dropped and re-encoded as in
+  `scripts/train_gen.py`.
+- **Banks (contexts):** clean: the first 512 val windows (`examples("val", 512)`, even-index validation items, as
+  `scripts/mech_eval_w2m.py`); generated: 512 ancestral samples each from the released model, M2 and M3 (two groups of
+  256, seeds 900 and 901, the same for every model). For (iv) also 512 from M4 (seeds 900 and 901) and the 512
+  plausible-wrong corrupted windows of `w2m.corrupted_contexts` at seed 2026 (W1's rates; the mech eval's).
+- **(i) Predictive divergence:** on each bank, teacher-forced on the bank's codes, the Jensen-Shannon divergence (nats)
+  between M2's and M3's predictive distributions at every position of levels 2-5; per bank, J_b = the mean over levels
+  2..5 of the per-level mean over positions and windows. Ratio r_b = J_b / J_clean for b in {released, M2, M3 samples};
+  95% CI by a window bootstrap (2000 resamples, seed 0, both banks resampled). Prediction (Astra A2, "the model discounts
+  generated-looking contexts"): **holds** if r_b >= 3 for all three generated banks with every lower CI bound > 1.2;
+  **overturned** if every r_b's upper CI bound is <= 1.2; else mixed. Per-level J is reported.
+- **(ii) Crossed replay:** prefix model P and suffix model Q in {M2, M3}: P samples levels 1..c-1, Q samples levels
+  c..11 given them, at cuts c = 2, 4, 6 (prefix through L1, L3, L5). Cells: (M2, M2) and (M3, M3) (identical at every
+  cut by the shared noise) and the two crossed cells at each cut: 8 cells, 2048 samples each (8 groups of 256, seeds
+  0-7). Per cell: Gen-PPL (GPT-2 large, primary; TinyStories-33M), the mean over groups; the mean token log loss L = the
+  mean over groups of the group's mean token NLL (= log of the group's Gen-PPL); entropy and adjacent duplicates per 1k
+  (`src/ncmr/eval_text.py`). With Delta = L(M2, M2) - L(M3, M3) (notation prefix -> suffix), the prefix share
+  pi_c = (L(M2 -> M3 at c) - L(M3, M3)) / Delta and the suffix share sigma_c = (L(M3 -> M2 at c) - L(M3, M3)) / Delta,
+  interaction 1 - pi_c - sigma_c; SE by the jackknife over the 8 groups (the pairing is by group). Readings (GPT-2 large
+  log loss; TinyStories-33M beside it): **early-state selection** (Astra A2's forecast) if pi_4 >= 0.5 and
+  pi_6 >= 0.75; **conditional rendering** if sigma_6 >= 0.8 (Astra's overturning result: a healthy prefix through L5
+  keeps >= 80% of the damage); else distributed. Sanity: G(M2, M2) and G(M3, M3) within 3 SE of W2M's 42.62 and 21.69
+  (different noise, fewer samples); a miss is reported, and the shares are still computed within W2M-G.
+- **Direction-1 run gate (L1R):** **passes** if pi_2 >= 0.25 under GPT-2 large log loss and pi_2 > 0 under
+  TinyStories-33M. Why 0.25: the kill predicts >= 25% rescue from changing L1's targets alone; if the L0-L1 prefix that
+  M2 samples carries less than a quarter of the contrast, the rescue would have to come through L1's effect on the
+  response to later levels, which R055's numbers (0.42 nats apart at clean L1) make unlikely enough not to fund now.
+- **(iii) L1 root reliance:** on the clean bank, for each window 8 roots drawn from the released unigram (generator seed
+  2027, the same draws for every model; a draw may equal the true root), level 1's input rebuilt from the drawn root,
+  level 1's canonical targets kept: rho = the mean over windows and draws of NLL_L1(drawn root) - NLL_L1(true root)
+  (nats per window, 8 codes). Models: released, M0, M2, M3, M4. Channel-model prediction (R055: the posterior that a
+  supplied root is canonical is 0.43 under M2, 0.63 under M3): rho(M2) < rho(M3). **Holds** if the paired (over
+  windows) 95% CI of rho(M3) - rho(M2) lies above 0; **overturned** if it lies below 0; else neither.
+- **(iv) M4 flag routing sweep:** a constant flag f in {0, 0.5, 1} on every input position of levels 1..11 (f * w added
+  to every level's input). Generation: M4 at each f, 2048 samples (seeds 0-7, (ii)'s noise); rescue R(f) =
+  (G(M2, M2) - G(M4, f)) / (G(M2, M2) - G(M3, M3)) per scorer, with (ii)'s pure cells. Diagnostics: canonical-label NLL
+  per window at each f on the clean bank and on the corrupted bank (there also with the true flags); mean
+  KL(P_f=0 || P_f) over the positions of levels 1..11 on the clean, corrupted and M4-sample banks. Prediction (Astra
+  A4): **no** f recovers 80% of the gap. **Overturned** if some f in {0.5, 1} has R(f) >= 0.8 under both scorers,
+  entropy >= M3's - 0.05 and duplicates per 1k <= M3's + 2 on seeds 0-7, and again on fresh seeds 8-15 (run only in
+  that case); if it holds on seeds 0-7 only: mixed. Astra A4's four outcome patterns (misrouting, denoising only,
+  ineffective use, no capacity bottleneck) are reported descriptively.
+- **Cost:** ~30k samples, two scorers and the bank forwards, on an L4 (fp32 with TF32 off is no faster on an A100):
+  ~60-90 L4-minutes (~2-2.5 CU; ~4-5 at R056's burn); cap 120 L4-minutes.
+
+## E1b — continued E1 sampling on censored and wide items (registered 2026-10-28, before any code or run; criterion (c) candidate C1)
+- **Why:** E1 (R054) missed its (c) bar because 18 WMT14 J0 pairs had no hit in 2048 samples at cut 8 (they carry 21%
+  of N_8 into the lower bound at R = 0), not because of evidence against prediction 1. E1a's per-item beta-mixture
+  confidence sequences are anytime-valid: by Ville's inequality they hold at any data-dependent stopping time, including
+  a continuation decided after seeing the first samples. Registered after E1's result, which is stated here.
+- **How E1 seeded its rounds** (`scripts/e1_equivalence.py`, `mc_hits`): one CUDA generator per (item i, cut k),
+  seeded 1_000_003 * seed + 101 i + k (seed 0), drawn in rounds of 64 samples, each round drawing its Gumbel noise level
+  by level with fixed shapes, stopping at 20 hits or 2048 samples. E1 ran on an L4 (torch 2.11.0+cu130).
+- **Items:** cut 8 only, in the released models. WMT14 J0: every item whose E1 count is censored (0 hits) or whose E1a
+  interval for T_8 (delta = 0.05 / (128 x 4)) is wider than 2 nats: 18 + 40 = 58 of 128. TinyStories A0: the same rule
+  (delta = 0.05 / (64 x 4)): 6 + 8 = 14 of 64. Sudoku has no censored item and no wide interval and is not continued.
+  The code recomputes the lists from the saved E1 results.
+- **Sampling:** per item, E1's generator and seed: first a replay in rounds of 64 up to E1's sample count n_E1, checking
+  that it reproduces E1's hit count exactly (reported per item); then rounds of 512 until the item's T_8 interval is no
+  wider than 2 nats or 2^15 = 32768 samples in total. Order: J0's items by index, then A0's. L4, fp32, TF32 off. If a
+  replay does not reproduce E1's count (e.g. a changed CUDA library), the item's E1b stream is still a valid independent
+  stream: it is read on its E1b counts alone (from sample 1) and flagged. An item's E1b counts replace its E1 counts at
+  cut 8; every other item, cut and model keeps E1's.
+- **Readings:** prediction 1 re-read for the three released models with E1's and E1a's rules and deltas unchanged
+  (`scripts/analyze_e1.py`: E1's rule = lower bound of mean R_8 / mean N_8 >= 0.8; E1a's added rule on the 61 untouched
+  TinyStories windows and on all WMT14 and Sudoku items). **E1's (c) replication bar is met** if E1's rule holds in all
+  three released models after E1b (Sudoku's E1 reading, 0.993, stands); E1a's stronger rule is reported for each.
+  Prediction 2 is not re-read (its comparison models are not continued). E1's readings stay as R054 reported them;
+  E1b's are reported beside them.
+- **Cost:** at most 72 items x 32768 samples; ~60-100 L4-minutes (~2-3 CU; ~4-6 at R056's burn); cap 150 L4-minutes,
+  checked between items; items not reached keep E1's counts, and the reading says so.
+
+## L1R — direction-1 kill: balanced L1 target reassignment (registered 2026-10-28, before any code or run; exploratory)
+- **Why:** Astra round 3, direction 1 and A3: change only the context-target association at the first refinement while
+  every corrupted input stays M2's. Gated (R055, R056) on W2M-G's crossed replay at cut 2; prior ~15-20%.
+- **Arm M2R** (config `L_ts_m2r_frozen_pw_l1reassign.yaml`): exactly M2 at seed 0 (same data order, mask stream,
+  replacement stream and micro-batch partition: A100-40GB, `--micro_batch 64`), except L1's targets on a selected set of
+  root-corrupted rows. Before training, the run replays its own data, mask and replacement streams for all 600 steps
+  (the frozen proposer's level >= 1 draws consume the replacement generator by shape only; the run checks the supplied
+  roots against the replay at every micro-batch and stops on any difference) and records, for every row whose level-0
+  code is replaced, its canonical root a_i, its supplied root u_i (a_i != u_i by construction) and its canonical L1
+  block y_i (8 codes). Selection: the largest balanced subset of the multigraph with edges a_i -> u_i (every root has as
+  many selected outgoing as incoming edges), solved as a maximum circulation (a linear program on a network matrix,
+  integral); within each (a, u) pair the rows are drawn at random (seeded); within each root r the selected rows with
+  u_i = r receive, by a random permutation, the blocks y_j of the selected rows with a_j = r. Only roots and masks enter
+  the selection, never target content or a score. Unselected rows are unchanged.
+- **CPU gate (code):** tests show that M2R's inputs, masks, replacement codes and its level >= 2 targets equal M2's at
+  every step, that the L1 target multiset over the run is unchanged, that every reassigned row receives a block whose
+  canonical root equals its supplied root, and that a resumed run equals an uninterrupted one; a CPU estimate of the
+  coverage on the seed-0 data stream (simulated replacement draws) is reported. **Run-time gate:** coverage = selected
+  / root-corrupted rows >= 0.80, else the run stops before training (a kill).
+- **Run gate:** W2M-G (ii)'s direction-1 gate passes (pi_2 >= 0.25 under GPT-2 large log loss, > 0 under
+  TinyStories-33M).
+- **Reading** (seed 0; W2M's final evaluation; rescue r = (G(M2) - G(M2R)) / (G(M2) - G(M3)) with W2M's seed-0 M2 and M3,
+  per scorer): prediction **>= 25% rescue under both scorers**, with no diversity loss explaining it (entropy >= M3's
+  - 0.05, i.e. >= 3.94; MAUVE >= M2's 0.412; duplicates per 1k <= M2's). **Killed** if r <= 0.10 (GPT-2 large), if the
+  coverage gate fails, or if the gain comes with entropy below 3.94. Between 0.10 and 0.25: reported, no expansion.
+  Seeds 1-3 (~14 CU at run time) only after a new user decision. A rescue of a deliberately damaged model is not a
+  quality advance over the healthy model and is not reported as one.
+- **Cost:** ~55 A100-minutes (M2's 51 plus the replay; ~5 CU; ~10 at R056's burn); cap 75 A100-minutes. Waits for the
+  run gate and the user's compute purchase.
