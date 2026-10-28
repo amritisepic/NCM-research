@@ -67,11 +67,12 @@ def test_release_cell_unassigns_and_respects_switch(monkeypatch):
 
 
 def test_notebooks_are_the_old_five_cells_plus_the_release_cell():
-    """Every notebook (the L1R one also has its guard) is markdown, setup, data, run, collect + the release cell; the data, run
-    and collect cells are the unchanged templates, so existing notebooks changed only by the last cell."""
+    """Every notebook (the L1R one also has its A100 guard, the W2M-GR one its GPU guard) is markdown, setup, data, run, collect +
+    the release cell; the data, run and collect cells are the unchanged templates, so existing notebooks changed only by the
+    last cell."""
     for name, spec in MK.RUNS.items():
         cells = MK.make(name, spec)["cells"]
-        guard = 1 if spec.get("require_a100") else 0
+        guard = 1 if spec.get("require_a100") or spec.get("require_gpu") else 0
         assert len(cells) == 6 + guard, name
         assert src(cells[2 + guard]) == nl(MK.DATA) and src(cells[3 + guard]) == nl(MK.RUN)
         assert src(cells[4 + guard]) == nl(MK.COLLECT.replace("__NAME__", name))

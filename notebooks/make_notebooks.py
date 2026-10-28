@@ -285,6 +285,18 @@ RUNS["w2mg_eval"] = {
     "cmds": ["python scripts/w2mg_eval.py --run_root {R} --run_dir {R}/w2mg_eval --seed 0"],
     "cap": "120 L4-minutes",
 }
+RUNS["w2mgr_eval"] = {
+    "desc": "W2M-GR (pre-registered, eval-only, no training; criterion (c) candidate with W2C): W2M-G's localization (i) context-bank "
+            "divergence, (ii) crossed replay and (iii) L1 root reliance for the released generator and W2C's final checkpoints "
+            "M2_s and M3_s at training seeds 1-3 (reads {R}/L_ts_m2_frozen_pw_s{1,2,3}/final.pt and "
+            "{R}/L_ts_m3_uniform_wrong_s{1,2,3}/final.pt, so run it on the same Drive as the w2c1_L_ts_m2 and w2c1_L_ts_m3 "
+            "notebooks). No M0, no M4, no (iv). fp32, TF32 off. L4 only: the Gumbel streams depend on the device, so the notebook "
+            "refuses to run on any other GPU. Each seed is one run (SEEDS is [1, 2, 3]; edit it to run one seed per session). "
+            "Cost: ~20-25 L4-minutes per seed, cap 40 L4-minutes per seed. Waits for the user's go.",
+    "gpu": "L4 only", "units": 2.5, "needs": ["ts", "ckpt"], "seeds": [1, 2, 3], "require_gpu": "L4",
+    "cmds": ["python scripts/w2mg_eval.py --run_root {R} --run_dir {R}/w2mgr_eval_s{S} --seed {S} --arms m2,m3"],
+    "cap": "40 L4-minutes per seed",
+}
 RUNS["e1b_continue"] = {
     "desc": "E1b (pre-registered, eval-only, no training; criterion (c) candidate C1): continued E1 sampling at cut 8 on the "
             "censored and wide items of the released models (WMT14 J0 and TinyStories A0; the item lists are recomputed from the "
@@ -473,6 +485,19 @@ if 'A100' not in _name or _mem <= 39e9:
 print('GPU guard passed:', _name, f'{_mem / 1e9:.0f} GB')
 '''
 
+# Only for specs with "require_gpu" (W2M-GR: "L4"): the registration runs every seed on an L4 because the Gumbel noise streams
+# depend on the device. A GPU name must contain the token as a whole word ("NVIDIA L4" passes, "NVIDIA L40S" and "Tesla T4" do
+# not). Runs before anything is downloaded.
+GUARD_GPU = r'''
+import re, torch
+_need = __GPU__
+_name = torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'none'
+if not re.search(r'(?<![A-Za-z0-9])' + re.escape(_need) + r'(?![A-Za-z0-9])', _name):
+    raise SystemExit(f'This run needs an {_need} (the registered runs use one: the sampling noise streams depend on the device); '
+                     f'this runtime has {_name}. Runtime > Change runtime type > {_need}.')
+print('GPU requirement passed:', _name)
+'''
+
 # Last cell of every notebook (R056): once the results are on Drive, give the Colab GPU back. Run all stops at a failing
 # cell, so this cell runs only if every earlier cell succeeded.
 RELEASE = r'''
@@ -509,6 +534,7 @@ def make(name: str, spec: dict) -> dict:
                  .replace("__SEEDS__", json.dumps(spec.get("seeds", [0])))
                  .replace("__NEEDS__", json.dumps(spec.get("needs", [])))),
             *([cell(GUARD)] if spec.get("require_a100") else []),
+            *([cell(GUARD_GPU.replace("__GPU__", json.dumps(spec["require_gpu"])))] if spec.get("require_gpu") else []),
             cell(DATA),
             cell(RUN),
             cell(COLLECT.replace("__NAME__", name)),

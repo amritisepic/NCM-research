@@ -2,7 +2,8 @@
 checkpoints M0, M2, M3, M4 (`<run_root>/L_ts_m*_s<seed>/final.pt`). fp32, TF32 off, eval mode, for every forward,
 sample and score.
 
-  python scripts/w2mg_eval.py --run_root <runs dir> --run_dir <out dir> [--seed 0]     (writes <out dir>/result.json)
+  python scripts/w2mg_eval.py --run_root <runs dir> --run_dir <out dir> [--seed 0] [--arms m0,m2,m3,m4]
+                                                                                       (writes <out dir>/result.json)
 
   (ii)  crossed replay: (M2, M2), (M3, M3) and the two crossed cells at cuts 2, 4, 6; 8 groups of 256 (seeds 0-7)
         each; Gen-PPL (GPT-2 large, TinyStories-33M), mean token log loss L = log of the group's Gen-PPL, shares
@@ -18,6 +19,12 @@ Resumable by cell: every finished cell (metrics, sample ids, groups), bank and p
 <out>/cells/; a rerun skips them and reproduces result.json. A partial result.json ("complete": false) is written as
 cells finish. <out>/manifest.json pins the protocol, the SHA-256 of the checkpoints, the released assets and val data, and the device /
 GPU / runtime: a run directory made under any other is refused.
+
+--arms (W2M-GR, "W2M-GR" in the registration): the default m0,m2,m3,m4 is W2M-G exactly. `--arms m2,m3` loads only the
+released model, M2 and M3 (`<run_root>/<dir>_s<seed>/final.pt`), and runs (i), (ii) and (iii) with (iii)'s models released,
+m2, m3: no M4 cells, no m4f0 bank, no corrupted bank, no (iv). The arm set is part of manifest.json and of the result's
+protocol block (a run directory refuses another arm set). For a run seed >= 1 the sanity reference of (ii) is W2C's final-eval
+GPT-2 large Gen-PPL of that seed (results/colab/w2c1_*/..., read at the start; a missing file exits); seed 0 keeps W2M's.
 """
 from __future__ import annotations
 
@@ -46,6 +53,56 @@ ARM_DIRS = {"m0": "L_ts_m0_uniform", "m2": "L_ts_m2_frozen_pw", "m3": "L_ts_m3_u
 SCORER_IDS = {"gpt2-large": "gpt2-large", "TinyStories-33M": "roneneldan/TinyStories-33M"}
 BANKS = ("released", "m2", "m3", "m4f0")        # sample banks (m4f0: for (iv)'s KL only)
 RHO_MODELS = ("released", "m0", "m2", "m3", "m4")
+ALL_ARMS = ("m0", "m2", "m3", "m4")             # W2M-G (the default)
+REDUCED_ARMS = ("m2", "m3")                     # W2M-GR: the released model, M2 and M3 only; (i), (ii), (iii)
+# where W2C stage 1's final-eval Gen-PPL (the sanity reference of (ii) at run seed >= 1) is saved: arm -> (notebook dir, run)
+W2C_RESULTS = {"m2": ("w2c1_L_ts_m2", "L_ts_m2_frozen_pw_s{s}__result.json"),
+               "m3": ("w2c1_L_ts_m3", "L_ts_m3_uniform_wrong_s{s}__result.json")}
+
+
+def parse_arms(arms):
+    """The arm set as a canonical tuple from a comma list or a sequence. Only the two registered sets exist: the full
+    W2M-G set and M2, M3 (W2M-GR); M2 and M3 are always required."""
+    names = [a.strip().lower() for a in (arms.split(",") if isinstance(arms, str) else arms) if str(a).strip()]
+    unknown = sorted(set(names) - set(ARM_DIRS))
+    if unknown:
+        sys.exit(f"unknown arm(s) {unknown}: choose from {sorted(ARM_DIRS)}")
+    got = tuple(a for a in ALL_ARMS if a in names)
+    if len(got) != len(names):
+        sys.exit(f"duplicate arm in --arms {names}")
+    if "m2" not in got or "m3" not in got:
+        sys.exit("--arms must contain m2 and m3 (the crossed replay needs both)")
+    if got not in (ALL_ARMS, REDUCED_ARMS):
+        sys.exit(f"--arms {','.join(got)} is not a registered arm set: use {','.join(ALL_ARMS)} (W2M-G) or {','.join(REDUCED_ARMS)} (W2M-GR)")
+    return got
+
+
+def banks_for(arms):
+    return tuple(b for b in BANKS if b != "m4f0" or "m4" in arms)
+
+
+def rho_models(arms):
+    return ("released", *arms)
+
+
+def w2c_reference(seed):
+    """W2M-GR: the sanity reference of (ii) for run seed s >= 1 -- W2C's final-eval GPT-2 large Gen-PPL of M2_s and M3_s,
+    read from the repository's saved results. Returns ({arm: value}, {arm: repo-relative file}); a missing or unreadable file exits."""
+    ref, src = {}, {}
+    for arm, (nb, name) in W2C_RESULTS.items():
+        rel = f"results/colab/{nb}/{name.format(s=seed)}"
+        path = os.path.join(ROOT, *rel.split("/"))
+        if not os.path.exists(path):
+            sys.exit(f"missing {rel}: W2C's final-eval Gen-PPL is the sanity reference of (ii) at seed {seed}")
+        try:
+            with open(path) as f:
+                v = float(json.load(f)["final_eval"]["genppl_gpt2-large"])
+        except (KeyError, TypeError, ValueError) as e:
+            sys.exit(f"{rel} has no final_eval['genppl_gpt2-large'] ({type(e).__name__}: {e})")
+        if not (math.isfinite(v) and v > 0):
+            sys.exit(f"{rel}: final_eval['genppl_gpt2-large'] = {v} is not a positive finite number")
+        ref[arm], src[arm] = v, rel
+    return ref, src
 
 
 @dataclass
@@ -117,7 +174,7 @@ def make_evaluate(bpe, device):
     return lambda ids, groups: evaluate_samples(ids, bpe.decode, groups, scorers=tuple(SCORER_IDS.values()), device=device)
 
 
-def load_env(run_root, seed, device, P=G.Protocol()):
+def load_env(run_root, seed, device, P=G.Protocol(), arms=ALL_ARMS):
     from ncmr.ncm_ref_loader import load_ncm
     import copy
     B = load_ncm(os.path.join(ROOT, "artifacts", "tinystories"), device=device)
@@ -125,8 +182,10 @@ def load_env(run_root, seed, device, P=G.Protocol()):
     for p in tok.parameters():
         p.requires_grad_(False)
     released = B.net.eval()
+    arms = parse_arms(arms)
     nets, flag, sha, runs = {"released": released}, None, {}, {"released": "released"}
-    for n, d in ARM_DIRS.items():
+    for n in arms:
+        d = ARM_DIRS[n]
         p = os.path.join(run_root, f"{d}_s{seed}", "final.pt")
         if not os.path.exists(p):
             sys.exit(f"missing final checkpoint for {n}: {d}_s{seed}/final.pt")
@@ -160,8 +219,9 @@ def run_identity(device):
 
 
 # ------------------------------------------------------------------------------------------------ cells
-def cell_specs(P, replicate=False, fs=None):
-    """The cells of (ii) / (iv) on seeds 0-7, or (replicate) the pure cells and the given f's on seeds 8-15."""
+def cell_specs(P, replicate=False, fs=None, arms=ALL_ARMS):
+    """The cells of (ii) / (iv) on seeds 0-7, or (replicate) the pure cells and the given f's on seeds 8-15. Without M4 in
+    `arms` there are no M4 cells."""
     sfx, seeds = ("_rep", list(P.replicate_seeds)) if replicate else ("", list(P.replay_seeds))
     mk = lambda key, kind, prefix, suffix, cut=None, f=None: {"key": key + sfx, "kind": kind, "prefix": prefix,
                                                               "suffix": suffix, "cut": cut, "f": f, "seeds": seeds,
@@ -170,7 +230,7 @@ def cell_specs(P, replicate=False, fs=None):
     if not replicate:
         for c in P.cuts:
             out += [mk(f"m2to3_c{c}", "crossed", "m2", "m3", c), mk(f"m3to2_c{c}", "crossed", "m3", "m2", c)]
-    for f in (P.f_sweep if fs is None else fs):
+    for f in ((P.f_sweep if fs is None else fs) if "m4" in arms else ()):
         out.append(mk(f"m4_f{fkey(f)}", "m4", "m4", "m4", None, float(f)))
     return out
 
@@ -271,19 +331,19 @@ def analysis_i(env, P, canon, banks, cdir, log):
     return out
 
 
-def analysis_iii(env, P, canon, cdir, log):
-    paths = {n: os.path.join(cdir, f"rho_{n}.npy") for n in RHO_MODELS}
-    missing = [n for n in RHO_MODELS if not os.path.exists(paths[n])]
+def analysis_iii(env, P, canon, cdir, log, models=RHO_MODELS):
+    paths = {n: os.path.join(cdir, f"rho_{n}.npy") for n in models}
+    missing = [n for n in models if not os.path.exists(paths[n])]
     if missing:
         r = G.root_reliance({n: env.nets[n] for n in missing}, env.tok, env.L0, canon, env.device, P.n_roots, P.root_seed)
         for n in missing:
             save_npy(paths[n], r["rho"][n])
-    rho = {n: np.load(paths[n]) for n in RHO_MODELS}
+    rho = {n: np.load(paths[n]) for n in models}
     d = G.paired_ci(rho["m3"], rho["m2"], P.n_boot, P.boot_seed)
     out = {"n_roots": P.n_roots, "root_seed": P.root_seed, "unit": "nats per window (8 level-1 codes)",
            "rho": {n: {"mean": float(a.mean()), "se": float(a.std(ddof=1) / math.sqrt(len(a)))} for n, a in rho.items()},
            "m3_minus_m2": d, "reading": G.read_iii(d["lo"], d["hi"])}
-    log(f"(iii) rho " + " ".join(f"{n} {out['rho'][n]['mean']:.3f}" for n in RHO_MODELS) + f"; reading {out['reading']}")
+    log(f"(iii) rho " + " ".join(f"{n} {out['rho'][n]['mean']:.3f}" for n in models) + f"; reading {out['reading']}")
     return out
 
 
@@ -327,7 +387,8 @@ def log_losses(cell, sc):
     return cell["metrics"][f"genppl_{sc}"]["log_loss_per_group"]
 
 
-def analysis_ii(P, cells):
+def analysis_ii(P, cells, ref=None, source=None):
+    """`ref` / `source`: the sanity reference of seed >= 1 (W2C's final eval, W2M-GR) and its files; None: W2M's (W2M-G)."""
     need = ["m2_m2", "m3_m3"] + [f"{p}_c{c}" for c in P.cuts for p in ("m2to3", "m3to2")]
     if any(k not in cells for k in need):
         return None
@@ -337,9 +398,10 @@ def analysis_ii(P, cells):
     reading = {sc: G.read_ii(sh[sc]["4"]["pi"], sh[sc]["6"]["pi"], sh[sc]["6"]["sigma"]) for sc in G.SCORERS} \
         if {4, 6} <= set(P.cuts) else None
     g = lambda k: cells[k]["metrics"]["genppl_gpt2-large"]
-    sanity = G.sanity_ii(g("m2_m2")["mean"], g("m2_m2")["se"], g("m3_m3")["mean"], g("m3_m3")["se"])
+    sanity = G.sanity_ii(g("m2_m2")["mean"], g("m2_m2")["se"], g("m3_m3")["mean"], g("m3_m3")["se"], ref, source)
     out = {"delta_log_loss": {sc: sh[sc][str(P.cuts[0])]["delta"] for sc in G.SCORERS}, "shares": sh, "reading": reading,
-           "reading_primary": None if reading is None else reading["gpt2-large"], "sanity_vs_w2m": sanity}
+           "reading_primary": None if reading is None else reading["gpt2-large"],
+           ("sanity_vs_w2m" if ref is None else "sanity_vs_w2c_final_eval"): sanity}
     if 2 in P.cuts:
         a, b = sh["gpt2-large"]["2"]["pi"], sh["TinyStories-33M"]["2"]["pi"]
         out["direction1_gate"] = {"pi_2_gpt2-large": a, "pi_2_TinyStories-33M": b,
@@ -390,40 +452,46 @@ def analysis_iv(P, cells, diag):
 
 
 # ------------------------------------------------------------------------------------------------ driver
-def protocol_block(env, P, seed):
-    return {**P.to_json(), "run_seed": seed, "runs": env.runs, "ckpt_sha256": env.ckpt_sha256,
+def protocol_block(env, P, seed, arms=ALL_ARMS):
+    return {**P.to_json(), "run_seed": seed, "arms": list(arms), "runs": env.runs, "ckpt_sha256": env.ckpt_sha256,
             "cells": {"groups_per_cell": len(P.replay_seeds), "samples_per_group": P.group_n,
                       "crossed_cuts": list(P.cuts), "cut_meaning": "prefix model samples levels 1..c-1, suffix model c..11"},
-            "clean_bank": f'examples("val", {P.n_clean})', "corrupted_bank": f"plausible_wrong, seed {P.corrupt_seed}, W1 rates",
+            "clean_bank": f'examples("val", {P.n_clean})',
+            "corrupted_bank": f"plausible_wrong, seed {P.corrupt_seed}, W1 rates" if "m4" in arms else None,
             "sampler": "ancestral, T=1, Gumbel-max, one generator per group seeded with the group seed (common random numbers)",
             "ci": "percentile bootstrap over windows, both banks resampled", "scorers": SCORER_IDS,
             "precision": "fp32, TF32 off, eval mode", "torch": torch.__version__, "identity": env.identity}
 
 
-def check_manifest(out_dir, env, P, seed):
-    man = {"protocol": P.to_json(), "run_seed": seed, "ckpt_sha256": env.ckpt_sha256, "identity": env.identity}
+def check_manifest(out_dir, env, P, seed, arms=ALL_ARMS):
+    man = {"protocol": P.to_json(), "run_seed": seed, "arms": list(arms), "ckpt_sha256": env.ckpt_sha256, "identity": env.identity}
     path = os.path.join(out_dir, "manifest.json")
     if os.path.exists(path):
         with open(path) as f:
             old = json.load(f)
         if old != json.loads(json.dumps(man)):
-            sys.exit("this run directory was made with a different protocol, seed, checkpoint, released asset, val data, device or runtime "
-                     "(manifest.json): use a fresh --run_dir")
+            sys.exit("this run directory was made with a different protocol, seed, arm set, checkpoint, released asset, val data, "
+                     "device or runtime (manifest.json): use a fresh --run_dir")
     else:
         write_json(path, man)
 
 
-def run(env, out_dir, P=G.Protocol(), seed=0, log=print):
+def run(env, out_dir, P=G.Protocol(), seed=0, log=print, arms=ALL_ARMS):
+    arms = parse_arms(arms)
+    if set(env.nets) != {"released", *arms}:
+        sys.exit(f"the environment holds models {sorted(env.nets)} but --arms is {','.join(arms)}: it must hold exactly the released model and the arms")
+    ref, src = (None, None) if seed == 0 else w2c_reference(seed)        # before anything is written: a missing file exits early
     os.makedirs(out_dir, exist_ok=True)
     cdir = os.path.join(out_dir, "cells")
     os.makedirs(cdir, exist_ok=True)
-    check_manifest(out_dir, env, P, seed)
+    check_manifest(out_dir, env, P, seed, arms)
     cells, an = {}, {}
+    with_m4 = "m4" in arms
 
     def write(complete):
-        res = {"protocol": protocol_block(env, P, seed), "complete": complete,
+        res = {"protocol": protocol_block(env, P, seed, arms), "complete": complete,
                "cells": {k: public_cell(c) for k, c in cells.items()}}
-        ii = analysis_ii(P, cells)
+        ii = analysis_ii(P, cells, ref, src)
         if ii is not None:
             res["ii"] = ii
             if "direction1_gate" in ii:
@@ -439,22 +507,26 @@ def run(env, out_dir, P=G.Protocol(), seed=0, log=print):
         write(False)
 
     torch.backends.cuda.matmul.allow_tf32 = torch.backends.cudnn.allow_tf32 = False
-    specs = cell_specs(P)
+    specs = cell_specs(P, arms=arms)
     for spec in specs:
         do(spec)
     canon = canonical_codes(env, env.clean_x)
-    banks = {b: bank_codes(env, P, b, cdir, log) for b in BANKS}
-    an["iii"] = analysis_iii(env, P, canon, cdir, log)
+    banks = {b: bank_codes(env, P, b, cdir, log) for b in banks_for(arms)}
+    an["iii"] = analysis_iii(env, P, canon, cdir, log, rho_models(arms))
     write(False)
     an["i"] = analysis_i(env, P, canon, banks, cdir, log)
     write(False)
+    if not with_m4:                                   # W2M-GR: no (iv), no M4 bank, no corrupted bank
+        res = write(True)
+        log(f"arms {','.join(arms)}: (iv) not run; direction-1 gate {res.get('direction1_gate', {}).get('passes')}")
+        return res
     diag = analysis_iv_diag(env, P, canon, banks, cdir, log)
     an["iv"] = analysis_iv(P, cells, diag)
     write(False)
     hit = [f for f in (0.5, 1.0) if f in P.f_sweep and an["iv"]["seeds_0_7"]["f"][fkey(f)]["rule_met"]]
     if hit:
         log(f"(iv) overturn rule met on seeds 0-7 for f = {hit}: replicating on seeds {P.replicate_seeds[0]}-{P.replicate_seeds[-1]}")
-        for spec in cell_specs(P, replicate=True, fs=hit):
+        for spec in cell_specs(P, replicate=True, fs=hit, arms=arms):
             do(spec)
         an["iv"] = analysis_iv(P, cells, diag)
     res = write(True)
@@ -467,10 +539,13 @@ def main():
     ap.add_argument("--run_root", required=True, help="directory holding the run directories (final.pt)")
     ap.add_argument("--run_dir", required=True, help="output directory; writes result.json")
     ap.add_argument("--seed", type=int, default=0, help="run seed of the arms (directory suffix _s<seed>)")
+    ap.add_argument("--arms", default=",".join(ALL_ARMS),
+                    help="m0,m2,m3,m4 (W2M-G, default) or m2,m3 (W2M-GR: no M0 / M4, no (iv)); m2 and m3 are required")
     a = ap.parse_args()
+    arms = parse_arms(a.arms)
     device = pick_device()
     torch.backends.cuda.matmul.allow_tf32 = torch.backends.cudnn.allow_tf32 = False
-    run(load_env(a.run_root, a.seed, device), a.run_dir, G.Protocol(), a.seed)
+    run(load_env(a.run_root, a.seed, device, arms=arms), a.run_dir, G.Protocol(), a.seed, arms=arms)
     print("wrote result.json")
 
 
