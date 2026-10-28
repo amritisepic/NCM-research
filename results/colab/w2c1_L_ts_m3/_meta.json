@@ -1,0 +1,77 @@
+{
+ "run": "w2c1_L_ts_m3",
+ "gpu": "NVIDIA A100-SXM4-40GB",
+ "finished_utc": "2026-10-28T18:27:17Z",
+ "git_sha": "8bc61b8394756e04e08e7418f9b36ac0e687268e",
+ "git_shas_all_sessions": [
+  "8bc61b8394756e04e08e7418f9b36ac0e687268e"
+ ],
+ "sessions": {
+  "L_ts_m3_uniform_wrong_s1": [
+   {
+    "event": "start",
+    "git_sha": "8bc61b8394756e04e08e7418f9b36ac0e687268e",
+    "utc": "2026-10-28T17:00:19Z",
+    "gpu": "NVIDIA A100-SXM4-40GB",
+    "cmd": "python scripts/train_gen.py --config configs/scale/L_ts_m3_uniform_wrong.yaml --run_dir {R}/L_ts_m3_uniform_wrong_s{S} --seed {S}",
+    "seed": 1,
+    "local_data_copy": true,
+    "micro_batch_64": true,
+    "had_ckpt": false,
+    "last_logged_step": null
+   },
+   {
+    "event": "end",
+    "git_sha": "8bc61b8394756e04e08e7418f9b36ac0e687268e",
+    "utc": "2026-10-28T17:30:38Z",
+    "exit": 0,
+    "minutes": 30.32,
+    "last_logged_step": 600
+   }
+  ],
+  "L_ts_m3_uniform_wrong_s2": [
+   {
+    "event": "start",
+    "git_sha": "8bc61b8394756e04e08e7418f9b36ac0e687268e",
+    "utc": "2026-10-28T17:30:38Z",
+    "gpu": "NVIDIA A100-SXM4-40GB",
+    "cmd": "python scripts/train_gen.py --config configs/scale/L_ts_m3_uniform_wrong.yaml --run_dir {R}/L_ts_m3_uniform_wrong_s{S} --seed {S}",
+    "seed": 2,
+    "local_data_copy": true,
+    "micro_batch_64": true,
+    "had_ckpt": false,
+    "last_logged_step": null
+   },
+   {
+    "event": "end",
+    "git_sha": "8bc61b8394756e04e08e7418f9b36ac0e687268e",
+    "utc": "2026-10-28T17:58:57Z",
+    "exit": 0,
+    "minutes": 28.32,
+    "last_logged_step": 600
+   }
+  ],
+  "L_ts_m3_uniform_wrong_s3": [
+   {
+    "event": "start",
+    "git_sha": "8bc61b8394756e04e08e7418f9b36ac0e687268e",
+    "utc": "2026-10-28T17:58:57Z",
+    "gpu": "NVIDIA A100-SXM4-40GB",
+    "cmd": "python scripts/train_gen.py --config configs/scale/L_ts_m3_uniform_wrong.yaml --run_dir {R}/L_ts_m3_uniform_wrong_s{S} --seed {S}",
+    "seed": 3,
+    "local_data_copy": true,
+    "micro_batch_64": true,
+    "had_ckpt": false,
+    "last_logged_step": null
+   },
+   {
+    "event": "end",
+    "git_sha": "8bc61b8394756e04e08e7418f9b36ac0e687268e",
+    "utc": "2026-10-28T18:27:17Z",
+    "exit": 0,
+    "minutes": 28.33,
+    "last_logged_step": 600
+   }
+  ]
+ }
+}

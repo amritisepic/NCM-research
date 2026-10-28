@@ -1,0 +1,2 @@
+{"event": "start", "git_sha": "6be06902d4cd0022e27573edf5af755f6a17c7b1", "utc": "2026-10-28T17:45:15Z", "gpu": "NVIDIA A100-SXM4-40GB", "cmd": "python scripts/train_gen.py --config configs/scale/L_ts_m2_frozen_pw.yaml --run_dir {R}/L_ts_m2_frozen_pw_s{S} --seed {S}", "seed": 2, "local_data_copy": true, "micro_batch_64": true, "had_ckpt": false, "last_logged_step": null}
+{"event": "end", "git_sha": "6be06902d4cd0022e27573edf5af755f6a17c7b1", "utc": "2026-10-28T18:35:22Z", "exit": 0, "minutes": 50.11, "last_logged_step": 600}
