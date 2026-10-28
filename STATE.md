@@ -185,8 +185,11 @@ reassignment kill gated on W2M-G, E1b (continue sampling on censored items, ~1.5
 - CPU: ~13.5 CPU-h before session 5; session 5 ~1.2 h (Sudoku paired rerun, test suites).
 
 ## Next 3 actions
-1. **W2M-GR (R063):** finish the code on `claude/wip-w2mgr`, Codex PR, delta deep audit, merge; then the user launches
-   `w2mgr_eval` (L4, seeds 1-3). Read with `scripts/analyze_w2mgr.py`. The W2C claim (wording in R063) waits for it.
+1. **W2M-GR (R063):** code in PR 18 (`a949044`; Codex review clean, gate passes). **Delta deep audit 13 not yet
+   done: the local Codex CLI hit its usage limit on 2026-10-28 ~20:35 UTC (reset ~21:56 UTC)**; brief
+   `docs/prompts/codex_audit13_w2mgr.md`; rerun `scripts/review/codex_local.sh audit audit13 <brief>` from the PR
+   head. PR 18 is not merged and `w2mgr_eval` is not cleared until audit 13 is triaged. Then the user launches
+   `w2mgr_eval` (L4, seeds 1-3); read with `scripts/analyze_w2mgr.py`. The W2C claim (wording in R063) waits for it.
 2. **User: the E1 criterion-(c) claim** (`docs/claim_e1_2026-10-28.md`, R061): claim it as scoped, as supporting
    evidence only, or hold.
 3. **User: next compute (~95 CU expected).** Options: W2M-G localization on the seed 1-3 checkpoints (eval-only, ~2 CU
