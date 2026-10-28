@@ -1,0 +1,21 @@
+# Triage of Codex deep audit 12 (W2C stage 1 claim: recomputation, matched comparison, claim scope)
+
+Source: `docs/reviews/codex_audit12.md`, `tests/test_audit12_{numbers,readings,matched,evaluation}.py` (local Codex CLI,
+gpt-6.1-sol / ultra, on `fc2a7a5`; branch `codex/audit12` at `2271125`; brief `docs/prompts/codex_audit12_w2cclaim.md`).
+Python ran in the audit's sandbox this time (torch 2.6 CPU). Audit suite re-run here on the audited commit: 45 passed.
+Ported unchanged to `claude/ncm-research`: 45 passed (the hash-pinned Sudoku assets under the git-ignored
+`tests/_assets/` are needed by one test). The audit adds no strict xfails: it demonstrated no defect.
+
+| # | Finding | Verdict | Evidence | Action |
+|---|---|---|---|---|
+| none | No P0 / P1. Every R062 number reproduces at its printed precision from the raw files (independent counters for duplicates and entropy, own paired SEs and pooled SD). Readings: damage replicates, dissociation holds. | **accept** | My own recomputation (R062) agrees; the audit's 45 tests pass here. | None. |
+| W1 | Wording: the proposed claim's "each seed >= +18.4" is too strong; the minimum D_s is 18.3649. | **accept** | `results/w2c_analysis.json`: D_1 = 18.3649. | Claim wording says "each seed at least +18.36" (R063). |
+| W2 | Wording: W2C shows that M2 causes additional degradation relative to matched uniform-wrong M3, not that M3 causes none: M3's seed mean 21.68 is above the released model's 16.16. | **accept** | R062 already noted the drift (R059: the clean rows). | Claim wording is comparative (R063). |
+| W3 | "Plausible-wrong" as implemented: wrong codes drawn at T = 1 from the frozen released model given the canonical coarser levels (canonical code excluded); the root is a context-free draw from the released unigram, canonical root excluded. No typicality filter; not on-policy. | **accept** | `src/ncmr/w2m.py:189-196`, `:235-241`; the audit's executed traces. | The claim states this definition (R063). |
+| W4 | Equal `realized_disagreement` across arms is not sufficient evidence of identical slots (it keeps aggregates only; a permutation of rows keeps it equal). Identical batches, clean rows and masks are shown by the code and by executed traces of the production training loop. | **accept** | `tests/test_audit12_matched.py` (counterexample and the 4-step traces at seeds 1-3). | My report to the user cited the equal disagreement as showing the same slots; R063 says the evidence is the code and the traces. |
+| W5 | W2C replicates a training-signal effect; the level localization (R058) is one seed, so W2C alone is not a replicated finding about what the levels encode. | **accept** | Matches R062's scope note. | W2M-GR registered (`733ea77`) to replicate the localization before a criterion-(c) claim; its code is in PR (to come). |
+| W6 | The registered duplicate measure counts equal adjacent BPE ids per 1k adjacent pairs (`scripts/w1_sample_stats.py`), not `eval_text`'s word duplicates per 1k words (`dup_eval` in the results). M2's `rep_2` is about 0.014 lower: do not say every repetition measure worsens. | **accept** | The audit's independent integer counts match `results/w2c1_sample_stats.json`. | The claim says "adjacent BPE duplicates per thousand pairs" and makes no general repetition statement (R063). |
+| W7 | R062's per-level dNLL range 0.18-0.64 is of the seed means, not of every seed (seed 1's L3 is 0.14). The saved per-level values are rounded to 0.01. | **accept** | The audit's table. | Corrected in R063 (the log is append-only). |
+| W8 | Limits: scorer revision hashes and the MAUVE reference features are not pinned in the run manifests, so their byte identity across the two notebooks cannot be certified from saved scalars; M2's extra proposal forward is counted in the FLOP proxy and the arms are not equal-compute; M2's samples are ~1.0 token shorter after re-encoding; no temperature-, frequency- or length-matched control exists. | **partial** | True as limits; nothing indicates a mismatch: both notebooks ran the same code and assets (manifests identical), and every paired group agrees in sign under both scorers. Not actionable for completed runs. | Stated as limits in R063 and in the claim's scope. |
+
+No reading changes. W2C stage 1's registered readings stand; the claim's wording is narrowed (R063).

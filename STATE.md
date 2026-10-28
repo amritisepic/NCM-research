@@ -1,12 +1,18 @@
 # STATE — read this first
 
-_Last updated: 2026-10-28, W2C stage 1 read (R062; PR 17 merged). Before that, deep audit 11 (R061: E1 claim audit; claim drafted for the user). Before that, session 9 continued (R058-R060: W2M-G, M3-0, E1b read). Before that, session 10 (R057: R056 package registered, built, merged in PR 16 after Codex and deep audit 10; user bought 100 CU). Before that, session 9 (R052-R055; plan `docs/plan_2026-10-27.md`; handoff `docs/prompts/handoff_2026-10-27.md`). Branches: `claude/ncm-research` (notebooks clone it) and
+_Last updated: 2026-10-28, deep audit 12 (R063: W2C claim, no P0/P1; W2M-GR registered, code on `claude/wip-w2mgr`). Before that, W2C stage 1 read (R062; PR 17 merged). Before that, deep audit 11 (R061: E1 claim audit; claim drafted for the user). Before that, session 9 continued (R058-R060: W2M-G, M3-0, E1b read). Before that, session 10 (R057: R056 package registered, built, merged in PR 16 after Codex and deep audit 10; user bought 100 CU). Before that, session 9 (R052-R055; plan `docs/plan_2026-10-27.md`; handoff `docs/prompts/handoff_2026-10-27.md`). Branches: `claude/ncm-research` (notebooks clone it) and
 `claude/ncm-phase2-analysis-finetune-pkh64d` (older mirror). Repo is PUBLIC: commit nothing identifying (no
 personal names/emails, no absolute local paths, no session links, no credentials). Goals, success bar and rules:
 `docs/brief.md`._
 
 ## Current phase
-**Latest (R062, 2026-10-28):** **W2C stage 1: damage replicates and the dissociation holds (registered readings).**
+**Latest (R063, 2026-10-28):** **deep audit 12 (W2C claim): no P0 / P1; every R062 number reproduces; executed traces
+confirm the matched comparison.** Claim wording narrowed (comparative to M3; "plausible-wrong" defined as frozen
+released-model draws given canonical coarser levels; each seed at least +18.36). Not a finding about the levels until
+the localization replicates: **W2M-GR registered** (`733ea77`, user-approved; W2M-G (i)-(iii) on the seed 1-3
+checkpoints, thresholds fixed in advance, ~2-2.5 CU on L4). Its code is being built on `claude/wip-w2mgr`; Codex PR
+and a delta deep audit before launch.
+**R062 (2026-10-28):** **W2C stage 1: damage replicates and the dissociation holds (registered readings).**
 M2 - M3 Gen-PPL (GPT-2 large) = +18.36 / +19.51 / +18.76 at seeds 1-3 (mean 18.88, s_p 0.56), TinyStories-33M +29.8,
 duplicates +12.3 per 1k, MAUVE -0.41, all 16 sample groups M2 > M3 in every seed; clean NLL M2 - M3 = +4.03
 nats/window (0.5%, same sign every seed). **Believed to meet criterion (c) as registered; not claimed**: the user is
@@ -179,8 +185,8 @@ reassignment kill gated on W2M-G, E1b (continue sampling on censored items, ~1.5
 - CPU: ~13.5 CPU-h before session 5; session 5 ~1.2 h (Sudoku paired rerun, test suites).
 
 ## Next 3 actions
-1. **User: the W2C criterion-(c) result (R062)** — told before any further compute is spent on it. Then the W2C claim
-   audit (Tier 2: recomputation and the claim's scope; trainer and `scripts/analyze_w2c.py` were audited in audit 10).
+1. **W2M-GR (R063):** finish the code on `claude/wip-w2mgr`, Codex PR, delta deep audit, merge; then the user launches
+   `w2mgr_eval` (L4, seeds 1-3). Read with `scripts/analyze_w2mgr.py`. The W2C claim (wording in R063) waits for it.
 2. **User: the E1 criterion-(c) claim** (`docs/claim_e1_2026-10-28.md`, R061): claim it as scoped, as supporting
    evidence only, or hold.
 3. **User: next compute (~95 CU expected).** Options: W2M-G localization on the seed 1-3 checkpoints (eval-only, ~2 CU

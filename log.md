@@ -1556,3 +1556,35 @@ A100-min, ~21 CU at 5.3 CU/h (~26 at the ~1.25x burn). Raw results: commit `97b2
     domain, one model. Criterion (c) asks for a finding about what the levels encode. W2C replicates a training-signal
     effect (which wrong codes damage generation); the level localization (R058: damage builds over levels 2-5, not
     L1) is one seed. Replicating R058's localization on the seed 1-3 checkpoints would tie the claim to the levels.
+
+## R063 — Deep audit 12 (W2C claim): no P0 / P1; every R062 number reproduces; the claim's wording is narrowed; W2M-GR registered to replicate the localization (2026-10-28; review)
+- Codex deep audit of W2C stage 1 at `fc2a7a5` (local Codex CLI, gpt-6.1-sol / ultra; `docs/reviews/codex_audit12.md`,
+  branch `codex/audit12` at `2271125`; brief `docs/prompts/codex_audit12_w2cclaim.md`; triage
+  `docs/reviews/triage_audit12_2026-10-28.md`). Python ran in its sandbox; its 45 tests pass here on the audited commit
+  and on `claude/ncm-research` (ported unchanged).
+- **No P0 / P1. Registered readings stand: damage replicates, dissociation holds.** Independent recomputation agrees
+  with R062 at its printed precision (duplicates and entropy recounted from the saved samples). The readings code
+  matches the registration; its threshold tests were already complete. Executed CPU traces of the production training
+  loop (4 steps at seeds 1-3, dropout on) show identical batches, targets, clean rows, masks and RNG states across M2
+  and M3; M2's proposals do not touch those streams. Every masked slot is wrong in both arms. Evaluation: same items,
+  sample seeds, fp32 / TF32 off, no autocast leak, val = even items; code at both notebooks' SHAs equals `5ad74b5`;
+  all six run manifests are identical apart from the arm and the seed.
+- Corrections to R062 (the log is append-only): the per-level dNLL range 0.18-0.64 is of the seed means (seed 1's L3
+  is 0.14). Equal `realized_disagreement` across arms is consistent with, but does not prove, identical slots; the
+  evidence for identical slots is the code and the executed traces.
+- **Claim wording after the audit** (not claimed; the user decides, after W2M-GR):
+  "Under one continuation protocol for the released TinyStories NCM (600 steps, 25% clean rows, W1's per-level rates,
+  one mask stream), replacing masked codes with wrong codes drawn from the frozen released model given the canonical
+  coarser levels (the root: a released-unigram draw, canonical root excluded) caused additional generation degradation
+  relative to uniform-wrong replacement in the same slots. Across three training seeds, M2 - M3 Gen-PPL was +18.9 under
+  GPT-2 large (each seed at least +18.36; pooled seed SD 0.56) and +29.8 under TinyStories-33M, with MAUVE -0.41 and
+  adjacent BPE duplicates +12.3 per thousand pairs, while canonical teacher-forced NLL was higher by only 4.0
+  nats/window (0.53%), positive in every seed."
+  Limits: comparative only (M3 itself is above the released model, R059); no temperature-, frequency- or length-matched
+  control, so model-specific plausibility is not shown to be the unique cause; not equal compute (M2's proposal
+  forward); scorer revisions and MAUVE features not pinned in the manifests; one model, domain and protocol. Not a
+  finding about what the levels encode until the localization replicates.
+- **W2M-GR registered** (`733ea77`, user-approved): W2M-G's (i)-(iii) on W2C's seed 1-3 M2 / M3 checkpoints, thresholds
+  fixed before any measurement (localization replicates iff, in every seed under GPT-2 large, pi_2 <= 0.10,
+  pi_6 >= 0.30, sigma_6 <= 0.20 and the interaction >= 0.20 at cuts 4 and 6, and the same on TinyStories-33M seed
+  means). ~2-2.5 CU on L4. Code being built on `claude/wip-w2mgr` (Codex PR and a delta deep audit before launch).
