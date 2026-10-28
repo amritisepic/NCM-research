@@ -16,7 +16,8 @@ sample and score.
 
 Resumable by cell: every finished cell (metrics, sample ids, groups), bank and per-window array is cached under
 <out>/cells/; a rerun skips them and reproduces result.json. A partial result.json ("complete": false) is written as
-cells finish. <out>/manifest.json pins the protocol and the SHA-256 of the checkpoints: a different one is refused.
+cells finish. <out>/manifest.json pins the protocol, the SHA-256 of the checkpoints, the released assets and val data, and the device /
+GPU / runtime: a run directory made under any other is refused.
 """
 from __future__ import annotations
 
@@ -61,6 +62,7 @@ class Env:
     evaluate: object
     ckpt_sha256: dict = field(default_factory=dict)
     runs: dict = field(default_factory=dict)
+    identity: dict = field(default_factory=dict)      # released assets, val data, device and runtime (pinned by manifest.json)
 
     def prefix_emb(self, b):
         return self.tok.encoder.wte(torch.full((b, 1), G.EOS, dtype=torch.long, device=self.device))
@@ -141,7 +143,20 @@ def load_env(run_root, seed, device, P=G.Protocol()):
         del ck
     L0 = B.ckpt_extra["inference"]["level0_unigram"].float().to(device)
     return Env(device, tok, B.pre_tokenizer, L0, nets, flag, clean_windows(P, device), make_evaluate(B.pre_tokenizer, device),
-               sha, runs)
+               sha, runs, run_identity(device))
+
+
+def run_identity(device):
+    """What else a cached cell depends on (Codex PR 16): the released generator, tokenizer, unigram (in generator.pt) and BPE
+    files, the validation windows, and the device / GPU / runtime that draws the random streams (CPU and CUDA generators
+    give different streams for the same seed, so a cross-device continuation would break the common random numbers)."""
+    from ncmr.data import DATA_DIR
+    art = os.path.join(ROOT, "artifacts", "tinystories")
+    return {"released_sha256": {n: sha256_file(os.path.join(art, n)) for n in
+                                ("config.yaml", "tokenizer.pt", "generator.pt", "bpe_vocab_8192.pickle", "bpe_merges_8192.pickle")},
+            "val_sha256": sha256_file(os.path.join(DATA_DIR, "valid_bpe_8192.pickle")),
+            "device": str(device), "gpu": torch.cuda.get_device_name() if str(device).startswith("cuda") else None,
+            "torch": torch.__version__, "cuda": torch.version.cuda}
 
 
 # ------------------------------------------------------------------------------------------------ cells
@@ -382,17 +397,18 @@ def protocol_block(env, P, seed):
             "clean_bank": f'examples("val", {P.n_clean})', "corrupted_bank": f"plausible_wrong, seed {P.corrupt_seed}, W1 rates",
             "sampler": "ancestral, T=1, Gumbel-max, one generator per group seeded with the group seed (common random numbers)",
             "ci": "percentile bootstrap over windows, both banks resampled", "scorers": SCORER_IDS,
-            "precision": "fp32, TF32 off, eval mode", "torch": torch.__version__}
+            "precision": "fp32, TF32 off, eval mode", "torch": torch.__version__, "identity": env.identity}
 
 
 def check_manifest(out_dir, env, P, seed):
-    man = {"protocol": P.to_json(), "run_seed": seed, "ckpt_sha256": env.ckpt_sha256}
+    man = {"protocol": P.to_json(), "run_seed": seed, "ckpt_sha256": env.ckpt_sha256, "identity": env.identity}
     path = os.path.join(out_dir, "manifest.json")
     if os.path.exists(path):
         with open(path) as f:
             old = json.load(f)
         if old != json.loads(json.dumps(man)):
-            sys.exit("this run directory was made with a different protocol, seed or checkpoint (manifest.json): use a fresh --run_dir")
+            sys.exit("this run directory was made with a different protocol, seed, checkpoint, released asset, val data, device or runtime "
+                     "(manifest.json): use a fresh --run_dir")
     else:
         write_json(path, man)
 

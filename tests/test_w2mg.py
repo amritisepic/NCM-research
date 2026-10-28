@@ -818,3 +818,33 @@ def test_load_env_reads_the_four_checkpoints_and_m4_flag(tmp_path, monkeypatch):
     (tmp_path / "L_ts_m0_uniform_s0" / "final.pt").unlink()
     with pytest.raises(SystemExit):
         S.load_env(str(tmp_path), 0, "cpu", G.Protocol(n_clean=2))
+
+
+# ------------------------------------------------------------------------------------------------ Codex PR 16 (id 4396360878)
+@pytest.mark.parametrize("change", [
+    {"device": "cuda", "gpu": "NVIDIA A100-SXM4-40GB"},                     # a cross-device continuation (other random streams)
+    {"released_sha256": {"generator.pt": "other"}},                          # replaced released generator / unigram
+    {"val_sha256": "other"},                                                 # other validation windows
+    {"torch": "0.0.0"},                                                      # other runtime
+])
+def test_resume_refuses_a_changed_released_asset_device_or_runtime(world, fake_scorers, tmp_path, change):
+    w = world
+    out = str(tmp_path / "m")
+    env = make_env(w)
+    env.identity = {"released_sha256": {"generator.pt": "g"}, "val_sha256": "v", "device": "cpu", "gpu": None, "torch": "t"}
+    S.run(env, out, SMALL, 0, _quiet)
+    env2 = make_env(w)
+    env2.identity = {**env.identity, **change}
+    with pytest.raises(SystemExit, match="manifest"):
+        S.run(env2, out, SMALL, 0, _quiet)
+    env3 = make_env(w)
+    env3.identity = dict(env.identity)
+    S.run(env3, out, SMALL, 0, _quiet)                                       # the same identity still resumes
+
+
+def test_run_identity_hashes_the_released_assets_val_data_device_and_runtime():
+    ident = S.run_identity("cpu")
+    assert set(ident["released_sha256"]) == {"config.yaml", "tokenizer.pt", "generator.pt", "bpe_vocab_8192.pickle",
+                                             "bpe_merges_8192.pickle"}
+    assert all(len(v) == 64 for v in ident["released_sha256"].values()) and len(ident["val_sha256"]) == 64
+    assert ident["device"] == "cpu" and ident["gpu"] is None and ident["torch"] == torch.__version__

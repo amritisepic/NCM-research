@@ -1,0 +1,7 @@
+# Triage of Codex's review of PR 16 (R056 package: W2M-G, M3-0, E1b, W2C stage 1, L1R)
+
+Reviewed commit `cf684ff`. Verdicts: **accept** (finding correct, acted on), **partial**, **reject** (with evidence).
+
+| Comment id | Finding | Verdict | Evidence | Action |
+|---|---|---|---|---|
+| 4396360878 | P1: `scripts/w2mg_eval.py` reuses cached cells when only the protocol, seed and the four fine-tuned checkpoint hashes match; the released generator, tokenizer, unigram, BPE files, validation windows, sampling device and torch runtime are not pinned, so a resume under other assets or on another device (CPU vs CUDA generators give other streams for the same seed) would mix inputs and break the registered common random numbers. | **accept** | Code path on `cf684ff`: `check_manifest` builds `{"protocol", "run_seed", "ckpt_sha256"}` only; `load_env` hashes no released file and records no device. | `run_identity` (SHA-256 of the five released TinyStories files and `valid_bpe_8192.pickle`, device, GPU name, torch and CUDA versions) is stored on `Env`, pinned in `manifest.json` and reported in the result's protocol block. Tests `test_resume_refuses_a_changed_released_asset_device_or_runtime` (4 cases: device, released generator, val data, torch) and `test_run_identity_hashes_the_released_assets_val_data_device_and_runtime`; removing the identity from the manifest makes all 4 cases fail (mutation killed). |
