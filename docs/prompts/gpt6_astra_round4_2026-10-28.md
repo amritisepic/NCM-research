@@ -47,6 +47,9 @@ Any one, met precisely, pre-registered; a training-arm claim needs 3 fresh seeds
   batch-1 wall-clock saving.
 
 Status: (c) has two candidates (section 4); (a), (b) and (d) have none ((d) is closed on text for Jacobi decoding).
+**New this round:** the user can buy another **500-1000 CU** if a paper-scale experiment warrants it (section 9). That
+reopens from-scratch training at the released model's size, which (a) in particular needs: a gain over a matched NCM
+at equal compute is hard to show by fine-tuning a model that was trained with the baseline recipe.
 If you see a route to a more ambitious result, for example a principle that predicts which training-context
 distributions help or destroy any iterative / multi-scale generator (masked diffusion LMs, VAR-style image models, NCM),
 propose a sharper criterion, say why it would matter more, and estimate how reachable it is.
@@ -212,12 +215,46 @@ falsifiable prediction with a number or a sign; your probability that the predic
      sampler; J2 / J2-F; the Sudoku analogue).
 4. **Then, against the best direction, argue the opposite:** is consolidating C-E1 and C-W2C and writing them up a
    better use of the time than any new direction? Say which you would do and why.
+5. **Three budget tiers (section 9).** Give the best programme for each: (T0) the ~96 CU we have; (T1) +500 CU; (T2)
+   +1000 CU. For T1 and T2: what experiment the money buys that T0 cannot (name the arms, the matched control, the seeds,
+   the training protocol and its EFLOP, and the CU at our measured throughput); which criterion it targets; your
+   probability of a clean positive result; what we learn if it fails; and the gate it must pass at T0 first (a kill test
+   at tier L or tier M) before any money is spent. Then say plainly whether the purchase is warranted, and at which
+   tier. "Not warranted" is an acceptable answer; we would rather not buy compute for a long shot.
+6. **A specific question we want examined: is the fine-level redundancy load-bearing?** E1 (anomaly 11) shows the
+   model's samples of levels 8-11 land on the right text with probability hundreds of nats above the canonical path's,
+   and the decoder tolerates the generator's own codes (anomaly 14). One reading: the redundancy is waste (it inflates
+   code NLL and spends training signal on the tokenizer's arbitrary choice; removing it, by a tokenizer with fewer /
+   smaller fine levels or a canonicalizing loss, would sharpen likelihood and might allow fewer levels, ~0.73x NFE or
+   less). The opposite reading: the redundancy is what makes factorized, parallel sampling within a level work (many
+   joint configurations decode correctly, so independent per-position errors are absorbed), and an injective tokenizer
+   would improve likelihood while degrading samples. Which is right, what predicts which, what eval-only measurement on
+   the released models (<= 2 CU) separates them, and what it implies for tokenizer design for any parallel
+   coarse-to-fine generator. If the answer favours redesigning the tokenizer, cost the paper-scale version (a new
+   36.4M tokenizer plus a generator from scratch) against T1 / T2.
 
 ## 9. Constraints (for Part C only)
 - **Compute:** ~96 CU after W2M-GR (Colab; A100-40GB ~5.3 CU/h, L4 1.71 CU/h; our estimates now hold within ~25%). A
   600-step tier-L fine-tune of the 88.6M model costs ~2.7 CU (uniform) to ~4.6 CU (with proposal forwards) per seed;
-  eval-only passes over the released models ~1-2 CU. Any single run > 15 CU needs the user's approval. A direction that
-  needs more must say how much more and why it is worth it (the user has raised the budget before).
+  eval-only passes over the released models ~1-2 CU. Any single run > 15 CU needs the user's approval.
+- **Optional purchase: +500 or +1000 CU**, for a paper-scale experiment only, and only if it is warranted (section 8.5).
+  Cost facts for planning, all [ours] unless marked:
+  - **Measured training throughput** of the 88.6M TinyStories generator on an A100-40GB: **37.9 TFLOPS effective**
+    (bf16 autocast, no `torch.compile`, micro-batch 64; 52 PFLOP of training per 600-step run of 256 windows per step), i.e. ~26 PFLOP of
+    training per CU. Compilation, larger micro-batches or an H100 might raise it 1.5-2x [speculation]; any plan should
+    say which throughput it assumes.
+  - **The paper's full TinyStories generator training** (88.6M, 50k steps x 2048 windows): ~34 EFLOP, i.e. **~650-1,300
+    CU per run** (at 75 vs 38 TFLOPS). One run; no seeds fit even in T2.
+  - **The paper's ablation protocol** (88.6M from scratch, 10k steps x 1024 windows, the setting of its corruption
+    ablation, Gen-PPL ~48 -> ~19 [source]): ~3.5 EFLOP, **~70-135 CU per run**. Two arms x 3 seeds = 6 runs, ~420-810 CU:
+    the natural T1 / T2 experiment for a from-scratch matched comparison.
+  - **Tier M** (25M generator from scratch on the released tokenizer, 15k x 256): ~0.41 EFLOP, ~8-16 CU per run at our
+    throughput. Our tier-M models were far below the released quality, so tier M is a gate, not a claim.
+  - **Sudoku-hard** (25.5M): a fine-tune of 5000 x 256 is 0.08 EFLOP (~2-3 CU); the paper's from-scratch Sudoku budget is
+    unknown to us, likely a few tens of CU [speculation].
+  - **A new 36.4M tokenizer**: cost unknown to us; estimate it if your plan needs one.
+  - Other generators (e.g. a masked-diffusion LM trained on TinyStories at the same protocol, to test whether a finding
+    transfers beyond NCM) cost roughly the same per EFLOP; we have no such code yet.
 - **Hardware besides Colab:** a laptop RTX 4050 (6 GB) for evaluation and small jobs; CPU.
 - **Models:** fine-tune or evaluate the released checkpoints; no new 36M tokenizer or 88.6M generator from scratch;
   small from-scratch models (<= ~25M generator, <= ~10M tokenizer) are affordable but ours were far below the released
@@ -225,7 +262,9 @@ falsifiable prediction with a number or a sign; your probability that the predic
 - **Process:** every comparison pre-registered (prediction, overturning result, reading), one axis at a time, matched
   data order and seeds, fp32 evaluation, Codex review plus a deep audit before any GPU run whose code changed (~1 day of
   latency per new piece of code). Null results are reported.
-- **Timeline:** about three weeks to a write-up; realistically one or two new pieces of code.
+- **Timeline:** about three weeks to a write-up; realistically one or two new pieces of code. A T1 / T2 programme of
+  six ~70-135-CU runs is ~80-150 A100-hours: feasible in parallel Colab sessions within two weeks, but only if its code
+  is built, reviewed and gated in the first week. Say whether the write-up should wait for it.
 
 ## 10. Part D — Hostile review and the paper (short)
 1. For C-E1 and C-W2C: a verdict (claim as worded / narrow it / hold), the strongest single sentence a hostile reviewer
@@ -239,8 +278,9 @@ falsifiable prediction with a number or a sign; your probability that the predic
 ## 11. Output format
 - Part A: at most 15 lines plus the per-finding novelty table.
 - Part B: the numbered idea list (>= 25), each labelled with its move(s), anomalies used, prediction and probability.
-- Part C: the theme list, the ranking table, two or three deep dives, then the consolidate-vs-explore argument.
+- Part C: the theme list, the ranking table, two or three deep dives, the consolidate-vs-explore argument, the three
+  budget tiers with a purchase verdict, and the redundancy question.
 - Part D: at most 20 lines.
-- End with one queue for the ~96 CU: item, CU, gate, what it decides.
+- End with one queue per budget tier (T0 ~96 CU; T1 +500; T2 +1000): item, CU, gate, what it decides.
 - Dense: mechanisms, numbers, experiments; no general encouragement. Being boldly wrong with a clear prediction beats
   being vaguely safe.
