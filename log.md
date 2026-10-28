@@ -1516,3 +1516,6 @@ burn). `scripts/analyze_e1b.py` -> `results/e1b_analysis.json`.
 - **Claim:** drafted in `docs/claim_e1_2026-10-28.md` for the user. Scope: the registered items; levels 8 and finer
   given canonical levels 0-7; modelwise 95%; Monte Carlo error only; the 0.90 version only in Sudoku; nothing about
   generation quality; prior art Cao and Rimell 2021. Not claimed until the user decides.
+- Update (same day): Codex's review of PR 17 at `85e304f` found no issues, in one round. The first request sat at
+  "Running" for 90 min; a re-request completed in 2 min. The merge gate passes. Not merged: W2C stage 1 is running, and
+  no code merges until the user reports it finished.

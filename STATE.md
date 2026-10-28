@@ -8,7 +8,7 @@ personal names/emails, no absolute local paths, no session links, no credentials
 ## Current phase
 **Latest (R061, 2026-10-28):** **deep audit 11 (E1 claim): no P0; every R054 / R060 number recomputes.** One P1
 (A11-1: `scripts/analyze_e1b.py` did not check the e1b records against the pinned plan; R060's reading is unchanged) is
-fixed on PR 17, **not merged** until the user confirms no Colab run is mid-flight. **The E1 criterion-(c) claim is
+fixed on PR 17 (Codex review clean, gate passes), **not merged** until the user reports W2C finished. **The E1 claim is
 drafted for the user** (`docs/claim_e1_2026-10-28.md`): levels 8 and finer given canonical levels 0-7, the registered
 items, modelwise 95%, Monte Carlo error only. Resampling items leaves thin text margins (5% quantiles 0.82 TinyStories,
 0.80 WMT14).
