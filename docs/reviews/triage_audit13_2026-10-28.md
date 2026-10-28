@@ -13,6 +13,7 @@ pass after the fix.
 | Q2 note | The default W2M-G path now records `arms`, so an unfinished pre-PR-18 W2M-G run directory would be refused (exact manifest comparison). | **accept** (note) | No such directory is in use: W2M-G finished (R058). | None. |
 | Q4 note | `EPS = 1e-12` widens inclusive bounds and narrows the strict `< 0.05` overturn bound by 1e-12. | **accept** (note) | Far below any resolvable difference between estimated shares; the audit's boundary tests characterise it. | None. |
 | numbers | W2C's six sanity references (G(M2_s), G(M3_s)) and R062's paired contrasts recompute exactly. | **accept** | Agrees with R062 and audit 12. | None. |
+| pins | The ported `tests/test_audit13_{numbers,analysis}.py` pinned SHA-256 digests of the raw result bytes as checked out on Windows (CRLF), so they fail on an LF checkout (Linux, Colab, or the original LF copies) of the same content. | **accept** (test fix) | Each old digest is the CRLF form of git's stored blob (all 13 pins matched); on `claude/ncm-research` 17 tests failed on the LF working copies. | On `claude/ncm-research` after PR 18's merge: the reads normalise CRLF to LF before hashing and the pins are git's stored (LF) digests, as audit 12's tests do. Passes on LF and CRLF checkouts. Codex's own files on `codex/audit13` are unchanged. |
 
 No P0. Everything else in the delta (reduced path identical to the full one on the retained computations, sanity
 reference, notebook wiring and L4 guard, precision) was found correct by source review.

@@ -26,19 +26,19 @@ AN = importlib.util.module_from_spec(MODULE_SPEC)
 MODULE_SPEC.loader.exec_module(AN)
 
 SEED0 = "results/colab/w2mg_eval/w2mg_eval__result.json"
-SEED0_SHA256 = "f32a29cf1a7df0dcb6bf2e2f9d820582571fe17ceb9a7bd7eb1ec497929b4fa7"
+SEED0_SHA256 = "ef78b288a4d702582e858a2cf05753a45f636bd7e7351d70fc44bbf6c8fce393"
 REFERENCE_SHA256 = {
-    (1, "m2"): "54bf7cfd0538faeb2cc32713ded4e2c662572e5e2c97803cacd1e6bde2181a59",
-    (1, "m3"): "e0e2d7c2eb8bdda56afb1709f9cefbaa727030b8adc266fbe9d6f1aa2a66c772",
-    (2, "m2"): "e34cbb08b55442d3c5635c058333827012e9d12f22b4927280abd37303a52061",
-    (2, "m3"): "5d12a8807c977be276e2b254c59b24fe7aea6cd349a8b3f89ba6df1aa6e89725",
-    (3, "m2"): "0e2d1191dbeab52dee34aa8a5978a5e74dda7b7987d1827bdfb6491f3be69582",
-    (3, "m3"): "259ceec06496c0927b2811aabd3aa324f129197d7ed77004318b1f9a7714c94b",
+    (1, "m2"): "d079dc520e2cbc1b93530c3701aafc7e90b99f3b03ec78ad50a9b3423109c989",
+    (1, "m3"): "bd6898e17fc1c3a63363a2ba2bfd97201f296b47da4640b971525a69c644d959",
+    (2, "m2"): "a837c0dd61bdee8413d693700cf844b8f85f9b711a9b7367690051eb3b85829e",
+    (2, "m3"): "f7761c8391762747f18df6848c7a18c081b45d0ad1043409175830d9fbcca15d",
+    (3, "m2"): "33b9c036e6ad57f51469ef5760f840c4d9d03cefcdf8a8672707c600c0fd2a9e",
+    (3, "m3"): "98cf9e5d95c24e07cf88a4869b57e3f888ed6371510d7b73ffb02a0dda54f66c",
 }
 
 
 def read_pinned(relative, digest):
-    raw = (ROOT / relative).read_bytes()
+    raw = (ROOT / relative).read_bytes().replace(b"\r\n", b"\n")  # git's stored bytes on any checkout
     assert hashlib.sha256(raw).hexdigest() == digest, relative
     return json.loads(raw)
 

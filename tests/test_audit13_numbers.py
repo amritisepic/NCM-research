@@ -16,12 +16,12 @@ from conftest import ROOT
 
 # (arm, seed): (result digest, GPT-2 large Gen-PPL recomputed from 16 groups).
 SOURCES = {
-    ("m2", 1): ("54bf7cfd0538faeb2cc32713ded4e2c662572e5e2c97803cacd1e6bde2181a59", 39.790341371937075),
-    ("m2", 2): ("e34cbb08b55442d3c5635c058333827012e9d12f22b4927280abd37303a52061", 41.30791192128558),
-    ("m2", 3): ("0e2d1191dbeab52dee34aa8a5978a5e74dda7b7987d1827bdfb6491f3be69582", 40.56038277086411),
-    ("m3", 1): ("e0e2d7c2eb8bdda56afb1709f9cefbaa727030b8adc266fbe9d6f1aa2a66c772", 21.425413127057226),
-    ("m3", 2): ("5d12a8807c977be276e2b254c59b24fe7aea6cd349a8b3f89ba6df1aa6e89725", 21.8019284403825),
-    ("m3", 3): ("259ceec06496c0927b2811aabd3aa324f129197d7ed77004318b1f9a7714c94b", 21.803127274556942),
+    ("m2", 1): ("d079dc520e2cbc1b93530c3701aafc7e90b99f3b03ec78ad50a9b3423109c989", 39.790341371937075),
+    ("m2", 2): ("a837c0dd61bdee8413d693700cf844b8f85f9b711a9b7367690051eb3b85829e", 41.30791192128558),
+    ("m2", 3): ("33b9c036e6ad57f51469ef5760f840c4d9d03cefcdf8a8672707c600c0fd2a9e", 40.56038277086411),
+    ("m3", 1): ("bd6898e17fc1c3a63363a2ba2bfd97201f296b47da4640b971525a69c644d959", 21.425413127057226),
+    ("m3", 2): ("f7761c8391762747f18df6848c7a18c081b45d0ad1043409175830d9fbcca15d", 21.8019284403825),
+    ("m3", 3): ("98cf9e5d95c24e07cf88a4869b57e3f888ed6371510d7b73ffb02a0dda54f66c", 21.803127274556942),
 }
 DIRS = {"m2": "L_ts_m2_frozen_pw", "m3": "L_ts_m3_uniform_wrong"}
 
@@ -32,7 +32,7 @@ def source_path(arm, seed):
 
 def pinned(arm, seed):
     rel = source_path(arm, seed)
-    raw = (ROOT / rel).read_bytes()
+    raw = (ROOT / rel).read_bytes().replace(b"\r\n", b"\n")  # git's stored bytes on any checkout
     assert hashlib.sha256(raw).hexdigest() == SOURCES[arm, seed][0], rel
     return json.loads(raw)
 

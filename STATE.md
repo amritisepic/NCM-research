@@ -1,6 +1,6 @@
 # STATE — read this first
 
-_Last updated: 2026-10-28, deep audit 12 (R063: W2C claim, no P0/P1; W2M-GR registered, code on `claude/wip-w2mgr`). Before that, W2C stage 1 read (R062; PR 17 merged). Before that, deep audit 11 (R061: E1 claim audit; claim drafted for the user). Before that, session 9 continued (R058-R060: W2M-G, M3-0, E1b read). Before that, session 10 (R057: R056 package registered, built, merged in PR 16 after Codex and deep audit 10; user bought 100 CU). Before that, session 9 (R052-R055; plan `docs/plan_2026-10-27.md`; handoff `docs/prompts/handoff_2026-10-27.md`). Branches: `claude/ncm-research` (notebooks clone it) and
+_Last updated: 2026-10-28, W2M-GR built and merged (R064, PR 18; deep audit 13); `w2mgr_eval` cleared. Before that, deep audit 12 (R063: W2C claim, no P0/P1; W2M-GR registered). Before that, W2C stage 1 read (R062; PR 17 merged). Before that, deep audit 11 (R061: E1 claim audit; claim drafted for the user). Before that, session 9 continued (R058-R060: W2M-G, M3-0, E1b read). Before that, session 10 (R057: R056 package registered, built, merged in PR 16 after Codex and deep audit 10; user bought 100 CU). Before that, session 9 (R052-R055; plan `docs/plan_2026-10-27.md`; handoff `docs/prompts/handoff_2026-10-27.md`). Branches: `claude/ncm-research` (notebooks clone it) and
 `claude/ncm-phase2-analysis-finetune-pkh64d` (older mirror). Repo is PUBLIC: commit nothing identifying (no
 personal names/emails, no absolute local paths, no session links, no credentials). Goals, success bar and rules:
 `docs/brief.md`._
@@ -185,11 +185,10 @@ reassignment kill gated on W2M-G, E1b (continue sampling on censored items, ~1.5
 - CPU: ~13.5 CPU-h before session 5; session 5 ~1.2 h (Sudoku paired rerun, test suites).
 
 ## Next 3 actions
-1. **W2M-GR (R063):** code in PR 18 (`a949044`; Codex review clean, gate passes). **Delta deep audit 13 not yet
-   done: the local Codex CLI hit its usage limit on 2026-10-28 ~20:35 UTC (reset ~21:56 UTC)**; brief
-   `docs/prompts/codex_audit13_w2mgr.md`; rerun `scripts/review/codex_local.sh audit audit13 <brief>` from the PR
-   head. PR 18 is not merged and `w2mgr_eval` is not cleared until audit 13 is triaged. Then the user launches
-   `w2mgr_eval` (L4, seeds 1-3); read with `scripts/analyze_w2mgr.py`. The W2C claim (wording in R063) waits for it.
+1. **User (Colab): launch `w2mgr_eval`** (R064: PR 18 merged at `17a4bf4` after Codex x2 and deep audit 13, A13-1
+   fixed). L4 only, seeds 1-3, ~2-2.5 CU; same Drive as the `w2c1_*` notebooks. Then copy `results/colab/w2mgr_eval/`
+   and run `python scripts/analyze_w2mgr.py`. The W2C claim (wording in R063) waits for its reading. Merge no code
+   while it runs.
 2. **User: the E1 criterion-(c) claim** (`docs/claim_e1_2026-10-28.md`, R061): claim it as scoped, as supporting
    evidence only, or hold.
 3. **User: next compute (~95 CU expected).** Options: W2M-G localization on the seed 1-3 checkpoints (eval-only, ~2 CU

@@ -1588,3 +1588,22 @@ A100-min, ~21 CU at 5.3 CU/h (~26 at the ~1.25x burn). Raw results: commit `97b2
   fixed before any measurement (localization replicates iff, in every seed under GPT-2 large, pi_2 <= 0.10,
   pi_6 >= 0.30, sigma_6 <= 0.20 and the interaction >= 0.20 at cuts 4 and 6, and the same on TinyStories-33M seed
   means). ~2-2.5 CU on L4. Code being built on `claude/wip-w2mgr` (Codex PR and a delta deep audit before launch).
+
+## R064 — W2M-GR built and merged (PR 18): Codex clean in two rounds; deep audit 13 found one P1 in the analyzer's admission checks (A13-1), fixed; `w2mgr_eval` cleared to launch (2026-10-28; build / review)
+- Registered at `733ea77` before any code or run (R063). Code: `scripts/w2mg_eval.py --arms m2,m3` (released + M2 + M3
+  only; W2M-G's (i)-(iii) unchanged; no M0 / M4 / (iv); the arm set in the manifest and the protocol block); the sanity
+  reference for seed s >= 1 is W2C's final-eval GPT-2 large Gen-PPL read from `results/colab/w2c1_*`;
+  `scripts/analyze_w2mgr.py` validates the three per-seed results and computes the registered readings; notebook
+  `w2mgr_eval` (L4 only, whole-word guard; seeds 1-3; `{R}/w2mgr_eval_s<s>`).
+- Review: Codex PR review clean at `a949044` and, after the fix, at `b550b3b`. **Deep audit 13** (delta, at `a949044`;
+  `docs/reviews/codex_audit13.md`, triage `docs/reviews/triage_audit13_2026-10-28.md`; the first attempt hit the Codex
+  usage limit and was rerun after the reset): no P0; **A13-1 (P1, accepted, reproduced)**: the analyzer accepted results
+  that declare a test-split clean bank, a mislabelled cut, other replay seeds or fewer than 8 groups. Fixed in `b550b3b`
+  (protocol descriptions and every cell's spec pinned, 8 consistent group vectors required, readings from shares
+  recomputed from the cells); audit tests ported (pass; their 4 strict xfails fail on `a949044`); 8 mutations killed.
+  Audit 13's ported tests pinned CRLF checkout bytes and failed on LF copies of the same files: repinned to git's stored
+  bytes (test-only fix on `claude/ncm-research`).
+- Merged at `17a4bf4`; 356 tests pass on the merged branch (W2M-G, W2M-GR, audits 12-13, R056 build).
+- **Cleared to launch: `w2mgr_eval`** (L4, seeds 1-3, ~20-25 L4-min per seed, cap 40; ~2-2.5 CU). It reads W2C's
+  seed 1-3 `final.pt` from the same Drive `runs/` folder as the `w2c1_*` notebooks. Read with
+  `python scripts/analyze_w2mgr.py` after copying `results/colab/w2mgr_eval/`.
