@@ -1,0 +1,77 @@
+{
+ "run": "w2mgr_eval",
+ "gpu": "NVIDIA L4",
+ "finished_utc": "2026-10-28T23:43:41Z",
+ "git_sha": "46b0470745160f286be022e1dc46dacdc8125956",
+ "git_shas_all_sessions": [
+  "46b0470745160f286be022e1dc46dacdc8125956"
+ ],
+ "sessions": {
+  "w2mgr_eval_s1": [
+   {
+    "event": "start",
+    "git_sha": "46b0470745160f286be022e1dc46dacdc8125956",
+    "utc": "2026-10-28T22:48:11Z",
+    "gpu": "NVIDIA L4",
+    "cmd": "python scripts/w2mg_eval.py --run_root {R} --run_dir {R}/w2mgr_eval_s{S} --seed {S} --arms m2,m3",
+    "seed": 1,
+    "local_data_copy": false,
+    "micro_batch_64": false,
+    "had_ckpt": false,
+    "last_logged_step": null
+   },
+   {
+    "event": "end",
+    "git_sha": "46b0470745160f286be022e1dc46dacdc8125956",
+    "utc": "2026-10-28T23:07:04Z",
+    "exit": 0,
+    "minutes": 18.88,
+    "last_logged_step": null
+   }
+  ],
+  "w2mgr_eval_s2": [
+   {
+    "event": "start",
+    "git_sha": "46b0470745160f286be022e1dc46dacdc8125956",
+    "utc": "2026-10-28T23:07:04Z",
+    "gpu": "NVIDIA L4",
+    "cmd": "python scripts/w2mg_eval.py --run_root {R} --run_dir {R}/w2mgr_eval_s{S} --seed {S} --arms m2,m3",
+    "seed": 2,
+    "local_data_copy": false,
+    "micro_batch_64": false,
+    "had_ckpt": false,
+    "last_logged_step": null
+   },
+   {
+    "event": "end",
+    "git_sha": "46b0470745160f286be022e1dc46dacdc8125956",
+    "utc": "2026-10-28T23:25:34Z",
+    "exit": 0,
+    "minutes": 18.5,
+    "last_logged_step": null
+   }
+  ],
+  "w2mgr_eval_s3": [
+   {
+    "event": "start",
+    "git_sha": "46b0470745160f286be022e1dc46dacdc8125956",
+    "utc": "2026-10-28T23:25:34Z",
+    "gpu": "NVIDIA L4",
+    "cmd": "python scripts/w2mg_eval.py --run_root {R} --run_dir {R}/w2mgr_eval_s{S} --seed {S} --arms m2,m3",
+    "seed": 3,
+    "local_data_copy": false,
+    "micro_batch_64": false,
+    "had_ckpt": false,
+    "last_logged_step": null
+   },
+   {
+    "event": "end",
+    "git_sha": "46b0470745160f286be022e1dc46dacdc8125956",
+    "utc": "2026-10-28T23:43:41Z",
+    "exit": 0,
+    "minutes": 18.11,
+    "last_logged_step": null
+   }
+  ]
+ }
+}
