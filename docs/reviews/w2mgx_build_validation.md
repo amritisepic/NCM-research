@@ -28,7 +28,12 @@ remain in Drive `runs/`. The collector also retains per-window JS/rho arrays for
 - New interrupted-session cap regression: 1 failed in 2.05s before the fix. An exhausted unclosed session
   now persists its charged time before refusing resume, so the notebook recognizes and cleans up the cap.
 - Post-fix cap, release-order, notebook and provenance checks: 55 passed, 76 deselected in 4.00s.
-- The final full CPU suite on the settled code is pending its serialized execution slot.
+- Final full CPU suite on the settled code: **1072 passed, 32 warnings in 617.66s (0:10:17)**; no
+  skipped tests. Command: `python -m pytest tests --ignore=tests/_deps -q`, with CUDA disabled and
+  `tests/_deps`, `tests` and `src` on `PYTHONPATH`. The warnings arise in existing degenerate synthetic
+  metric fixtures. Test assets were available; no download or experiment run was needed.
+- Tested tree: `0d3cb05c48a8d98d97c3fc586f21b2d14431aa65`. Sanitizing the three unpublished commit
+  identities left this tree unchanged. The later validation-record commit changes this document only.
 
 ## Behavior mutations
 
