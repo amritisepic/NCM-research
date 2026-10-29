@@ -80,3 +80,42 @@ R065's numbers are unaffected: audit 14 recomputed them independently.
 
 Before routing roles in a general workflow, build a 5-8-case benchmark from this repository's audited, fixed defects
 (for example A11-1, A13-1, R024) and score each model on bugs found per dollar and false-alarm rate.
+
+## Cheap-tier benchmark, partial (2026-10-29)
+**Setup.**
+- Seven known-bug cases from this repository's audits:
+  - C0 A13-1;
+  - C1 PR 3 resume guard;
+  - C2 W2M flag halo;
+  - C3 TF32 / bf16 MAUVE;
+  - C4 D1 gate tolerance / FLOPs;
+  - C5 E1b cap reset;
+  - C6 A11-1.
+- Each case is a history-free snapshot of the pre-fix commit, with its PR diff. Large PRs are restricted to the relevant
+  files, and `docs/reviews/` is excluded.
+- Same blind prompt, read-only OpenCode, the four models in parallel per case.
+- OpenRouter credit ran out during C2: it reserves credit for in-flight requests. C3-C5 did not run; C2 and C6 are
+  partial.
+
+"Found" means the reviewer named the defect's key element, at any priority.
+
+| Model | C0 | C1 | C2 | C6 | Found / completed | Bench cost (completed runs) |
+|---|---|---|---|---|---|---|
+| GLM-5.3-Flash | no (2 real P2 gaps) | **yes, both parts** (P1 + P2) | no | **yes** (as P2) | 2 / 4 | $0.37 |
+| DeepSeek V4.1 Flash | no (1 real P2 gap) | **yes** (P1) | failed | failed | 1 / 2 | $0.21 |
+| GLM-5.3 | no (docs nit only) | **yes** (as P2) | failed | failed | 1 / 2 | $0.57 |
+| DeepSeek V4 Pro | no (1 real P2 gap) | no | no | failed | 0 / 3 | $1.03 |
+
+The calibration run is not in the table: on C0, Kimi K3.1 Pro found the bug; GLM-5.3 and DeepSeek V4 Pro did not.
+
+**Reading (small n).**
+- No cheap model found C0 (A13-1) or C2 (the halo) in any run. Kimi K3.1 Pro remains the only model that found C0.
+- GLM-5.3-Flash is the best value so far: two of four found, about $0.09 per review, and repeated real minor findings.
+  It tends to rate real defects one level low.
+- DeepSeek V4 Pro found none of its three cases.
+- GLM-5.3's output varied between runs of the same case: two real gaps in the calibration run, one docs nit here.
+- Several models independently found the two open gaps in `scripts/analyze_w2mgr.py` (CI bounds not checked; sanity
+  reference not checked against the W2C files).
+
+**To finish:** about $4 more credit for C2-C6. Run the models sequentially, not in parallel, so that in-flight
+reservations do not exhaust the balance.
