@@ -258,7 +258,8 @@ for key, (what, cap) in {"p": ("M2 plausible wrong", 25), "d": ("PDa reassigned 
                 "shared Drive budget also enforces the registered 60-minute total across P/D/U. Costs use 5.4 CU/hour "
                 "at run time; idle connected runtimes cost extra. All results and code provenance are copied before release.",
         "gpu": "A100-40GB", "units": round(cap * 5.4 / 60, 2), "needs": ["ts", "ckpt"], "seeds": [0],
-        "require_a100": True, "cap": f"{cap} A100-minutes per arm, 60 total, including eval and resumes",
+        "require_a100": True, "release_on_cap": True,
+        "cap": f"{cap} A100-minutes per arm, 60 total, including eval and resumes",
         "cmds": ["python scripts/pd_coverage.py --verify --out results/pd_coverage.json",
                  f"python scripts/run_pilot_budget.py --experiment pd --arm {key} --run_root {{R}} -- "
                  f"python scripts/train_gen.py --config configs/scale/L_ts_pd_{key}.yaml "
@@ -534,6 +535,16 @@ def cell(src: str, kind: str = "code") -> dict:
 
 
 def make(name: str, spec: dict) -> dict:
+    run_source = RUN
+    if spec.get("release_on_cap"):
+        # A cap exits the trainer with 124. Colab's Run all stops at an exception, so collect and release here,
+        # before preserving the incomplete status with the existing error. The ordinary final cells cannot run then.
+        run_source = run_source.replace("        if p.returncode != 0:",
+            "        if p.returncode == 124:\n"
+            + "            exec(" + repr(COLLECT.replace("__NAME__", name)) + ")\n"
+            + "            from google.colab import runtime\n"
+            + "            runtime.unassign()\n"
+            + "        if p.returncode != 0:")
     head = (f"# NCM research run: `{name}`\n\n{spec['desc']}\n\n"
             f"- Recommended GPU: **{spec['gpu']}**. Estimated cost: **{spec['units']} compute units**"
             + (f" (cap: {spec['cap']}).\n" if spec.get("cap") else ".\n") +
@@ -553,7 +564,7 @@ def make(name: str, spec: dict) -> dict:
             *([cell(GUARD)] if spec.get("require_a100") else []),
             *([cell(GUARD_GPU.replace("__GPU__", json.dumps(spec["require_gpu"])))] if spec.get("require_gpu") else []),
             cell(DATA),
-            cell(RUN),
+            cell(run_source),
             cell(COLLECT.replace("__NAME__", name)),
             cell(RELEASE),
         ],

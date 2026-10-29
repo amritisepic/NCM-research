@@ -48,6 +48,14 @@ def trace(tmp_path, arm, until=2, resume=False):
         return x
 
     h.mech.record, h.mech.proposals, h.ns["stream"].batch = record, propose, batch
+    if arm == "pd":
+        original_permute = h.mech.permute_proposals
+
+        def permute(canonical, proposed, plan):
+            assert len(canonical) == h.tc.batch_size and plan.row0 == 0
+            return original_permute(canonical, proposed, plan)
+
+        h.mech.permute_proposals = permute
     h.run(until)
     return h, records, proposals, batches
 

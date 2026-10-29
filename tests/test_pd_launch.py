@@ -55,3 +55,31 @@ def test_pd_generated_notebooks_have_guard_gate_budget_provenance_release():
         assert "'event': 'start'" in source and "'event': 'end'" in source
         assert "runtime.unassign()" in source
         assert maker.RUNS[name]["seeds"] == [0]
+
+
+def test_pd_cap_path_collects_and_releases_before_raising(monkeypatch):
+    import ast
+    import sys
+    from types import ModuleType, SimpleNamespace
+
+    maker = module("pd_cap_notebooks", "notebooks/make_notebooks.py")
+    for arm in "pdu":
+        name = f"pd_L_ts_{arm}"
+        notebook = maker.make(name, maker.RUNS[name])
+        source = next("".join(c["source"]) for c in notebook["cells"] if "CMDS_RAW = list(CMDS)" in "".join(c["source"]))
+        tree = ast.parse(source)
+        cap = next(n for n in ast.walk(tree) if isinstance(n, ast.If) and ast.unparse(n.test) == "p.returncode == 124")
+        error = next(n for n in ast.walk(tree) if isinstance(n, ast.If) and ast.unparse(n.test) == "p.returncode != 0")
+        order = []
+        colab = ModuleType("google.colab")
+        colab.runtime = SimpleNamespace(unassign=lambda: order.append("release"))
+        monkeypatch.setitem(sys.modules, "google.colab", colab)
+
+        def collect(code):
+            assert code == maker.COLLECT.replace("__NAME__", name)
+            order.append("collect")
+
+        ns = {"p": SimpleNamespace(returncode=124), "exec": collect}
+        with pytest.raises(SystemExit, match="command failed"):
+            exec(compile(ast.Module(body=[cap, error], type_ignores=[]), "cap_path", "exec"), ns)
+        assert order == ["collect", "release"]
