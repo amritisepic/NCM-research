@@ -57,6 +57,25 @@ class Protocol:
         return {k: (list(v) if isinstance(v, tuple) else v) for k, v in self.__dict__.items()}
 
 
+GX_SEEDS = (1, 2, 3)
+GX_ARMS = tuple(f"{a}_s{s}" for s in GX_SEEDS for a in ("m2", "m3"))
+
+
+@dataclass(frozen=True)
+class GXProtocol(Protocol):
+    """W2M-GX and W2M-GXa: all six W2C checkpoints in one replay run."""
+    cuts: tuple = (3, 5, 6)
+    model_seeds: tuple = GX_SEEDS
+
+
+def assigned(members):
+    """Explicit assignment for sampling levels 1..11; root sampling remains shared."""
+    members = tuple(members)
+    if len(members) != 11:
+        raise ValueError("the assignment must hold sampling levels 1..11")
+    return lambda j: members[j - 1]
+
+
 # ====================================================================================================== sampler
 class Member:
     """One sampling model: the network, and optionally a FlagVector with a constant flag value `f` that adds f * w to
@@ -359,3 +378,88 @@ def read_iv(met_0_7: dict, met_8_15: dict | None) -> str:
     if met_8_15 is None:
         return "pending replication"
     return "overturned" if any(met_8_15.get(f) for f in hit) else "mixed"
+
+
+def jackknife_ratio(numerator, denominator):
+    """Ratio of group means, with the paired delete-one-group jackknife SE."""
+    a, b = (np.asarray(v, dtype=np.float64) for v in (numerator, denominator))
+    if a.ndim != 1 or a.shape != b.shape or len(a) < 2 or not np.isfinite([a, b]).all():
+        raise ValueError("ratio needs matched finite group vectors")
+    means = np.array([b.mean(), *[np.delete(b, i).mean() for i in range(len(b))]])
+    if np.any(means == 0):
+        raise ValueError("zero ratio denominator, including a jackknife replicate")
+    point = a.mean() / b.mean()
+    loo = np.array([np.delete(a, i).mean() / np.delete(b, i).mean() for i in range(len(a))])
+    se = np.sqrt((len(a) - 1) / len(a) * ((loo - loo.mean()) ** 2).sum())
+    return {"value": float(point), "se": float(se)}
+
+
+def gx_quantities(cells, references):
+    """W2M-GX ratios from public cell metrics. W2M-GXa pairs pi(s,t) with the REVERSE cell M3_t -> M2_s."""
+    out = {}
+    for sc in SCORERS:
+        ll = lambda key: np.asarray(cells[key][f"genppl_{sc}"]["log_loss_per_group"], dtype=np.float64)
+        # Registered delta_s and the cross/single/cut baselines come from W2M-GR, never a new draw.
+        pure = {(a, s): np.asarray(references[s]["cells"][f"{a}_{a}"][f"genppl_{sc}"]["log_loss_per_group"], dtype=np.float64)
+                for s in GX_SEEDS for a in ("m2", "m3")}
+        resampled = {(a, s): ll(f"pure_{a}_s{s}") for s in GX_SEEDS for a in ("m2", "m3")}
+        delta = {s: pure["m2", s] - pure["m3", s] for s in GX_SEEDS}
+        compat, cross, single, cuts = {"m2": {}, "m3": {}}, {}, {}, {}
+        for s in GX_SEEDS:
+            for t in GX_SEEDS:
+                if s == t:
+                    continue
+                key = f"{s}_{t}"
+                for a in compat:
+                    compat[a][key] = jackknife_ratio(ll(f"X_{a}_s{s}_to_{a}_s{t}_c6") - (resampled[a, s] + resampled[a, t]) / 2,
+                                                    (delta[s] + delta[t]) / 2)
+                # W2M-GXa: both crossed cells and both pure baselines belong to (M2_s, M3_t).
+                cross[key] = shares(pure["m2", s], pure["m3", t], ll(f"X_m2_s{s}_to_m3_s{t}_c6"),
+                                    ll(f"X_m3_s{t}_to_m2_s{s}_c6"))
+                if not all(math.isfinite(v) for v in cross[key].values()):
+                    raise ValueError("non-finite cross-seed share")
+            single[str(s)], cuts[str(s)] = {}, {}
+            for level in range(1, 6):
+                up = jackknife_ratio(ll(f"S_up_s{s}_l{level}") - pure["m3", s], delta[s])
+                down = jackknife_ratio(pure["m2", s] - ll(f"S_down_s{s}_l{level}"), delta[s])
+                single[str(s)][str(level)] = {"e_up": up["value"], "e_up_se": up["se"],
+                                              "e_down": down["value"], "e_down_se": down["se"]}
+            for c in (3, 5):
+                cuts[str(s)][str(c)] = shares(pure["m2", s], pure["m3", s], ll(f"C_m2to3_s{s}_c{c}"),
+                                             ll(f"C_m3to2_s{s}_c{c}"))
+                if not all(math.isfinite(v) for v in cuts[str(s)][str(c)].values()):
+                    raise ValueError("non-finite within-seed share")
+        out[sc] = {"compatibility": compat, "cross_seed": cross, "single_level": single, "cuts": cuts}
+    return out
+
+
+def read_gx_compatibility(compat):
+    """Minor: every absolute kappa <= .10; material: mean M2 kappa >= .25; otherwise mixed."""
+    if all(abs(r["value"]) <= 0.10 + 1e-12 for a in ("m2", "m3") for r in compat[a].values()):
+        return "minor"
+    if np.mean([r["value"] for r in compat["m2"].values()]) >= 0.25 - 1e-12:
+        return "material"
+    return "mixed"
+
+
+def read_gx_localization(cross):
+    """Holds: every pi >= .30 and interaction >= .20; fails: mean pi < .15; otherwise mixed."""
+    if all(r["pi"] >= 0.30 - 1e-12 and r["interaction"] >= 0.20 - 1e-12 for r in cross.values()):
+        return "holds"
+    if np.mean([r["pi"] for r in cross.values()]) < 0.15 - 1e-12:
+        return "fails"
+    return "mixed"
+
+
+def read_gx_concentration(single):
+    """Registered necessary condition for saying one level carries >= half each summed effect in every seed."""
+    out = []
+    for level in range(1, 6):
+        ok = True
+        for s in GX_SEEDS:
+            for direction in ("e_up", "e_down"):
+                total = sum(single[str(s)][str(j)][direction] for j in range(1, 6))
+                ok &= single[str(s)][str(level)][direction] >= total / 2 - 1e-12
+        if ok:
+            out.append(level)
+    return out

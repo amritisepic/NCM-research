@@ -33,8 +33,11 @@ import hashlib
 import json
 import math
 import os
+import re
 import sys
 import time
+import signal
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -55,15 +58,17 @@ BANKS = ("released", "m2", "m3", "m4f0")        # sample banks (m4f0: for (iv)'s
 RHO_MODELS = ("released", "m0", "m2", "m3", "m4")
 ALL_ARMS = ("m0", "m2", "m3", "m4")             # W2M-G (the default)
 REDUCED_ARMS = ("m2", "m3")                     # W2M-GR: the released model, M2 and M3 only; (i), (ii), (iii)
+GX_ARMS = G.GX_ARMS                             # W2M-GX: six checkpoints, new replay cells only
 # where W2C stage 1's final-eval Gen-PPL (the sanity reference of (ii) at run seed >= 1) is saved: arm -> (notebook dir, run)
 W2C_RESULTS = {"m2": ("w2c1_L_ts_m2", "L_ts_m2_frozen_pw_s{s}__result.json"),
                "m3": ("w2c1_L_ts_m3", "L_ts_m3_uniform_wrong_s{s}__result.json")}
 
 
 def parse_arms(arms):
-    """The arm set as a canonical tuple from a comma list or a sequence. Only the two registered sets exist: the full
-    W2M-G set and M2, M3 (W2M-GR); M2 and M3 are always required."""
+    """Canonical full W2M-G, reduced W2M-GR, or six-checkpoint W2M-GX arm set."""
     names = [a.strip().lower() for a in (arms.split(",") if isinstance(arms, str) else arms) if str(a).strip()]
+    if set(names) == set(GX_ARMS) and len(names) == len(GX_ARMS):
+        return GX_ARMS
     unknown = sorted(set(names) - set(ARM_DIRS))
     if unknown:
         sys.exit(f"unknown arm(s) {unknown}: choose from {sorted(ARM_DIRS)}")
@@ -159,6 +164,11 @@ def sha256_file(path):
     return h.hexdigest()
 
 
+def sha256_json(obj):
+    """Canonical JSON content hash, independent of checkout line endings."""
+    return hashlib.sha256(json.dumps(obj, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+
+
 def fkey(f):
     return f"{float(f):g}"
 
@@ -185,10 +195,11 @@ def load_env(run_root, seed, device, P=G.Protocol(), arms=ALL_ARMS):
     arms = parse_arms(arms)
     nets, flag, sha, runs = {"released": released}, None, {}, {"released": "released"}
     for n in arms:
-        d = ARM_DIRS[n]
-        p = os.path.join(run_root, f"{d}_s{seed}", "final.pt")
+        base, sd = (n.split("_s")[0], int(n.split("_s")[1])) if n in GX_ARMS else (n, seed)
+        d = ARM_DIRS[base]
+        p = os.path.join(run_root, f"{d}_s{sd}", "final.pt")
         if not os.path.exists(p):
-            sys.exit(f"missing final checkpoint for {n}: {d}_s{seed}/final.pt")
+            sys.exit(f"missing final checkpoint for {n}: {d}_s{sd}/final.pt")
         ck = torch.load(p, map_location=device, weights_only=False)
         nets[n] = copy.deepcopy(released)
         nets[n].load_state_dict(ck["model"])
@@ -198,7 +209,7 @@ def load_env(run_root, seed, device, P=G.Protocol(), arms=ALL_ARMS):
             flag.load_state_dict(ck["flag"])
         elif n == "m4":
             sys.exit("M4's checkpoint has no flag state")
-        sha[n], runs[n] = sha256_file(p), f"{d}_s{seed}/final.pt"
+        sha[n], runs[n] = sha256_file(p), f"{d}_s{sd}/final.pt"
         del ck
     L0 = B.ckpt_extra["inference"]["level0_unigram"].float().to(device)
     return Env(device, tok, B.pre_tokenizer, L0, nets, flag, clean_windows(P, device), make_evaluate(B.pre_tokenizer, device),
@@ -222,6 +233,10 @@ def run_identity(device):
 def cell_specs(P, replicate=False, fs=None, arms=ALL_ARMS):
     """The cells of (ii) / (iv) on seeds 0-7, or (replicate) the pure cells and the given f's on seeds 8-15. Without M4 in
     `arms` there are no M4 cells."""
+    if tuple(arms) == GX_ARMS:
+        if replicate:
+            raise ValueError("W2M-GX has no replication sweep")
+        return gx_cell_specs(P)
     sfx, seeds = ("_rep", list(P.replicate_seeds)) if replicate else ("", list(P.replay_seeds))
     mk = lambda key, kind, prefix, suffix, cut=None, f=None: {"key": key + sfx, "kind": kind, "prefix": prefix,
                                                               "suffix": suffix, "cut": cut, "f": f, "seeds": seeds,
@@ -235,7 +250,37 @@ def cell_specs(P, replicate=False, fs=None, arms=ALL_ARMS):
     return out
 
 
+def gx_cell_specs(P):
+    """66 registered new cells plus six resampled pure sanity cells; levels 1..11 are explicit."""
+    out = []
+    def add(key, kind, assignment, cut=None, level=None):
+        out.append({"key": key, "kind": kind, "assignment": assignment, "cut": cut, "level": level,
+                    "seeds": list(P.replay_seeds), "group_n": P.group_n})
+    for s in G.GX_SEEDS:
+        for a in ("m2", "m3"):
+            add(f"pure_{a}_s{s}", "pure", [f"{a}_s{s}"] * 11)
+    for s in G.GX_SEEDS:
+        for t in G.GX_SEEDS:
+            if s == t:
+                continue
+            for a in ("m2", "m3"):
+                for b in ("m2", "m3"):
+                    add(f"X_{a}_s{s}_to_{b}_s{t}_c6", "cross_seed", [f"{a}_s{s}"] * 5 + [f"{b}_s{t}"] * 6, cut=6)
+    for s in G.GX_SEEDS:
+        for level in range(1, 6):
+            for direction, base, swap in (("up", "m3", "m2"), ("down", "m2", "m3")):
+                assignment = [f"{base}_s{s}"] * 11
+                assignment[level - 1] = f"{swap}_s{s}"
+                add(f"S_{direction}_s{s}_l{level}", "single_level", assignment, level=level)
+        for c in (3, 5):
+            for a, b in (("m2", "m3"), ("m3", "m2")):
+                add(f"C_{a}to{b[1:]}_s{s}_c{c}", "crossed", [f"{a}_s{s}"] * (c - 1) + [f"{b}_s{s}"] * (12 - c), cut=c)
+    return out
+
+
 def model_fn(env, spec):
+    if "assignment" in spec:
+        return G.assigned([env.member(name) for name in spec["assignment"]])
     if spec["kind"] == "m4":
         return G.pure(env.member("m4", spec["f"]))
     if spec["kind"] == "pure":
@@ -285,7 +330,8 @@ def get_cell(env, P, spec, cdir, log):
 
 
 def public_cell(cell):
-    return {"spec": cell["spec"], **cell["metrics"], "n_groups": len(set(cell["groups"]))}
+    return {"spec": cell["spec"], **cell["metrics"], "n_groups": len(set(cell["groups"])),
+            **({"group_seeds": list(dict.fromkeys(cell["groups"]))} if "assignment" in cell["spec"] else {})}
 
 
 # ------------------------------------------------------------------------------------------------ banks
@@ -453,6 +499,17 @@ def analysis_iv(P, cells, diag):
 
 # ------------------------------------------------------------------------------------------------ driver
 def protocol_block(env, P, seed, arms=ALL_ARMS):
+    if tuple(arms) == GX_ARMS:
+        return {**P.to_json(), "experiment": "W2M-GX", "amendment": "W2M-GXa", "run_seed": 0,
+                "arms": list(arms), "runs": env.runs, "ckpt_sha256": env.ckpt_sha256,
+                "cells": {"new_cells": 66, "pure_cells": 6, "total": 72, "groups_per_cell": len(P.replay_seeds),
+                          "samples_per_group": P.group_n, "crossed_cuts": [3, 5, 6],
+                          "cut_meaning": "prefix model samples levels 1..c-1, suffix model c..11",
+                          "assignment_meaning": "assignment[j-1] samples level j, j=1..11"},
+                "pure_source": "kappa pure means resampled, sanity within 3 SE of W2M-GR; delta and all other baselines from W2M-GR",
+                "sampler": "ancestral, T=1, Gumbel-max, one generator per group seeded with the group seed (common random numbers)",
+                "ci": "paired delete-one-group jackknife, 8 groups", "scorers": SCORER_IDS,
+                "precision": "fp32, TF32 off, eval mode", "torch": torch.__version__, "identity": env.identity}
     return {**P.to_json(), "run_seed": seed, "arms": list(arms), "runs": env.runs, "ckpt_sha256": env.ckpt_sha256,
             "cells": {"groups_per_cell": len(P.replay_seeds), "samples_per_group": P.group_n,
                       "crossed_cuts": list(P.cuts), "cut_meaning": "prefix model samples levels 1..c-1, suffix model c..11"},
@@ -478,6 +535,8 @@ def check_manifest(out_dir, env, P, seed, arms=ALL_ARMS):
 
 def run(env, out_dir, P=G.Protocol(), seed=0, log=print, arms=ALL_ARMS):
     arms = parse_arms(arms)
+    if arms == GX_ARMS:
+        return run_gx(env, out_dir, P, seed, log)
     if set(env.nets) != {"released", *arms}:
         sys.exit(f"the environment holds models {sorted(env.nets)} but --arms is {','.join(arms)}: it must hold exactly the released model and the arms")
     ref, src = (None, None) if seed == 0 else w2c_reference(seed)        # before anything is written: a missing file exits early
@@ -534,18 +593,97 @@ def run(env, out_dir, P=G.Protocol(), seed=0, log=print, arms=ALL_ARMS):
     return res
 
 
+def run_gx(env, out_dir, P, seed=0, log=print):
+    """One resumable run loads all training seeds. Re-sampling pure cells avoids reusing cached GR noise."""
+    if seed != 0 or set(env.nets) != {"released", *GX_ARMS}:
+        sys.exit("W2M-GX needs --seed 0 and all six checkpoints M2_s / M3_s, s=1,2,3")
+    if P.to_json() != G.GXProtocol().to_json():
+        sys.exit("W2M-GX refuses a changed registered protocol")
+    if not re.search(r"\bL4\b", env.identity.get("gpu") or ""):
+        sys.exit("W2M-GX requires an L4 GPU")
+    # Before sampling, validate GR references and their exact checkpoint identities.
+    from analyze_w2mgx import load_references
+    refs, bad = load_references(os.path.join(ROOT, "results", "colab"), env.ckpt_sha256)
+    if bad:
+        sys.exit("W2M-GX reference rejected: " + "; ".join(bad))
+    env.identity = {**env.identity, "w2mgr_reference_sha256": {str(s): sha256_json(refs[s]) for s in G.GX_SEEDS}}
+    os.makedirs(out_dir, exist_ok=True)
+    cdir = os.path.join(out_dir, "cells")
+    os.makedirs(cdir, exist_ok=True)
+    check_manifest(out_dir, env, P, seed, GX_ARMS)
+    torch.backends.cuda.matmul.allow_tf32 = torch.backends.cudnn.allow_tf32 = False
+    cells = {}
+    for spec in cell_specs(P, arms=GX_ARMS):
+        cells[spec["key"]] = public_cell(get_cell(env, P, spec, cdir, log))
+        write_json(os.path.join(out_dir, "result.json"), {"protocol": protocol_block(env, P, 0, GX_ARMS),
+                                                        "complete": False, "cells": cells})
+    from analyze_w2mgx import summarize
+    res = {"protocol": protocol_block(env, P, 0, GX_ARMS), "complete": True, "cells": cells, **summarize(cells, refs)}
+    write_json(os.path.join(out_dir, "result.json"), res)
+    return res
+
+
+@contextmanager
+def gx_budget(out_dir, limit_seconds=210 * 60):
+    """Cumulative cap across sessions, including load/score/cache time. Colab's alarm interrupts an unfinished cell.
+
+    An unclosed session is charged through the next start, conservatively including disconnected time.
+    Finished cells remain atomic and resumable; an interrupted cell is re-sampled from its original group seed.
+    """
+    os.makedirs(out_dir, exist_ok=True)
+    path = os.path.join(out_dir, "runtime_budget.json")
+    now = time.time()
+    ledger = {"spent_seconds": 0.0, "active_since": None, "limit_seconds": limit_seconds}
+    if os.path.exists(path):
+        with open(path) as f:
+            ledger = json.load(f)
+        if ledger.get("limit_seconds") != limit_seconds:
+            sys.exit("runtime budget cap differs: use the registered 210-minute cap")
+    spent = float(ledger["spent_seconds"])
+    if ledger.get("active_since") is not None:
+        spent += max(0.0, now - ledger["active_since"])
+    remaining = limit_seconds - spent
+    if remaining <= 0:
+        write_json(path, {"spent_seconds": spent, "active_since": None, "limit_seconds": limit_seconds})
+        sys.exit("W2M-GX cumulative 210 L4-minute cap reached")
+    write_json(path, {"spent_seconds": spent, "active_since": now, "limit_seconds": limit_seconds})
+    def expired(signum, frame):
+        raise SystemExit("W2M-GX cumulative 210 L4-minute cap reached; unfinished cell discarded")
+    old = None
+    if hasattr(signal, "SIGALRM"):
+        old = signal.signal(signal.SIGALRM, expired)
+        signal.setitimer(signal.ITIMER_REAL, remaining)
+    try:
+        yield
+    finally:
+        if old is not None:
+            signal.setitimer(signal.ITIMER_REAL, 0)
+            signal.signal(signal.SIGALRM, old)
+        write_json(path, {"spent_seconds": spent + max(0.0, time.time() - now), "active_since": None,
+                          "limit_seconds": limit_seconds})
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--run_root", required=True, help="directory holding the run directories (final.pt)")
     ap.add_argument("--run_dir", required=True, help="output directory; writes result.json")
     ap.add_argument("--seed", type=int, default=0, help="run seed of the arms (directory suffix _s<seed>)")
     ap.add_argument("--arms", default=",".join(ALL_ARMS),
-                    help="m0,m2,m3,m4 (W2M-G, default) or m2,m3 (W2M-GR: no M0 / M4, no (iv)); m2 and m3 are required")
+                    help="m0,m2,m3,m4 (W2M-G), m2,m3 (W2M-GR), or " + ",".join(GX_ARMS) + " (W2M-GX, all seeds)")
     a = ap.parse_args()
     arms = parse_arms(a.arms)
     device = pick_device()
     torch.backends.cuda.matmul.allow_tf32 = torch.backends.cudnn.allow_tf32 = False
-    run(load_env(a.run_root, a.seed, device, arms=arms), a.run_dir, G.Protocol(), a.seed, arms=arms)
+    if arms == GX_ARMS and a.seed != 0:
+        ap.error("W2M-GX loads all training seeds in one run; use --seed 0")
+    P = G.GXProtocol() if arms == GX_ARMS else G.Protocol()
+    if arms == GX_ARMS:
+        if not hasattr(signal, "SIGALRM"):
+            ap.error("W2M-GX requires the Colab/Linux runtime for its enforced cumulative time cap")
+        with gx_budget(a.run_dir):
+            run(load_env(a.run_root, a.seed, device, arms=arms, P=P), a.run_dir, P, a.seed, arms=arms)
+    else:
+        run(load_env(a.run_root, a.seed, device, arms=arms, P=P), a.run_dir, P, a.seed, arms=arms)
     print("wrote result.json")
 
 
