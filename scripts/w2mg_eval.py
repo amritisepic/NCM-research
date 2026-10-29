@@ -644,6 +644,7 @@ def gx_budget(out_dir, limit_seconds=210 * 60):
         spent += max(0.0, now - ledger["active_since"])
     remaining = limit_seconds - spent
     if remaining <= 0:
+        write_json(path, {"spent_seconds": spent, "active_since": None, "limit_seconds": limit_seconds})
         sys.exit("W2M-GX cumulative 210 L4-minute cap reached")
     write_json(path, {"spent_seconds": spent, "active_since": now, "limit_seconds": limit_seconds})
     def expired(signum, frame):

@@ -19,7 +19,16 @@ remain in Drive `runs/`. The collector also retains per-window JS/rho arrays for
 - Focused W2M-GX and original W2M-GR regression: 190 passed in 93.20 seconds.
 - Subsequent pure notebook/cap/admission checks: 26 passed, 2 deselected in 18.39 seconds.
 - No trainer, corruption rule or training RNG/state was changed.
-- The full CPU suite is pending its serialized execution slot.
+- Diagnostic full CPU suite after the interrupted attempt: 40 failed, 1029 passed, 32 warnings in 553.32s
+  (0:09:13); no skipped tests. All 40 failures were the existing notebook invariant forbidding any release
+  before the terminal cell. The cap-failure cleanup now appears only in GX's generated run cell, and the
+  invariant admits that single guarded exception. Executed tests prove it releases only after a failed
+  command and exhausted cap, with partial results and provenance already copied; a successful command
+  or a non-cap failure does not release early. All other notebooks retain the terminal-cell-only rule.
+- New interrupted-session cap regression: 1 failed in 2.05s before the fix. An exhausted unclosed session
+  now persists its charged time before refusing resume, so the notebook recognizes and cleans up the cap.
+- Post-fix cap, release-order, notebook and provenance checks: 55 passed, 76 deselected in 4.00s.
+- The final full CPU suite on the settled code is pending its serialized execution slot.
 
 ## Behavior mutations
 

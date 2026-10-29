@@ -459,6 +459,11 @@ for seed in SEEDS:
             provenance(rd, {'event': 'end', 'git_sha': GIT_SHA, 'utc': utc(), 'exit': p.returncode,
                             'minutes': round((time.time() - t) / 60, 2), 'last_logged_step': last_step(rd)})
         if p.returncode != 0:
+            raise SystemExit('command failed; fix and re-run this cell (it resumes)')
+'''
+
+# W2M-GX also releases on its registered cap failure, after collecting partial results. Other run cells use RUN.
+GX_CAP_FAILURE = r'''
             # W2M-GX's registered cumulative cap must also return its allocated L4 on the failure path.
             bp = f'{rd}/runtime_budget.json' if rd else ''
             if 'w2mgx_eval' in CMDS_RAW[i] and os.path.exists(bp):
@@ -481,8 +486,8 @@ for seed in SEEDS:
                           'Returning the L4 runtime.', flush=True)
                     from google.colab import runtime
                     runtime.unassign()
-            raise SystemExit('command failed; fix and re-run this cell (it resumes)')
 '''
+GX_RUN = RUN.replace("        if p.returncode != 0:\n", "        if p.returncode != 0:\n" + GX_CAP_FAILURE)
 
 COLLECT = r'''
 out = f'{DRIVE}/results/__NAME__'; os.makedirs(out, exist_ok=True)
@@ -580,7 +585,7 @@ def make(name: str, spec: dict) -> dict:
             *([cell(GUARD)] if spec.get("require_a100") else []),
             *([cell(GUARD_GPU.replace("__GPU__", json.dumps(spec["require_gpu"])))] if spec.get("require_gpu") else []),
             cell(DATA),
-            cell(RUN),
+            cell(GX_RUN if name == "w2mgx_eval" else RUN),
             cell(COLLECT.replace("__NAME__", name)),
             cell(RELEASE),
         ],

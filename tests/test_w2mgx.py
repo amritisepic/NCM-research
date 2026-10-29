@@ -295,17 +295,37 @@ def test_runtime_cap_accumulates_across_resume_and_refuses_exhaustion(tmp_path, 
         with S.gx_budget(str(tmp_path), limit_seconds=10): pass
 
 
-def test_notebook_cap_path_collects_partial_and_releases_before_raising(tmp_path, monkeypatch):
+def test_runtime_cap_charges_unclosed_session_before_refusal(tmp_path, monkeypatch):
+    monkeypatch.setattr(S.time, "time", lambda: 111.0)
+    path = tmp_path / "runtime_budget.json"
+    path.write_text(json.dumps({"spent_seconds": 9, "active_since": 100, "limit_seconds": 10}))
+    with pytest.raises(SystemExit, match="cap reached"):
+        with S.gx_budget(str(tmp_path), limit_seconds=10):
+            pytest.fail("an exhausted interrupted session must not resume")
+    ledger = json.loads(path.read_text())
+    assert ledger == {"spent_seconds": 20, "active_since": None, "limit_seconds": 10}
+
+
+@pytest.mark.parametrize("returncode,spent,releases", [(1, 12601, True), (1, 12599, False), (0, 12601, False)])
+def test_notebook_cap_path_collects_partial_and_releases_before_raising(tmp_path, monkeypatch, returncode, spent, releases):
     import sys
     import types
     import shutil
     rd = tmp_path / "runs" / "w2mgx_eval"
     rd.mkdir(parents=True)
-    (rd / "runtime_budget.json").write_text(json.dumps({"spent_seconds": 12601, "limit_seconds": 12600}))
+    (rd / "runtime_budget.json").write_text(json.dumps({"spent_seconds": spent, "limit_seconds": 12600}))
     (rd / "result.json").write_text(json.dumps({"complete": False, "cells": {"cached": {}}}))
     released, history = [], []
     colab = types.ModuleType("google.colab")
-    colab.runtime = SimpleNamespace(unassign=lambda: released.append(True))
+    saved_path = tmp_path / "results/w2mgx_eval/w2mgx_eval__result.json"
+    meta_path = tmp_path / "results/w2mgx_eval/_meta.json"
+    def unassign():
+        # The executed order matters: a release must never lose partial results or provenance.
+        assert json.loads(saved_path.read_text())["complete"] is False
+        assert json.loads(meta_path.read_text())["cap_reached"] is True
+        assert history[-1]["event"] == "end"
+        released.append(True)
+    colab.runtime = SimpleNamespace(unassign=unassign)
     monkeypatch.setitem(sys.modules, "google", types.ModuleType("google"))
     monkeypatch.setitem(sys.modules, "google.colab", colab)
     ns = {"os": os, "json": json, "shutil": shutil, "time": SimpleNamespace(time=lambda: 12601),
@@ -313,13 +333,19 @@ def test_notebook_cap_path_collects_partial_and_releases_before_raising(tmp_path
           "CMDS": MK.RUNS["w2mgx_eval"]["cmds"], "R": str(tmp_path / "runs"), "D": "data",
           "DRIVE": str(tmp_path), "GIT_SHA": "a" * 40, "utc": lambda: "time", "last_step": lambda rd: None,
           "history": lambda rd: history, "provenance": lambda rd, event: history.append(event),
-          "subprocess": SimpleNamespace(run=lambda *a, **k: SimpleNamespace(returncode=1))}
-    with pytest.raises(SystemExit, match="command failed"):
-        exec(MK.RUN, ns)
+          "subprocess": SimpleNamespace(run=lambda *a, **k: SimpleNamespace(returncode=returncode))}
+    if returncode:
+        with pytest.raises(SystemExit, match="command failed"):
+            exec(MK.GX_RUN, ns)
+    else:
+        exec(MK.GX_RUN, ns)
+    if not releases:
+        assert released == [] and not saved_path.exists() and not meta_path.exists()
+        return
     assert released == [True]
-    saved = json.loads((tmp_path / "results/w2mgx_eval/w2mgx_eval__result.json").read_text())
+    saved = json.loads(saved_path.read_text())
     assert saved["complete"] is False and "cap" in saved["stop_reason"] and saved["cells"] == {"cached": {}}
-    assert json.loads((tmp_path / "results/w2mgx_eval/_meta.json").read_text())["cap_reached"] is True
+    assert json.loads(meta_path.read_text())["cap_reached"] is True
 
 
 def test_manifest_refuses_changed_checkpoint_assignment_or_protocol(tmp_path):

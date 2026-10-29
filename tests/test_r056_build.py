@@ -47,7 +47,14 @@ def test_every_notebook_ends_with_release_cell(name):
         assert "RELEASE_RUNTIME = True" in last and "from google.colab import runtime" in last
         assert last.rstrip().splitlines()[-1].lstrip().startswith("runtime.unassign()")
         assert "Results copied to" in before          # the release comes after the results are on Drive
-        assert "unassign" not in "".join(src(c) for c in nb["cells"][:-1])
+        earlier = nb["cells"][:-1]
+        if name == "w2mgx_eval":
+            # GX's executed cap tests cover this single exception: failure, exhausted ledger, copy, then release.
+            run_cells = [c for c in earlier if src(c) == nl(MK.GX_RUN)]
+            assert len(run_cells) == 1
+            assert "unassign" not in "".join(src(c) for c in earlier if c is not run_cells[0])
+        else:
+            assert "unassign" not in "".join(src(c) for c in earlier)
 
 
 def test_release_cell_unassigns_and_respects_switch(monkeypatch):
@@ -68,13 +75,13 @@ def test_release_cell_unassigns_and_respects_switch(monkeypatch):
 
 def test_notebooks_are_the_old_five_cells_plus_the_release_cell():
     """Every notebook (the L1R one also has its A100 guard, the W2M-GR one its GPU guard) is markdown, setup, data, run, collect +
-    the release cell; the data, run and collect cells are the unchanged templates, so existing notebooks changed only by the
-    last cell."""
+    the release cell. GX alone uses the cap-aware run template; every other run uses the common template."""
     for name, spec in MK.RUNS.items():
         cells = MK.make(name, spec)["cells"]
         guard = 1 if spec.get("require_a100") or spec.get("require_gpu") else 0
         assert len(cells) == 6 + guard, name
-        assert src(cells[2 + guard]) == nl(MK.DATA) and src(cells[3 + guard]) == nl(MK.RUN)
+        run = MK.GX_RUN if name == "w2mgx_eval" else MK.RUN
+        assert src(cells[2 + guard]) == nl(MK.DATA) and src(cells[3 + guard]) == nl(run)
         assert src(cells[4 + guard]) == nl(MK.COLLECT.replace("__NAME__", name))
         assert src(cells[-1]) == nl(MK.RELEASE)
 
