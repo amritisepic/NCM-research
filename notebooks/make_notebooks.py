@@ -248,6 +248,23 @@ for name, cfg, extra in [("w2_Mc_ar", "M_ar_c", "FLOP-matched to w2_Mc_ncm (27,3
 
 # ---- R056 package (docs/preregistration.md: W2C stage 1, M3-0, W2M-G, E1b, L1R). Units = the registration's run-time CU
 # estimate at R056's observed burn (twice the nominal 5.4 CU/h figure); the cap is in GPU-minutes, as registered.
+for key, (what, cap) in {"p": ("M2 plausible wrong", 25), "d": ("PDa reassigned M2 proposals", 25),
+                         "u": ("M3 uniform wrong", 15)}.items():
+    RUNS[f"pd_L_ts_{key}"] = {
+        "desc": f"PD/PDa seed-0 association kill: {what}, 175 steps, W2M rates and 25% clean rows; final evaluation "
+                "16 x 256 in fp32 under both scorers. The registered CPU coverage report results/pd_coverage.json must "
+                "already pass the first-20-step real-data gate before launch. A100 with --micro_batch64, matched in "
+                f"all arms. Cumulative cap {cap} A100-minutes for this arm including final eval and resumptions; a "
+                "shared Drive budget also enforces the registered 60-minute total across P/D/U. Costs use 5.4 CU/hour "
+                "at run time; idle connected runtimes cost extra. All results and code provenance are copied before release.",
+        "gpu": "A100-40GB", "units": round(cap * 5.4 / 60, 2), "needs": ["ts", "ckpt"], "seeds": [0],
+        "require_a100": True, "cap": f"{cap} A100-minutes per arm, 60 total, including eval and resumes",
+        "cmds": ["python scripts/pd_coverage.py --verify --out results/pd_coverage.json",
+                 f"python scripts/run_pilot_budget.py --experiment pd --arm {key} --run_root {{R}} -- "
+                 f"python scripts/train_gen.py --config configs/scale/L_ts_pd_{key}.yaml "
+                 f"--run_dir {{R}}/L_ts_pd_{key}_s{{S}} --seed {{S}}"],
+    }
+
 W2C1_SEEDS_NOTE = ("Each seed is one run (M2 ~51, M3 ~30 A100-minutes); SEEDS is [1, 2, 3] and can be edited to run one seed "
                    "per session (every run resumes from its Drive checkpoint). A100-40GB only, as W2M's seed 0 (the "
                    "notebook adds --micro_batch 64 on > 39 GB GPUs). Seed 0 is not part of the reading.")

@@ -260,11 +260,13 @@ def compute_loss(x, gen):
                   "labels_changed": round((h["targets"] != h["canonical"]).float().mean().item(), 4)}
 
 
-def compute_loss_mech(x, plan):
+def compute_loss_mech(x, plan, prepared=None):
     """W2M arms: canonical labels; replaced slots from the plan's mask stream, codes from the arm's proposer; flags (M4 /
     M5) enter as f * w on the code inputs. Evaluation never calls this: inference and evals use zero flags."""
-    canon = mech.canonical(x)
-    repl = mech.proposals(canon, plan)
+    canon, repl = prepared if prepared is not None else (None, None)
+    if canon is None:
+        canon = mech.canonical(x)
+        repl = mech.proposals(canon, plan)
     h = build_hierarchy(tok, x, corr, policy_codes=repl, masks=plan.masks, canonical=canon)
     mech.record(h["used"], h["targets"], plan)
     tgt, extra_logs = h["targets"], {}
@@ -405,10 +407,12 @@ while trainer.step < int(tc.steps):
     xb_full = torch.from_numpy(stream.batch(data_rng, int(tc.batch_size))).to(device)
     loss_sum, logs = 0.0, {}
     plan = mech.draw_plan(len(xb_full)) if mech else None   # one mask stream, drawn for the whole batch
+    prepared = mech.prepare_batch(xb_full, plan, accum) if mech and mech.arm == "pd" else None
     row0 = 0
     for xb in torch.chunk(xb_full, accum):
         with trainer.ctx:
-            loss, logs = compute_loss_mech(xb, plan.rows(row0, row0 + len(xb))) if mech else compute_loss(xb, gen)
+            ready = tuple(t[row0:row0 + len(xb)] for t in prepared) if prepared is not None else None
+            loss, logs = compute_loss_mech(xb, plan.rows(row0, row0 + len(xb)), ready) if mech else compute_loss(xb, gen)
         row0 += len(xb)
         trainer.backward(loss / accum)
         loss_sum += loss.item() / accum
@@ -461,6 +465,7 @@ res = {"run": os.path.basename(a.run_dir.rstrip("/")), "config": OmegaConf.to_co
 if mech:
     res.update({"w2m_arm": mech.arm, "proposal_forwards_per_step": mech.proposal_forwards,
                 "realized_disagreement": mech.realized(), "flag_vector_norm": float(flagmod.w.norm()) if flagmod else None,
+                **({"pd": mech.realized()["pd_coverage"]} if mech.arm == "pd" else {}),
                 **({"l1r": mech.l1r.summary()} if mech.l1r is not None else {})})
 json.dump(res, open(res_path, "w"), indent=1)
 print(json.dumps({k: v for k, v in res.items() if k != "config"}, indent=1, default=str))
