@@ -1,0 +1,117 @@
+{
+ "registration": "PD/PDa",
+ "identity": {
+  "asset_sha256": {
+   "base/config.yaml": "4009baccad5a159bfc12cd48f3da17c22c4a281b86f71f2fc70b7c1bbb62004b",
+   "base/generator.pt": "0acaf4f795390f9f7ccc8f84047867619a1d00e291681e299b855d7e563be6ff",
+   "base/tokenizer.pt": "76e26003719db32dc3d542518951c286be07d6a5881f29ad5152d299764b0f81",
+   "data/train_bpe_8192.bin": "b1dccdf7562f20a8a02f5563cb92c62b7cfb7c2eab5379973e897b661f1df7db",
+   "data/train_bpe_8192_offsets.npy": "c45c0471bc3fd62c204819ffadd84f9c904c2ea4e42f8f2daa902aacf609f958"
+  },
+  "config": {
+   "init": "released",
+   "corruption": {
+    "mode": "mech",
+    "arm": "pd",
+    "mean_rate": 0.5,
+    "spread": 0.5,
+    "retarget": false,
+    "clean_row_frac": 0.25,
+    "policy_temp": 1.0
+   },
+   "train": {
+    "steps": 175,
+    "batch_size": 256,
+    "grad_accum": 8,
+    "lr": 5e-05,
+    "warmup": 200,
+    "min_lr_frac": 0.1,
+    "weight_decay": 0.1,
+    "beta2": 0.95,
+    "ckpt_every": 100,
+    "eval_every": 100,
+    "eval_n": 1000,
+    "log_every": 25,
+    "compile": false,
+    "seed": 0
+   },
+   "sample_eval": {
+    "at": [
+     100
+    ],
+    "n": 256,
+    "final_seeds": [
+     42,
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14
+    ],
+    "final_n": 256,
+    "mauve": true
+   }
+  },
+  "micro_batch": 64,
+  "cpu_forward_batch": 8
+ },
+ "steps": 20,
+ "seed": 0,
+ "device": "cpu",
+ "coverage": {
+  "per_level": [
+   0.0,
+   0.0,
+   0.9997998098193284,
+   0.999873470346872,
+   0.999806708695135,
+   0.999870635567457,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "overall": 0.9998415623618883,
+  "reassigned_per_level": [
+   0,
+   0,
+   39954,
+   55316,
+   67243,
+   77291,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  "masked_per_level": [
+   0,
+   0,
+   39962,
+   55323,
+   67256,
+   77301,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0
+  ]
+ },
+ "wall_s": 3592.188000000002
+}

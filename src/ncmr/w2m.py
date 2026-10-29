@@ -42,7 +42,7 @@ ARMS = {
 # L1R (docs/preregistration.md, "L1R"): M2's proposals exactly, plus the target reassignment of src/ncmr/l1r.py. Kept out of
 # `ARMS` so that the M0-M7 sets enumerated by the W2M tests and notebooks are unchanged; `MechArm` accepts both.
 L1R_ARMS = {"m2r": ("frozen_wrong", None)}
-ALL_ARMS = {**ARMS, **L1R_ARMS}
+ALL_ARMS = {**ARMS, **L1R_ARMS, "pd": ("frozen_wrong", None)}
 # A3's mean logged per-level disagreement over its logged steps <= 600 (as registered; tests recompute it from
 # results/colab/w1_L_ts_onpol/L_ts_onpol_s0__metrics.jsonl)
 A3_DISAGREEMENT = (0.735, 0.691, 0.601, 0.505, 0.398, 0.304, 0.239, 0.103, 0.171, 0.167, 0.145, 0.0)
@@ -151,8 +151,49 @@ class MechArm:
         base = int(seed) * 7919
         mk = lambda off: torch.Generator(device=device).manual_seed(base + off)
         self.mask_gen, self.repl_gen, self.flag_gen = mk(2), mk(104729), mk(15485863)
+        self.pd_gen = mk(32452843)  # PDa: used only for association permutations and their collision repair
         z = [0.0] * self.K
         self.stats = {"n": 0, "n_clean": 0, "sum_all": list(z), "cnt_all": list(z), "sum_corr": list(z), "cnt_corr": list(z)}
+        if arm == "pd":
+            self.stats.update(pd_masked=[0] * self.K, pd_reassigned=[0] * self.K)
+
+    @torch.no_grad()
+    def prepare_batch(self, x, plan, accum):
+        """PD: draw M2 proposals in the identical micro-batch order, then permute across the full optimizer batch.
+
+        Neither canonical encoding nor the frozen proposer draws from training's dropout stream. Keeping their
+        partition identical to P also keeps every corresponding replacement RNG state and proposal identical.
+        """
+        canonical, proposals, row0 = [], [], 0
+        for xb in torch.chunk(x, accum):
+            cb = self.canonical(xb)
+            canonical.append(cb)
+            proposals.append(self.proposals(cb, plan.rows(row0, row0 + len(xb))))
+            row0 += len(xb)
+        canon, repl = torch.cat(canonical), torch.cat(proposals)
+        return canon, self.permute_proposals(canon, repl, plan)
+
+    @torch.no_grad()
+    def permute_proposals(self, canon, proposals, plan):
+        """PDa's exact multiset-preserving reassignment, separately per masked (batch, level, position) group."""
+        assert self.arm == "pd"
+        out = proposals.clone()
+        offset = 0
+        for level, length in enumerate(self.levels):
+            if 2 <= level <= 5:
+                for position in range(length):
+                    rows = plan.masks[level][:, position].nonzero().flatten()
+                    n = len(rows)
+                    if not n:
+                        continue
+                    col = offset + position
+                    own, true = proposals[rows, col], canon[rows, col]
+                    pi = pd_permutation(own, true, self.pd_gen)
+                    out[rows, col] = own[pi]
+                    self.stats["pd_masked"][level] += n
+                    self.stats["pd_reassigned"][level] += int((pi != torch.arange(n, device=pi.device)).sum())
+            offset += length
+        return out
 
     # ------------------------------------------------------------------ properties
     @property
@@ -277,20 +318,66 @@ class MechArm:
     def realized(self) -> dict:
         st = self.stats
         r = lambda s, c: [round(a / b, 4) if b else 0.0 for a, b in zip(s, c)]
-        return {"disagreement_all_rows_per_level": r(st["sum_all"], st["cnt_all"]),
+        out = {"disagreement_all_rows_per_level": r(st["sum_all"], st["cnt_all"]),
                 "disagreement_corrupted_rows_per_level": r(st["sum_corr"], st["cnt_corr"]),
                 "rows": st["n"], "clean_rows": st["n_clean"]}
+        if self.arm == "pd":
+            masked, reassigned = st["pd_masked"], st["pd_reassigned"]
+            out["pd_coverage"] = {"per_level": [a / b if b else 0.0 for a, b in zip(reassigned, masked)],
+                                  "overall": sum(reassigned) / sum(masked) if sum(masked) else 0.0,
+                                  "reassigned_per_level": list(reassigned), "masked_per_level": list(masked)}
+        return out
 
     # ------------------------------------------------------------------ checkpoint
     def state_dict(self) -> dict:
         return {"mask_rng": self.mask_gen.get_state(), "repl_rng": self.repl_gen.get_state(),
-                "flag_rng": self.flag_gen.get_state(), "stats": copy.deepcopy(self.stats)}
+                "flag_rng": self.flag_gen.get_state(), "stats": copy.deepcopy(self.stats),
+                **({"pd_rng": self.pd_gen.get_state()} if self.arm == "pd" else {})}
 
     def load_state_dict(self, st: dict):
         self.mask_gen.set_state(st["mask_rng"].cpu())
         self.repl_gen.set_state(st["repl_rng"].cpu())
         self.flag_gen.set_state(st["flag_rng"].cpu())
+        if self.arm == "pd":
+            if "pd_rng" not in st or not all(k in st["stats"] for k in ("pd_masked", "pd_reassigned")):
+                raise RuntimeError("checkpoint lacks PD permutation RNG or coverage; exact resume unavailable")
+            self.pd_gen.set_state(st["pd_rng"].cpu())
         self.stats = copy.deepcopy(st["stats"])
+
+
+def pd_permutation(proposals, canonical, generator):
+    """PDa: uniform initial derangement, then lowest-collision swap repair or cycle-shortening fixed point.
+
+    Rejection sampling from uniform permutations gives a uniform derangement. Repair terminates: every step
+    strictly decreases the collision count. With valid own proposals a swap always exists: a colliding code's
+    multiplicity cannot exceed the number of rows with a different canonical code, so one such row must receive
+    a noncolliding code and clear both targets. The registered fixed-point fallback is retained defensively.
+    """
+    n, device = len(proposals), proposals.device
+    identity = torch.arange(n, device=device)
+    assert bool((proposals != canonical).all()), "M2's own proposals must exclude canonical codes"
+    if n <= 1:
+        return identity
+    pi = torch.randperm(n, generator=generator, device=device)
+    while bool((pi == identity).any()):
+        pi = torch.randperm(n, generator=generator, device=device)
+    for _ in range(n):
+        collisions = (proposals[pi] == canonical).nonzero().flatten()
+        if not len(collisions):
+            return pi
+        i = int(collisions[0])
+        candidates = ((identity != i) & (proposals[pi] != canonical[i]) &
+                      (proposals[pi[i]] != canonical)).nonzero().flatten()
+        if len(candidates):
+            j = int(candidates[torch.randint(len(candidates), (), generator=generator, device=device)])
+            old = pi[i].clone()
+            pi[i], pi[j] = pi[j], old
+        else:
+            k = int((pi == i).nonzero()[0])
+            pi[k] = pi[i]
+            pi[i] = i
+    assert not bool((proposals[pi] == canonical).any()), "PDa collision repair failed to terminate"
+    return pi
 
 
 # ====================================================================================================== eval-only

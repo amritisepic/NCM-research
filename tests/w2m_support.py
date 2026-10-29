@@ -21,7 +21,7 @@ def prefix_fn(tok):
 
 
 def make_arm(arm, tok, net, seed=0, clean_frac=0.25, rates=None, frozen=None):
-    from ncmr.w2m import ARMS
+    from ncmr.w2m import ALL_ARMS as ARMS
     cfg = CorruptionCfg(mode="mech")
     if frozen is None and ARMS[arm][0] == "frozen_wrong":
         frozen = MechArm.frozen_copy(net)
@@ -44,7 +44,7 @@ from omegaconf import OmegaConf
 
 from ncmr.corruption import build_hierarchy, soft_ce
 from ncmr.train import Trainer, fp32_eval
-from ncmr.w2m import FlagVector, ARMS
+from ncmr.w2m import FlagVector, ALL_ARMS as ARMS
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent

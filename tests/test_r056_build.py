@@ -2,6 +2,7 @@
 skip-absent behaviour and every reading of scripts/analyze_w2c.py at its registered thresholds (docs/preregistration.md:
 W2C, M3-0, L1R). CPU only; the notebook cells are executed from `notebooks/make_notebooks.py` itself with stub subprocess / torch.
 """
+import ast
 import importlib.util
 import json
 import math
@@ -38,6 +39,35 @@ def nl(text):
     return text.strip(chr(10))
 
 
+def assert_run_cell(name, source):
+    """Only capped specs may release early, after collection and before preserving the failure."""
+    if not MK.RUNS[name].get("release_on_cap"):
+        assert source == nl(MK.RUN)
+        return
+    tree = ast.parse(source)
+    caps = [n for n in ast.walk(tree) if isinstance(n, ast.If)
+            and ast.unparse(n.test) == "p.returncode == 124"]
+    assert len(caps) == 1
+    cap = caps[0]
+    assert not cap.orelse and len(cap.body) == 3
+    collect, runtime_import, release = cap.body
+    assert isinstance(collect, ast.Expr) and isinstance(collect.value, ast.Call)
+    assert ast.unparse(collect.value.func) == "exec" and len(collect.value.args) == 1
+    assert ast.literal_eval(collect.value.args[0]) == MK.COLLECT.replace("__NAME__", name)
+    assert ast.unparse(runtime_import) == "from google.colab import runtime"
+    assert ast.unparse(release) == "runtime.unassign()"
+    calls = [n for n in ast.walk(tree) if isinstance(n, ast.Call)
+             and ast.unparse(n.func) == "runtime.unassign"]
+    assert calls == [release.value]
+    statements = next(value for node in ast.walk(tree) for _, value in ast.iter_fields(node)
+                      if isinstance(value, list) and cap in value)
+    failure = statements[statements.index(cap) + 1]
+    assert isinstance(failure, ast.If) and ast.unparse(failure.test) == "p.returncode != 0"
+    assert any(isinstance(n, ast.Raise) for n in ast.walk(failure))
+    statements.remove(cap)
+    assert ast.dump(tree) == ast.dump(ast.parse(MK.RUN))
+
+
 # ------------------------------------------------------------------------------------------------ AC1: release cell
 @pytest.mark.parametrize("name", sorted(MK.RUNS))
 def test_every_notebook_ends_with_release_cell(name):
@@ -47,7 +77,13 @@ def test_every_notebook_ends_with_release_cell(name):
         assert "RELEASE_RUNTIME = True" in last and "from google.colab import runtime" in last
         assert last.rstrip().splitlines()[-1].lstrip().startswith("runtime.unassign()")
         assert "Results copied to" in before          # the release comes after the results are on Drive
-        assert "unassign" not in "".join(src(c) for c in nb["cells"][:-1])
+        if MK.RUNS[name].get("release_on_cap"):
+            guard = 1 if MK.RUNS[name].get("require_a100") or MK.RUNS[name].get("require_gpu") else 0
+            run_index = 3 + guard
+            assert_run_cell(name, src(nb["cells"][run_index]))
+            assert "unassign" not in "".join(src(c) for i, c in enumerate(nb["cells"][:-1]) if i != run_index)
+        else:
+            assert "unassign" not in "".join(src(c) for c in nb["cells"][:-1])
 
 
 def test_release_cell_unassigns_and_respects_switch(monkeypatch):
@@ -68,13 +104,14 @@ def test_release_cell_unassigns_and_respects_switch(monkeypatch):
 
 def test_notebooks_are_the_old_five_cells_plus_the_release_cell():
     """Every notebook (the L1R one also has its A100 guard, the W2M-GR one its GPU guard) is markdown, setup, data, run, collect +
-    the release cell; the data, run and collect cells are the unchanged templates, so existing notebooks changed only by the
-    last cell."""
+    the release cell. Data and collection retain their templates; capped specs alone add the verified failure cleanup to
+    the run template."""
     for name, spec in MK.RUNS.items():
         cells = MK.make(name, spec)["cells"]
         guard = 1 if spec.get("require_a100") or spec.get("require_gpu") else 0
         assert len(cells) == 6 + guard, name
-        assert src(cells[2 + guard]) == nl(MK.DATA) and src(cells[3 + guard]) == nl(MK.RUN)
+        assert src(cells[2 + guard]) == nl(MK.DATA)
+        assert_run_cell(name, src(cells[3 + guard]))
         assert src(cells[4 + guard]) == nl(MK.COLLECT.replace("__NAME__", name))
         assert src(cells[-1]) == nl(MK.RELEASE)
 
@@ -147,11 +184,12 @@ def run_guard(device_name, mem_bytes, cuda=True):
     return True
 
 
-def test_guard_cell_only_in_l1r_notebook():
+def test_a100_guard_cell_matches_notebook_requirement():
+    assert MK.RUNS["l1r_L_ts_m2r"]["require_a100"] is True
     for n in MK.RUNS:
         nb = MK.make(n, MK.RUNS[n])
         has = any("GPU guard passed" in src(c) for c in nb["cells"])
-        assert has == (n == "l1r_L_ts_m2r"), n
+        assert has == bool(MK.RUNS[n].get("require_a100")), n
         if has:
             order = [src(c) for c in nb["cells"]]
             i = next(k for k, t in enumerate(order) if "GPU guard passed" in t)

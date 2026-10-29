@@ -106,7 +106,8 @@ def test_old_arms_still_resume_exactly(tmp_path, mode):
 
 def test_existing_configs_are_untouched_by_the_w2m_branch():
     import subprocess
-    out = subprocess.run(["git", "diff", "--name-only", "38a08fa", "--", "configs/scale"], cwd=HERE.parent,
+    # New registered pilots may add configs; this guard protects the configs that existed at the W2M base.
+    out = subprocess.run(["git", "diff", "--name-only", "--diff-filter=MDRT", "38a08fa", "--", "configs/scale"], cwd=HERE.parent,
                          capture_output=True, text=True)
     if out.returncode != 0:
         pytest.skip("base commit not available")
