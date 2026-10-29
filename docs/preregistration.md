@@ -915,3 +915,15 @@ Why: `docs/reviews/codex_audit4.md` (A4-1 to A4-5); triage `docs/reviews/triage_
   - Coverage is the fraction of masked L2-L5 slots with pi(i) != i. The registered >= 0.80 gate is unchanged.
   - Tests: an exact multiset per group; no canonical code received; termination on adversarial groups (all canonical
     codes equal, n = 1, n = 2 with crossed codes); resume equality of the stream.
+
+## E0a — clarification of E0's diversity kill (registered 2026-10-28, before any code result; raised by the Codex build)
+- E0 says "killed iff g <= -0.5, or the gain holds only with a diversity loss beyond those margins". The terms mean:
+  - **Gain:** any GPT-2 large improvement, g > 0. It need not meet the gate's g >= 1.0 or the TinyStories-33M
+    condition. The clause exists so that a Gen-PPL improvement bought by lower diversity reads as killed, not
+    inconclusive.
+  - **Diversity loss beyond those margins:** E0's unigram entropy < U0's - 0.05, or E0's MAUVE < U0's - 0.02. This
+    matches PD's kill clause.
+- Duplicates are not part of the kill, since they have no registered margin; a higher duplicate rate still fails the
+  gate.
+- **Full rule:** killed iff g <= -0.5, or (g > 0 and (entropy < U0 - 0.05 or MAUVE < U0 - 0.02)). The gate passes as
+  registered. Otherwise the result is inconclusive.
