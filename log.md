@@ -1677,3 +1677,68 @@ contrast below recomputed independently from the cells' per-group Gen-PPL.
     - Still unverified: Colab's $ per CU, Kaggle's quota, Vast's live prices.
   - Recommendation: Colab for T0. Benchmark one alternative (~$2) only if a paper-scale run is approved. Never move a
     comparison across GPU families.
+
+## R067 — Deep audit 14 (W2C + W2M-GR claim): no P0, no implementation defect; every R065 number reproduces; A14-1 (P1, wording) accepted: R065's claim wording is superseded by a conditional-replay wording; criterion (c) on its strict reading is not established (2026-10-28; review)
+- **Audit run.**
+  - Codex deep audit at `3b601dc` (local Codex CLI, gpt-6.1-sol / ultra). Doc `docs/reviews/codex_audit14.md` and
+    `docs/reviews/codex_audit14_numbers.json`, branch `codex/audit14` at `5b1f4ed`. Brief
+    `docs/prompts/codex_audit14_w2cgrclaim.md`; triage `docs/reviews/triage_audit14_2026-10-28.md`.
+  - Codex's closing message hit the usage limit after the audit files were complete (summary table present). Its
+    sandbox could not commit, so they were committed on its branch by hand, unchanged.
+  - Python ran in the audit's sandbox. Its suite, re-run here on the audited commit: 30 passed, 4 strict xfails, as
+    required. Ported with the markers removed, the four pass after this entry and the prompt note.
+- **Registered readings stand:** localization replicates; (i) and (iii) replicate; W2M-G's (ii) is "distributed".
+  - `results/w2mgr_analysis.json` reproduces byte for byte from the committed raw files (after CRLF normalisation).
+  - The audit's own json/math/statistics code agrees with every R065 table entry at printed precision, seed 0 included.
+  - The three results pass the fixed admission (A13-1) for the right reasons. Released and val hashes equal W2M-G
+    seed 0's and all six W2C manifests'.
+- **Corrections to R065** (append-only):
+  - **Margins.** Two printed bounds were rounded inward: seed 2's pi_2 is 0.02534 and seed 3's cut-6 interaction is
+    0.41572. Corrected: with margins: pi_2 < 0.026 vs 0.10, pi_6 >= 0.517 vs 0.30, sigma_6 <= 0.067 vs 0.20,
+    interactions > 0.415 vs 0.20.
+  - **Provenance.** Only the replay shares and contrasts were recomputed from the cells' per-group Gen-PPL. (i)'s
+    ratios come from the saved JS means and (iii)'s differences from the saved rho means. Their bootstrap CIs are
+    transcribed, not recomputed: the per-window arrays sit in each run's Drive cache, and the notebook's collector does
+    not copy them.
+  - **Sanity z** divides by the replay SE alone: a check against a fixed reference, as registered. With W2C's SE added
+    in quadrature, z is -1.46 / -0.39, -1.30 / +0.22 and -0.33 / -0.56. No pass changes.
+  - **Checkpoint identity.** W2C did not record its `final.pt` hashes. W2M-GR's six checkpoint hashes therefore cannot
+    be matched against W2C's. Names and metrics agree; no mismatch is shown.
+- **A14-1 (P1, accepted).** R065's claim wording and section 4 of the Astra round-4 prompt read the replay as an origin
+  ("the damage forms at levels 2-5", "not at L1") and drop the M3-prefix condition from "alone carry ~5%". Reproduced
+  from the cells:
+  - Switching levels 2-5 from M3 to M2 moves 0.511 of the contrast given M2's L1 and M3's levels 6-11, but 0.828 given
+    M3's L1 and M2's levels 6-11.
+  - M2's L1 moves 0.016 on an M3 continuation but 0.119 on an M2 continuation.
+  - The shares are not an allocation to levels. No single level and no cut at 3 or 5 was replayed.
+- **Corrected candidate wording (supersedes R065's claim wording):**
+  - The W2C half is unchanged from R063. Under one continuation protocol for the released TinyStories NCM (600 steps,
+    25% clean rows, W1's per-level rates, one mask stream), wrong codes drawn from the frozen released model given the
+    canonical coarser levels caused additional generation degradation relative to uniform-wrong replacement in the same
+    slots: M2 - M3 Gen-PPL +18.9 under GPT-2 large (each seed at least +18.36) and +29.8 under TinyStories-33M.
+    Canonical teacher-forced NLL rose by only 4.0 nats/window (0.53%), positive in every seed.
+  - The replay half is new. Crossed replay of whole level ranges reproduced a conditional response at seeds 1-3:
+    - M2's levels 1-5 rendered by M3's levels 6-11 carry 52.7% of the pure-model contrast in GPT-2 large mean log loss
+      of the decoded text; M2's level 1 carries 1.6%.
+    - M2's levels 6-11 on M3's levels 1-5 carry 5.3%.
+    - The prefix/suffix interaction is +0.444 / +0.420 at cuts 4 / 6.
+  - Limits stated with it:
+    - Roots (released-unigram draws) and noise are shared across cells.
+    - Whole-range interventions, not per-level ones.
+    - Scorer-defined output losses, not a quantity on codes; 0.53 x 18.9 is not an attributable Gen-PPL increment.
+    - M3's response to a foreign-prefix distribution and checkpoint compatibility (co-adaptation; no same-arm
+      cross-seed replay) remain open contributors to the interaction.
+    - No semantic attribution: this does not show what the levels encode.
+    - Audit 12's limits, plus the missing marginal-preserving reassignment control. The 5.5 Gen-PPL gap between M3 and
+      the released model is attributed to the clean rows on the evidence of the seed-0 M3-0 intervention.
+  - A dated correction note is added to section 4 of the sent prompt; the original text is kept.
+- **Criterion (c).** The audit does not certify (c) on the strict reading of `docs/brief.md` ("a replicated mechanistic
+  finding about what the levels encode"). I agree.
+  - What W2C + W2M-GR establish: a replicated, intervention-level finding about which level ranges carry a
+    training-induced generation failure that canonical NLL barely registers.
+  - What they do not establish: what those levels represent.
+  - Counting it as (c) would be the user's interpretive decision about the success bar, not a stronger result.
+  - Status: **not claimed**; options in `docs/claim_w2c_2026-10-28.md`.
+  - C-E1 (R060-R061) is the candidate that speaks directly to what levels 8 and finer encode.
+- Correction to R066: the panel's last check agrees with run-time rates (W2C used 19.7 CU against ~21 estimated), so
+  the "~1.25x burn" figures there are the planning margin, not a measured excess.

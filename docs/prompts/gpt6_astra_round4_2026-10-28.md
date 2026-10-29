@@ -144,6 +144,15 @@ because of the clean rows); no temperature-, frequency- or length-matched contro
 one model, domain and protocol; the localization is measured with one instrument (crossed replay of whole level
 ranges).
 
+**Correction (added 2026-10-28 after the prompt was sent; deep audit 14, R067).** The C-W2C + W2M-GR wording above
+overstates what crossed replay shows. Corrected: crossed replay of whole level ranges reproduces a conditional response:
+M2's levels 1-5 rendered by M3's levels 6-11 carry ~53% of the pure-model contrast in GPT-2 large mean log loss of the
+decoded text, M2's level 1 alone ~2%, and M2's levels 6-11 on M3's levels 1-5 ~5%, with a positive prefix/suffix
+interaction (~0.42-0.44). Roots and noise are shared across cells. M3's response to a foreign-prefix distribution and
+checkpoint compatibility (co-adaptation; no same-arm cross-seed replay was run) remain open, and this does not establish
+a semantic attribution or what the levels encode. Limits also missing above: no marginal-preserving reassignment
+control; scorer revisions and MAUVE features not pinned in the manifests.
+
 ## 5. Part A — Frontier map
 Quick searches (not a novelty clearance) suggest:
 - **Training corruptions in discrete diffusion LMs.** Recent work argues that uniform random replacements are a poor
