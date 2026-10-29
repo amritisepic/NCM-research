@@ -48,3 +48,35 @@ optionally Gemini 3.1 Pro (paid API). Expected cost is under $5 in total.
 2. Buy a small credit (~$10).
 3. Set the training / retention opt-outs.
 4. Add the key in OpenCode with `/connect`. The agent never handles keys.
+
+## Calibration result (2026-10-29)
+**Setup.**
+- OpenCode 1.19.5 through OpenRouter; account-level settings exclude providers that train on or retain prompts.
+- Read-only permissions, verified by a probe: writes, shell (except the test runner), web and out-of-tree reads were
+  refused.
+- The snapshot is PR 18's pre-fix head `a949044`, with no git history and with the diff against its base `733ea77`.
+- The prompt was blind (no hint of the bug), and the four models ran in parallel.
+- Ground truth: A13-1 (deep audit 13). The analyzer's admission check accepted results whose protocol block (clean bank,
+  sampler, CI), per-cell spec (cut, prefix, suffix, seeds) or group vectors depart from the registration. Codex's PR
+  review of the same head missed it.
+
+| Model | Found A13-1 | Other findings | Cost | Finished (launched together) |
+|---|---|---|---|---|
+| Kimi K3.1 Pro | **Yes** (GR-2: protocol / cell spec; GR-3: group vectors) | GR-4, GR-5: real, still in the merged analyzer; GR-1, GR-6: plausible, unverified. All real gaps were labelled P1, one level high | $2.04 | last (~2x the others) |
+| GLM-5.3 | No | R1, R2: the same real gaps as GR-5 / GR-4, correctly as P2 | $0.33 | 2nd |
+| Gemini 3.1 Pro | No; called the validation "rigid" | none | $1.47 | 3rd |
+| DeepSeek V4 Pro | No; called the validation "exhaustive" | none | $0.27 | 1st |
+
+**Real gaps the reviewers found that audits 13 and 14 did not.** Both are still open in `scripts/analyze_w2mgr.py`:
+- The (i) / (iii) intervals are checked only for being finite. `lo > hi`, or a mean outside its interval, is admitted.
+- The sanity reference is checked by its source filename, not against the W2C files' values.
+
+R065's numbers are unaffected: audit 14 recomputed them independently.
+
+**Reading.** One known-bug case is a coarse filter, not a ranking.
+- Kimi K3.1 Pro is the only model that found the bug. It is the recommended second reviewer.
+- GLM-5.3 is a cheap secondary pass: real findings, correct priorities, no false alarms.
+- DeepSeek V4 Pro and Gemini 3.1 Pro gave confident false negatives here.
+
+Before routing roles in a general workflow, build a 5-8-case benchmark from this repository's audited, fixed defects
+(for example A11-1, A13-1, R024) and score each model on bugs found per dollar and false-alarm rate.
