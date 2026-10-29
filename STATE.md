@@ -11,8 +11,8 @@ every R065 number reproduces; A14-1 (P1, wording) accepted.** R065's "the damage
 a conditional-replay wording (R067): M2's levels 1-5 rendered by M3 carry 52.7% of the GPT-2 large log-loss contrast,
 M2's L1 1.6%, M2's levels 6-11 on M3's 1-5 5.3%, interaction 0.444 / 0.420. Foreign-prefix response and checkpoint
 compatibility remain open, and there is no semantic attribution. **On the strict reading of (c) ("what the levels
-encode") W2C + W2M-GR is not established; counting it is the user's call.** The recommendation is to claim C-E1 as (c)
-and report W2C + W2M-GR beside it (`docs/claim_w2c_2026-10-28.md`). **Astra round 4 answered and triaged** (R066,
+encode") W2C + W2M-GR is not established.** User decisions (R068): **C-E1 claimed as criterion (c)**; W2C + W2M-GR
+reported as a scoped result beside it; W2M-GX, PD and E0 registered, to be built by Codex (`docs/claim_w2c_2026-10-28.md`). **Astra round 4 answered and triaged** (R066,
 `docs/plan_2026-10-27.md` section 11): write the paper now, no CU purchase before a T0 method gate. Proposed and not
 registered: cross-seed / single-level replay (~4-5 CU) and the marginal-preserving association kill (<= 6 CU).
 **Compute:** the official Colab CLI can pick the GPU and report CU, but runs only on Linux and macOS (WSL here,
@@ -204,10 +204,11 @@ reassignment kill gated on W2M-G, E1b (continue sampling on censored items, ~1.5
 - CPU: ~13.5 CPU-h before session 5; session 5 ~1.2 h (Sudoku paired rerun, test suites).
 
 ## Next 3 actions
-1. **User decisions** (`docs/claim_e1_2026-10-28.md`, `docs/claim_w2c_2026-10-28.md`, `docs/plan_2026-10-27.md`
-   section 11). The two claims (recommended: C-E1 as (c), W2C + W2M-GR as a scoped supporting result). Which proposals
-   to register: cross-seed / single-level replay, the P/D association kill, E0 / U0. The Colab CLI pilot in WSL.
-   The current CU balance from the panel.
-2. **Write-up:** draft the paper's three figures and claims from audited numbers (Astra Part D; no new compute).
-3. **If approved:** register R1 (cross-seed + single-level replay, eval-only) and/or the P/D kill before any code; one PR
-   each, with Codex review and a deep audit. **Do not run `l1r_L_ts_m2r`** (R058). No CU purchase before a T0 gate.
+1. **User: run the Codex build** by pasting `docs/prompts/codex_build_2026-10-29.md` into the Codex desktop app
+   (builds W2M-GX, PD, E0 on `claude/wip-*`; PR reviews; fresh-agent deep audit 15). Nothing is cleared to launch
+   until Claude triages audit 15 and merges (R068).
+2. **Claude, after the build:** triage audit 15 (re-run its suite on the audited commit, reproduce each P0 / P1, port
+   tests), check each PR's gate, merge, clear the notebooks. Then the Colab CLI smoke pilot once the user has set up
+   WSL (Python / uv) and the OAuth grant; launches need per-run approval.
+3. **Write-up:** C-E1 is claimed as (c) (R068); W2C + W2M-GR is reported as scoped (R067). Draft the three figures
+   from audited numbers. **Do not run `l1r_L_ts_m2r`** (R058). No CU purchase before a T0 gate (E0 / PD).

@@ -1742,3 +1742,29 @@ contrast below recomputed independently from the cells' per-group Gen-PPL.
   - C-E1 (R060-R061) is the candidate that speaks directly to what levels 8 and finer encode.
 - Correction to R066: the panel's last check agrees with run-time rates (W2C used 19.7 CU against ~21 estimated), so
   the "~1.25x burn" figures there are the planning margin, not a measured excess.
+
+## R068 — decisions (user, 2026-10-28): C-E1 claimed as criterion (c); W2C + W2M-GR reported as a scoped result, not (c); W2M-GX, PD and E0 registered; Codex to build them; Colab CLI pilot with per-run approval (process)
+- **C-E1: claimed as criterion (c)**, as scoped in `docs/claim_e1_2026-10-28.md`, with limit 4 (fixed items; thin text
+  margins under item resampling) stated in the claim. It uses the round-4 review's phrasing: posterior surprisal of the
+  canonical path within its exact reconstructed-output class.
+- **W2C + W2M-GR: reported as audited (R067 wording), not as (c)** (`docs/claim_w2c_2026-10-28.md`).
+- **Registered before any code or run** (user-approved; `docs/preregistration.md`, last three sections). Thresholds are
+  set here, not by the builder.
+  - **W2M-GX:** cross-seed, same-arm and single-level replay on W2C's seed 1-3 checkpoints. Eval-only, L4, ~4.5 CU.
+    It tests the compatibility and foreign-prefix readings that audit 14 left open.
+  - **PD:** M2's plausible-wrong codes deranged across rows at L2-L5. Seed 0, 175 steps, with a same-step M3
+    reference; coverage gate >= 0.80; ~4.5 CU.
+  - **E0:** masked L2-L5 contributions zeroed instead of replaced, against uniform corruption, no clean rows. Seed 0,
+    400 steps; ~4.5 CU. It is the only gate toward a paper-scale run.
+- **Build by Codex, to save Claude usage.** No process files change. The handoff prompt is
+  `docs/prompts/codex_build_2026-10-29.md`.
+  - A lead Codex agent spawns three builders on `claude/wip-*` branches: W2M-GX and PD in parallel, E0 stacked on PD.
+  - Each builder implements only its registration, never pushes to `claude/ncm-research` and never merges. It
+    tests, runs mutation checks, opens its PR and requests the Codex PR review.
+  - A fresh auditor agent runs deep audit 15 (`docs/prompts/codex_audit15_builds.md`).
+  - Claude then triages audit 15 and merges.
+  - Independence is weaker than before: builder, PR reviewer and auditor are all Codex. The registrations, the audit
+    questions and the final triage stay with Claude.
+- **Colab CLI pilot approved; the user approves each run.** Install the official CLI in WSL; the user completes the
+  OAuth grant. The first run is a < 0.1-CU smoke notebook on an L4. WSL Debian has no Python, curl or git yet; the
+  user installs them (sudo).

@@ -785,3 +785,106 @@ Why: `docs/reviews/codex_audit4.md` (A4-1 to A4-5); triage `docs/reviews/triage_
 - **Cost:** per seed 8 cells x 2048 samples, three 512-sample banks, the bank forwards and (iii) for three models: ~20-25
   L4-minutes per seed (seed 0's full run took ~31 L4-minutes with 11 cells, four banks and (iv)); cap 40 L4-minutes per
   seed; ~2 CU at run-time rates for three seeds (~2.5 at the ~1.25x burn).
+
+## W2M-GX — cross-seed and single-level replay on W2C's seed 1-3 checkpoints (registered 2026-10-28, after W2M-GR (R065) and deep audit 14 (R067), before any code or run; exploratory, supports the scoped W2C + W2M-GR result)
+- **Why:** audit 14 (A14-1) left two open contributors to W2M-GR's prefix/suffix interaction: checkpoint
+  compatibility (co-adaptation within one checkpoint) and M3's response to a foreign-prefix distribution. It also noted
+  that whole-range cuts at 2, 4, 6 cannot say which of levels 2-5 matter. Approved by the user (2026-10-28).
+- **Models:** the released generator; M2_s and M3_s for s in {1, 2, 3} (W2C's `final.pt`). Record each checkpoint's
+  SHA-256 in the result.
+- **Protocol:** W2M-G's sampler, scorers, precision and noise, unchanged:
+  - 8 groups x 256 per cell, replay seeds 0-7, roots seed 2027.
+  - Released-unigram roots shared across cells.
+  - fp32, TF32 off, eval mode, one L4.
+
+  New cells only; W2M-GR's cells are not re-run. "A_s -> B_t at cut c" means A_s samples levels 1..c-1 and B_t samples
+  levels c..11.
+  - (X) Cross-seed, cut 6, every ordered pair s != t: M2_s -> M3_t, M3_s -> M2_t, **M2_s -> M2_t** and
+    **M3_s -> M3_t** (24 cells).
+  - (S) Single-level swaps on seed s's own pair, for l = 1..5 (30 cells over three seeds):
+    - M3_s everywhere except level l, which M2_s samples;
+    - M2_s everywhere except level l, which M3_s samples.
+  - (C) Cuts 3 and 5 on seed s's own pair: M2_s -> M3_s and M3_s -> M2_s (12 cells).
+- **Quantities.** l is GPT-2 large mean log loss of the decoded text per group (TinyStories-33M beside).
+  delta_s = l(M2_s, M2_s) - l(M3_s, M3_s), from W2M-GR's pure cells of seed s.
+  - Same-arm compatibility penalty, for A in {M2, M3}, with delta_bar the mean of delta_s and delta_t:
+    kappa_A(s, t) = [l(A_s -> A_t, 6) - (l(A_s, A_s) + l(A_t, A_t)) / 2] / delta_bar.
+  - Cross-seed shares at cut 6: pi_6(s, t) = [l(M2_s -> M3_t) - l(M3_t, M3_t)] / [l(M2_s, M2_s) - l(M3_t, M3_t)].
+    sigma_6(s, t) is defined likewise with M3_s -> M2_t.
+  - Single-level effects on seed s:
+    - e_up(l) = [l(M3 with M2 at l) - l(M3, M3)] / delta_s;
+    - e_down(l) = [l(M2, M2) - l(M2 with M3 at l)] / delta_s;
+    - pi_3, pi_5, sigma_3, sigma_5.
+  - Jackknife SE over the 8 groups for every ratio.
+- **Readings (seeds 1-3; GPT-2 large primary):**
+  - **Compatibility minor** if every |kappa_M2(s, t)| <= 0.10 and every |kappa_M3(s, t)| <= 0.10.
+  - **Compatibility material** if the mean of kappa_M2 over the six pairs is >= 0.25.
+  - Otherwise compatibility is mixed.
+  - **Cross-seed localization holds** if every pi_6(s, t) >= 0.30 and every 1 - pi_6(s, t) - sigma_6(s, t) >= 0.20.
+  - It **fails** if the mean pi_6(s, t) < 0.15.
+  - The single-level effects and cuts 3 / 5 are descriptive: no reading is registered. "Concentrated at level l" may be
+    said only if e_up(l) and e_down(l) each carry >= 50% of the summed effect over l = 1..5 in every seed.
+  - **Sanity:** every pure cell re-sampled for kappa must equal W2M-GR's pure cell of the same checkpoint within 3 SE.
+    Alternatively, the pure cells may be taken from W2M-GR's results if the noise streams are provably identical. The
+    code must state which.
+- **Cost:** 66 cells x 2048 samples. W2M-GR ran 8 cells per seed in ~18.5 L4-minutes, so this is ~2.6 L4-hours, ~4.5
+  CU at run time; cap 3.5 L4-hours. It may be split into one run per seed (~1.5 CU each) if that fits the notebooks'
+  resume rules better.
+
+## PD — marginal-preserving association kill: plausible-wrong codes reassigned across examples at L2-L5 (registered 2026-10-28, before any code or run; exploratory kill; Astra round 4 Direction 1)
+- **Why:** audits 12 and 14 list the missing control. Does M2's damage need the *association* between a plausible
+  wrong code and its own example, or only the non-uniform multiset of wrong codes? Approved by the user (2026-10-28).
+- **Arms.** All use seed 0 and continue the released TinyStories generator under W2M's protocol: W1's per-level rates,
+  one mask stream, 25% clean rows, the same data order.
+  - **P:** M2 exactly (`L_ts_m2_frozen_pw.yaml`).
+  - **D:** M2's proposals are computed as in P. Then, at levels 2-5 only, the proposed wrong codes of the masked slots
+    are permuted across rows by a seeded derangement, within each batch, level and position.
+    - A receiving slot whose canonical code equals the incoming code keeps its own proposal.
+    - Every other level is exactly as in P. Batches, masks, clean rows and the proposal forward are identical to P's.
+    - The derangement uses its own RNG stream, saved in the checkpoint, which no other stream consumes.
+  - **U:** M3 (`L_ts_m3_uniform_wrong.yaml`), the same-step reference.
+  - All three run **175 steps**, then W2M's final evaluation at step 175 (16 groups x 256, fp32).
+- **Coverage:** the fraction of masked L2-L5 slots in D that receive another row's code, logged per level.
+  - It must be >= 0.80 overall for any reading; below that the kill is **inconclusive**.
+  - It is checked on CPU before launch, on the real data and masks for the first 20 steps.
+- **Quantities:**
+  - L_X = mean over the 16 groups of log Gen-PPL (GPT-2 large; TinyStories-33M beside).
+  - r = (L_P - L_D) / (L_P - L_U).
+  - Paired SEs over groups.
+  - MAUVE, unigram entropy, adjacent duplicates per 1k.
+- **Readings:**
+  - **Pilot valid** iff L_P - L_U >= 0.15 nats/token under GPT-2 large. Otherwise it is **underpowered**, with no
+    reading. A 600-step reference must not be substituted.
+  - **Association matters (rescue)** iff all of: r >= 0.25 under both scorers; D's duplicates <= P's; D's MAUVE
+    >= P's - 0.02; D's entropy >= U's - 0.05.
+  - **Killed** iff r <= 0.10 under GPT-2 large, or if the rescue holds only with an entropy or MAUVE drop beyond those
+    margins.
+  - Otherwise: inconclusive.
+  - A rescue supports example-conditioned association as a causal factor at fixed marginals. It does not separate
+    semantic conflict from within-row coherence or embedding displacement.
+- **If rescue:** P and D at fresh seeds 4-6, 600 steps (~28 CU at run-time rates), registered separately before launch.
+- **Cost:** P and D ~15 A100-min each (M2 ran 50.7 min per 600 steps) and U ~9, plus three final evals. About 4.5 CU at
+  run-time rates; cap 5 CU (60 A100-minutes total).
+
+## E0 — middle-level erasure kill: zero the masked L2-L5 contributions instead of replacing them (registered 2026-10-28, before any code or run; exploratory kill; Astra round 4 Direction 3)
+- **Why:** the only candidate method gate toward a paper-scale run (Astra round 4, Part C). Approved by the user
+  (2026-10-28). The reviewer's estimate of P(gain) is about 25%.
+- **Arms.** All use seed 0 and continue the released TinyStories generator for 400 steps: W1's per-level rates, one
+  mask stream, no clean rows, the same data order.
+  - **U0:** M0's uniform-corruption recipe (`L_ts_m0_uniform.yaml`, the upstream replacement convention), with
+    `clean_row_frac: 0.0`.
+  - **E0:** identical to U0, except at levels 2-5. There, the masked slots' code-embedding contributions are replaced
+    by a fixed zero vector before the existing upsampling and convolution, instead of by a replacement code.
+    - Targets, rates, masks, parameters and sampling depth are unchanged.
+    - No flag or extra input is added.
+    - At inference nothing changes: no slot is erased.
+- **Evaluation:** W2M's final evaluation at step 400 (16 x 256, fp32, both scorers, MAUVE, entropy, duplicates).
+- **Readings:** gain g = G(U0) - G(E0), GPT-2 large Gen-PPL, paired over the 16 groups.
+  - **Method gate passes** iff all of: g >= 1.0; E0 better under TinyStories-33M; E0's entropy >= U0's - 0.05; E0's
+    MAUVE >= U0's - 0.02; E0's duplicates <= U0's.
+  - **Killed** iff g <= -0.5, or the gain holds only with a diversity loss beyond those margins.
+  - Otherwise: inconclusive. An inconclusive result buys nothing.
+- **If it passes:** E0 and U0 at fresh seeds 4-6, 600 steps (~16 CU), registered separately. No CU purchase unless that
+  three-seed confirmation passes (Astra T1 / T2) and the user decides.
+- **Cost:** ~20 A100-min per arm at 400 steps (M3 ran ~29 min per 600), plus two final evals: ~4.5 CU; cap 5 CU (55
+  A100-minutes total).
