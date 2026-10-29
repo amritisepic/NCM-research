@@ -32,8 +32,8 @@ original source was restored in a `finally` block. All twelve were detected; non
 | Coverage gate | `coverage >= 0.80` to `coverage > 0.80` | `test_pd_coverage_includes_point80_and_gates_any_reading_below` | 1 failed |
 | Inconclusive | final `reading = "inconclusive"` to `reading = "rescue"` | `test_pd_rescue_requires_point25_under_both_scorers` | 2 failed |
 | Underpowered priority | `elif not valid:` to `elif not valid and False:` | `test_pd_validity_includes_point15_and_refuses_below` | 1 failed |
-| Same-step reference | `steps != 175` to `steps not in (175, 600)` | `test_pd_refuses_unregistered_or_inconsistent_inputs[steps]` | 1 failed |
-| Mean log loss | mean group log loss to log mean group PPL | `test_pd_means_group_log_ppl_before_averaging_and_pairs_contrasts` | 1 failed |
+| Same-step reference | `if result.get("steps") != 175:` to `if result.get("steps") not in (175, 600):` | `test_pd_refuses_unregistered_or_inconsistent_inputs[steps]` | 1 failed |
+| Mean log loss | `float(groups[arm][scorer].mean())` to `float(np.log(np.exp(groups[arm][scorer]).mean()))` | `test_pd_means_group_log_ppl_before_averaging_and_pairs_contrasts` | 1 failed |
 
 ## Notebook budget behavior
 
@@ -61,3 +61,20 @@ Budget exhaustion before a command launches was reproduced returning exit 1 (a s
 the notebook's cap-release branch. It now prints the reason and returns 124. A lightweight standard-library check
 confirmed exit 124, no child launched, unchanged ledger and released ledger lock; the equivalent pytest regression
 is `test_exhausted_budget_returns_cap_exit_without_launching_command`.
+
+## Restored-environment notebook invariants
+
+The first complete-suite attempt was stopped at 13% after an obsolete notebook invariant was identified; it has no
+complete-suite result. Targeted execution independently reproduced **4 failed, 39 passed in 1.98s**: the three PD
+notebooks' cap-only release and the shared unchanged-run-template assertion. The generic tests now allow early
+release only for `release_on_cap` specs, require the exact collection code before `runtime.unassign()`, require that
+release to sit inside the `p.returncode == 124` branch, and preserve the following failing status. Removing only
+that verified branch must recover the unchanged ordinary run template. Ordinary notebooks retain the last-cell-only
+release invariant.
+
+The broader focused run then independently reproduced the old L1R-only A100-guard assertion (**1 failed, 100 passed
+in 2.75s**). It now checks the declared A100 requirement for every notebook while explicitly retaining L1R's A100
+requirement and guard-before-download/run ordering. PD's own tests still require all three registered A100 guards.
+The complete notebook and PD-launch subset then passed: **101 passed, 20 warnings in 2.42s**. No production code,
+registered protocol or historical notebook was changed by these test updates. The warnings come from existing
+synthetic empty-distribution checks in `scripts/w1_sample_stats.py`.
