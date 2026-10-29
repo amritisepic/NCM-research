@@ -888,3 +888,30 @@ Why: `docs/reviews/codex_audit4.md` (A4-1 to A4-5); triage `docs/reviews/triage_
   three-seed confirmation passes (Astra T1 / T2) and the user decides.
 - **Cost:** ~20 A100-min per arm at 400 steps (M3 ran ~29 min per 600), plus two final evals: ~4.5 CU; cap 5 CU (55
   A100-minutes total).
+
+## W2M-GXa and PDa — clarifications before any code result (registered 2026-10-28; raised by the Codex build, answered by Claude with the user's go-ahead)
+- **W2M-GXa (sigma_6 cross-seed).** W2M-GX's "sigma_6(s, t) likewise with M3_s -> M2_t" was ambiguous. The interaction
+  is only meaningful when pi and sigma come from the same model pair. For the pair (M2_s, M3_t):
+  - pi_6(s, t) = [l(M2_s -> M3_t) - l(M3_t, M3_t)] / [l(M2_s, M2_s) - l(M3_t, M3_t)], as registered.
+  - sigma_6(s, t) = [l(M3_t -> M2_s) - l(M3_t, M3_t)] / [l(M2_s, M2_s) - l(M3_t, M3_t)]. This uses the cell with M3_t's
+    prefix and M2_s's suffix, which is among the 24 (X) cells.
+  - The interaction is 1 - pi_6(s, t) - sigma_6(s, t). The readings are unchanged.
+- **PDa (derangement rule).** W2M-GX's sibling PD said that a receiving slot whose canonical code equals the incoming
+  code "keeps its own proposal". That breaks exact multiset preservation. Example: canonical [0, 1], proposals [1, 2];
+  the swap gives [2, 1], and the fallback gives [2, 2]. The replacement rule within each (batch, level, position)
+  group of masked slots at levels 2-5 is:
+  - D uses a permutation pi of the group's slots: slot i receives proposal[pi(i)]. Any permutation preserves the
+    multiset exactly.
+  - pi must satisfy proposal[pi(i)] != canonical[i] for every i. Fixed points (pi(i) = i, the slot keeps its own
+    proposal) are allowed; they are always valid, because M2's own proposal excludes the canonical code.
+  - Construction, using only the derangement RNG stream:
+    1. Draw a uniformly random derangement of the group (with n = 1, the identity).
+    2. While some slot i collides (proposal[pi(i)] == canonical[i]), take the lowest-index colliding i. Among slots
+       j != i, collect those whose swap of targets clears both collisions (proposal[pi(j)] != canonical[i] and
+       proposal[pi(i)] != canonical[j]). If any exist, pick one uniformly and swap pi(i) and pi(j). Otherwise make i
+       a fixed point: with k = pi^-1(i), set pi(k) = pi(i) and pi(i) = i.
+    3. The loop terminates: a swap strictly reduces the number of colliding slots, and a fixed point is never a
+       collision. The identity is always valid.
+  - Coverage is the fraction of masked L2-L5 slots with pi(i) != i. The registered >= 0.80 gate is unchanged.
+  - Tests: an exact multiset per group; no canonical code received; termination on adversarial groups (all canonical
+    codes equal, n = 1, n = 2 with crossed codes); resume equality of the stream.
