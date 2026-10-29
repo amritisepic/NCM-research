@@ -827,9 +827,9 @@ def test_the_gpu_guard_runs_before_any_download_and_before_the_run_cell():
 def test_no_other_notebook_has_the_new_guard_and_the_a100_guard_is_unchanged():
     for n, spec in MK.RUNS.items():
         cells = [src(c) for c in MK.make(n, spec)["cells"]]
-        assert any("GPU requirement passed" in t for t in cells) == (n == "w2mgr_eval"), n
+        assert any("GPU requirement passed" in t for t in cells) == (n in ("w2mgr_eval", "w2mgx_eval")), n
         assert any("GPU guard passed" in t for t in cells) == bool(spec.get("require_a100")), n
-        if n != "w2mgr_eval":
+        if n not in ("w2mgr_eval", "w2mgx_eval"):
             assert "require_gpu" not in spec
     assert MK.RUNS["w2mg_eval"]["cmds"] == ["python scripts/w2mg_eval.py --run_root {R} --run_dir {R}/w2mg_eval --seed 0"]   # no --arms: W2M-G
     assert MK.RUNS["w2mg_eval"]["seeds"] == [0]

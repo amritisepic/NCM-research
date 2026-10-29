@@ -297,6 +297,20 @@ RUNS["w2mgr_eval"] = {
     "cmds": ["python scripts/w2mg_eval.py --run_root {R} --run_dir {R}/w2mgr_eval_s{S} --seed {S} --arms m2,m3"],
     "cap": "40 L4-minutes per seed",
 }
+RUNS["w2mgx_eval"] = {
+    "desc": "W2M-GX / W2M-GXa (registered, eval-only): all M2_s and M3_s W2C final.pt checkpoints at seeds 1-3, "
+            "cross-seed cut-6 compatibility, single-level swaps L1-L5 and cuts 3/5. Reads Drive runs/ "
+            "L_ts_m2_frozen_pw_s{1,2,3}/final.pt and L_ts_m3_uniform_wrong_s{1,2,3}/final.pt; use the same Drive as "
+            "w2c1. One run loads all six checkpoints because cross-seed cells need both seeds, and caches each finished "
+            "cell for resume. Six pure cells are re-sampled and checked against W2M-GR within 3 SE. "
+            "fp32, TF32 off, L4 only (whole-word guard). 66 new cells plus six pure sanity cells: ~2.8 L4-hours, "
+            "~4.8 CU at run-time rates (L4 ~1.7 CU/hour), cap 3.5 L4-hours (210 L4-minutes). The runtime-release "
+            "cell returns the GPU after collecting results and provenance. Waits for the user's go.",
+    "gpu": "L4 only", "units": 4.8, "needs": ["ts", "ckpt"], "seeds": [0], "require_gpu": "L4",
+    "cmds": ["python scripts/w2mg_eval.py --run_root {R} --run_dir {R}/w2mgx_eval --seed 0 "
+             "--arms m2_s1,m3_s1,m2_s2,m3_s2,m2_s3,m3_s3"],
+    "cap": "3.5 L4-hours (210 L4-minutes)",
+}
 RUNS["e1b_continue"] = {
     "desc": "E1b (pre-registered, eval-only, no training; criterion (c) candidate C1): continued E1 sampling at cut 8 on the "
             "censored and wide items of the released models (WMT14 J0 and TinyStories A0; the item lists are recomputed from the "
@@ -445,6 +459,28 @@ for seed in SEEDS:
             provenance(rd, {'event': 'end', 'git_sha': GIT_SHA, 'utc': utc(), 'exit': p.returncode,
                             'minutes': round((time.time() - t) / 60, 2), 'last_logged_step': last_step(rd)})
         if p.returncode != 0:
+            # W2M-GX's registered cumulative cap must also return its allocated L4 on the failure path.
+            bp = f'{rd}/runtime_budget.json' if rd else ''
+            if 'w2mgx_eval' in CMDS_RAW[i] and os.path.exists(bp):
+                budget = json.load(open(bp))
+                if budget['spent_seconds'] >= budget['limit_seconds']:
+                    partial = f'{rd}/result.json'
+                    if os.path.exists(partial):
+                        result = json.load(open(partial)); result['complete'] = False
+                        result['stop_reason'] = 'registered cumulative 210 L4-minute cap'
+                        with open(partial, 'w') as stream: json.dump(result, stream, indent=1)
+                    out = f'{DRIVE}/results/w2mgx_eval'; os.makedirs(out, exist_ok=True)
+                    name = os.path.basename(rd)
+                    for f in ['result.json', 'manifest.json', 'runtime_budget.json', 'provenance.jsonl']:
+                        if os.path.exists(f'{rd}/{f}'):
+                            shutil.copy(f'{rd}/{f}', f'{out}/{name}__{f}')
+                    json.dump({'run': 'w2mgx_eval', 'gpu': GPU, 'finished_utc': utc(), 'git_sha': GIT_SHA,
+                               'cap_reached': True, 'complete': False, 'sessions': {name: history(rd)}},
+                              open(f'{out}/_meta.json', 'w'), indent=1)
+                    print('W2M-GX cap reached: partial results collected; finished cell caches stay in Drive runs/. '
+                          'Returning the L4 runtime.', flush=True)
+                    from google.colab import runtime
+                    runtime.unassign()
             raise SystemExit('command failed; fix and re-run this cell (it resumes)')
 '''
 
@@ -458,9 +494,17 @@ for seed in SEEDS:
         rd = c.split('--run_dir ')[1].split()[0].format(R=R, S=seed)
         name = os.path.basename(rd)
         sessions[name] = history(rd)
-        for f in ['result.json', 'metrics.jsonl', 'config.yaml', 'calib.json', 'hyp_test.json', 'hyp_val.json', 'run_manifest.json', 'eval_final.json', 'eval_6000.json', 'eval_20500.json', 'samples_final.json', 'provenance.jsonl'] + sorted(n for n in (os.listdir(rd) if os.path.isdir(rd) else []) if n.startswith('hyp_val_step') and n.endswith('.json')):
+        for f in ['result.json', 'metrics.jsonl', 'config.yaml', 'calib.json', 'hyp_test.json', 'hyp_val.json', 'run_manifest.json', 'manifest.json', 'runtime_budget.json', 'eval_final.json', 'eval_6000.json', 'eval_20500.json', 'samples_final.json', 'provenance.jsonl'] + sorted(n for n in (os.listdir(rd) if os.path.isdir(rd) else []) if n.startswith('hyp_val_step') and n.endswith('.json')):
             if os.path.exists(f'{rd}/{f}'):
                 shutil.copy(f'{rd}/{f}', f'{out}/{name}__{f}')
+        # Audit 14: retain per-window JS / rho arrays needed for independent bootstrap recomputation.
+        arrays = os.path.join(rd, 'cells')
+        if os.path.isdir(arrays):
+            for f in sorted(os.listdir(arrays)):
+                if f.endswith('.npy') and f.startswith(('js_', 'rho_')):
+                    dest = os.path.join(out, name + '__cells')
+                    os.makedirs(dest, exist_ok=True)
+                    shutil.copy(os.path.join(arrays, f), os.path.join(dest, f))
 for f in os.listdir('results'):   # diagnostics write straight into the repo's results/
     if f.startswith(('diag_', 'b2_jacobi_', 'sudoku_', 'wmt14_')) and os.path.getmtime(f'results/{f}') > T_START:
         shutil.copy(f'results/{f}', f'{out}/{f}')
