@@ -1,12 +1,18 @@
 # STATE — read this first
 
-_Last updated: 2026-10-28, W2M-GR built and merged (R064, PR 18; deep audit 13); `w2mgr_eval` cleared. Before that, deep audit 12 (R063: W2C claim, no P0/P1; W2M-GR registered). Before that, W2C stage 1 read (R062; PR 17 merged). Before that, deep audit 11 (R061: E1 claim audit; claim drafted for the user). Before that, session 9 continued (R058-R060: W2M-G, M3-0, E1b read). Before that, session 10 (R057: R056 package registered, built, merged in PR 16 after Codex and deep audit 10; user bought 100 CU). Before that, session 9 (R052-R055; plan `docs/plan_2026-10-27.md`; handoff `docs/prompts/handoff_2026-10-27.md`). Branches: `claude/ncm-research` (notebooks clone it) and
+_Last updated: 2026-10-28, W2M-GR read (R065: localization replicates); Astra round-4 prompt final; handoff `docs/prompts/handoff_2026-10-29.md`. Before that, W2M-GR built and merged (R064, PR 18; deep audit 13). Before that, deep audit 12 (R063: W2C claim, no P0/P1; W2M-GR registered). Before that, W2C stage 1 read (R062; PR 17 merged). Before that, deep audit 11 (R061: E1 claim audit; claim drafted for the user). Before that, session 9 continued (R058-R060: W2M-G, M3-0, E1b read). Before that, session 10 (R057: R056 package registered, built, merged in PR 16 after Codex and deep audit 10; user bought 100 CU). Before that, session 9 (R052-R055; plan `docs/plan_2026-10-27.md`; handoff `docs/prompts/handoff_2026-10-27.md`). Branches: `claude/ncm-research` (notebooks clone it) and
 `claude/ncm-phase2-analysis-finetune-pkh64d` (older mirror). Repo is PUBLIC: commit nothing identifying (no
 personal names/emails, no absolute local paths, no session links, no credentials). Goals, success bar and rules:
 `docs/brief.md`._
 
 ## Current phase
-**Latest (R063, 2026-10-28):** **deep audit 12 (W2C claim): no P0 / P1; every R062 number reproduces; executed traces
+**Latest (R065, 2026-10-28):** **W2M-GR: the localization replicates at seeds 1-3** (registered thresholds, wide
+margins): M2's prefix through L1 carries 0.016 of the M2-M3 log-loss contrast, through L5 0.527; M2's levels 6-11 alone
+0.053; interaction 0.444 / 0.420 at cuts 4 / 6; every seed within ~0.03 of seed 0. (i) and (iii) replicate too. **With
+W2C (R062-R063), believed to meet criterion (c) as registered; not claimed**: the user is told first (done 2026-10-28),
+and a claim audit (Tier 2: R065's numbers and the combined wording) comes before a claim. ~1.6 CU. No Colab run in
+flight. Astra round-4 prompt final (`docs/prompts/gpt6_astra_round4_2026-10-28.md`), not yet sent.
+**R063 (2026-10-28):** **deep audit 12 (W2C claim): no P0 / P1; every R062 number reproduces; executed traces
 confirm the matched comparison.** Claim wording narrowed (comparative to M3; "plausible-wrong" defined as frozen
 released-model draws given canonical coarser levels; each seed at least +18.36). Not a finding about the levels until
 the localization replicates: **W2M-GR registered** (`733ea77`, user-approved; W2M-G (i)-(iii) on the seed 1-3
@@ -187,12 +193,10 @@ reassignment kill gated on W2M-G, E1b (continue sampling on censored items, ~1.5
 - CPU: ~13.5 CPU-h before session 5; session 5 ~1.2 h (Sudoku paired rerun, test suites).
 
 ## Next 3 actions
-1. **User (Colab): `w2mgr_eval` is running** (launched 2026-10-28, ~23:00 UTC) (R064: PR 18 merged at `17a4bf4` after Codex x2 and deep audit 13, A13-1
-   fixed). L4 only, seeds 1-3, ~2-2.5 CU; same Drive as the `w2c1_*` notebooks. Then copy `results/colab/w2mgr_eval/`
-   and run `python scripts/analyze_w2mgr.py`. The W2C claim (wording in R063) waits for its reading. Merge no code
-   while it runs.
-2. **User: the E1 criterion-(c) claim** (`docs/claim_e1_2026-10-28.md`, R061): claim it as scoped, as supporting
-   evidence only, or hold.
-3. **User: next compute (~95 CU expected).** Options: W2M-G localization on the seed 1-3 checkpoints (eval-only, ~2 CU
-   per seed on L4; `scripts/w2mg_eval.py` pins seed 0, small code change + registration); the 0%-clean factorial; Phase
-   3 synthesis and write-up. **Do not run `l1r_L_ts_m2r`** (R058: its gate failed).
+1. **User: send the Astra round-4 prompt** (`docs/prompts/gpt6_astra_round4_2026-10-28.md`; frontier map, wide
+   brainstorm, budget tiers, compute sources, hostile review of C-E1 and C-W2C+W2M-GR). Triage the answer in the repo.
+2. **Claim audit 14 (Tier 2)** of the combined W2C + W2M-GR claim: recompute R065, check the wording and scope (brief from
+   `docs/reviews/AUDIT_BRIEF_TEMPLATE.md`; local Codex CLI). Then the user decides on both claims (E1: as scoped /
+   supporting evidence / hold; W2C + W2M-GR: as audited / hold).
+3. **Compute options** (`docs/prompts/handoff_2026-10-29.md`): a Colab MCP so notebooks run from Claude Code; alternative
+   GPU providers before any +500-1000 CU purchase; measured throughput first. **Do not run `l1r_L_ts_m2r`** (R058).

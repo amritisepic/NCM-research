@@ -1607,3 +1607,35 @@ A100-min, ~21 CU at 5.3 CU/h (~26 at the ~1.25x burn). Raw results: commit `97b2
 - **Cleared to launch: `w2mgr_eval`** (L4, seeds 1-3, ~20-25 L4-min per seed, cap 40; ~2-2.5 CU). It reads W2C's
   seed 1-3 `final.pt` from the same Drive `runs/` folder as the `w2c1_*` notebooks. Read with
   `python scripts/analyze_w2mgr.py` after copying `results/colab/w2mgr_eval/`.
+
+## R065 — W2M-GR: the localization replicates at seeds 1-3 (registered): M2's damage forms at levels 2-5 and is amplified by its own later levels, not at L1; (i) and (iii) replicate; with W2C, believed to meet criterion (c); not claimed (2026-10-28; registered W2M-GR)
+Notebook `w2mgr_eval`, NVIDIA L4, at `46b0470` (code identical to PR 18's merge `17a4bf4`: `git diff --stat` over
+`src scripts configs assets notebooks` empty), one session per seed, exit 0: 18.9 / 18.5 / 18.1 min (55.5 L4-min, ~1.6
+CU). Raw results: commit `9259d1c`. `scripts/analyze_w2mgr.py` -> `results/w2mgr_analysis.json`; every share, ratio and
+contrast below recomputed independently from the cells' per-group Gen-PPL.
+  | seed | pi_2 | pi_4 | pi_6 | sigma_6 | interaction c4 / c6 | TS-33M pi_2 / pi_6 / sigma_6 | sanity z (M2, M3) |
+  |---|---|---|---|---|---|---|---|
+  | 1 | 0.011 | 0.226 | 0.540 | 0.042 | 0.445 / 0.418 | 0.005 / 0.495 / 0.024 | -1.66 / -0.50 |
+  | 2 | 0.025 | 0.232 | 0.524 | 0.051 | 0.445 / 0.425 | 0.018 / 0.495 / 0.045 | -1.45 / +0.26 |
+  | 3 | 0.011 | 0.211 | 0.517 | 0.067 | 0.441 / 0.416 | 0.012 / 0.479 / 0.056 | -0.42 / -0.86 |
+  | mean (seed SD) | 0.016 (0.008) | 0.223 (0.011) | 0.527 (0.012) | 0.053 (0.013) | 0.444 / 0.420 | 0.012 / 0.490 / 0.042 | |
+  | seed 0 (R058, not pooled) | 0.009 | 0.220 | 0.511 | 0.061 | 0.469 / 0.428 | 0.012 / 0.487 / 0.055 | -0.96 / -1.06 |
+  Shares of the M2 - M3 log-loss contrast under GPT-2 large (TinyStories-33M beside); the sanity z compares the pure
+  cells with W2C's final-eval Gen-PPL of the same seed.
+- **Registered readings: localization replicates** (every condition in every seed, with margins: pi_2 <= 0.025 vs
+  0.10, pi_6 >= 0.517 vs 0.30, sigma_6 <= 0.067 vs 0.20, interactions >= 0.416 vs 0.20; the TinyStories-33M seed means
+  too). **(i) replicates:** M2 and M3 diverge on generated contexts 6.2-7.0x (released and M2 samples) and 5.4-5.5x (M3
+  samples) more than on real ones (J_clean 0.0120-0.0126 nats), every lower bound >= 5.16. **(iii) replicates:** M2's L1
+  leans less on the root, rho(M3) - rho(M2) = 1.38 / 1.40 / 1.38 nats per window, CIs [1.27, 1.50] / [1.29, 1.53] /
+  [1.27, 1.50] (released 3.04, M2 1.99-2.05, M3 3.38-3.43). Sanity: all pure cells within 3 SE of W2C. W2M-G's own (ii)
+  reading is "distributed" in every seed under both scorers, as at seed 0.
+- **Status: with W2C (R062, R063), believed to meet criterion (c) as registered; not claimed.** The candidate claim:
+  under one continuation protocol for the released TinyStories NCM, plausible-wrong replacement causes additional
+  generation damage relative to uniform-wrong replacement in the same slots, which canonical teacher-forced NLL barely
+  registers; the damage forms at levels 2-5 (M2's prefix through L5 carries ~53% of the log-loss contrast, through L1
+  ~2%) and is amplified by M2's own later levels (interaction ~0.42-0.44), which alone carry ~5%. The user is told
+  before any further compute is spent on it. Before a claim: a claim audit (Tier 2) of R065's numbers and the combined
+  wording (audit 13 covered the code, not these numbers). Audit 12's limits carry over (comparative; no temperature- or
+  frequency-matched control; one model, domain and protocol).
+- Every seed reproduces seed 0's values within ~0.03, so the localization is not a seed-0 accident; it is still a
+  property of these two arms under this protocol, measured with this crossed-replay instrument.
