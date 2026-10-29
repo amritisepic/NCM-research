@@ -93,3 +93,19 @@ binding constraint at this scale; wall time (~25 A100-hours per run), availabili
    matched comparison entirely on one device type. Never resume an L4 or A100 stream on a different GPU family.
 4. **Credits:** the Lambda research-credit application and Modal's free Starter credit are the user's to apply for;
    neither is budgeted.
+
+## 4. Colab CLI pilot (2026-10-28)
+- **Install.** `google-colab-cli` 0.7.5 in WSL Debian via `uv tool install --python 3.12`. The CLI needs Python >= 3.12;
+  Debian 12 ships 3.11.
+- **Sign-in.** OAuth copy-paste flow by the user. The granted scopes are Colab, `drive.file`, email and profile. The token
+  is in `~/.config/colab-cli/token.json` (mode 600).
+- **Secret leak.** The CLI forces DEBUG logging to `~/.config/colab-cli/colab.log`, which writes the full OAuth token
+  response there on every sign-in and refresh. Point the log at `/dev/null` (done here). An earlier grant whose tokens
+  were exposed this way was revoked.
+- **Smoke run.** `colab run --gpu L4` with a 5-second script, 13 s end to end:
+  - it got an NVIDIA L4 (23 GB) with torch 2.11.0+cu130, the stack of the W2M-GR runs;
+  - the remote head of `claude/ncm-research` matched the expected SHA;
+  - the session was released automatically and no session remained;
+  - the cost is below the balance display's resolution (97.55 before and after).
+- **Not yet tested.** Drive mount (one browser click per VM), running a repository notebook end to end, and resuming
+  after a stop. These get tested on the first approved eval run.
