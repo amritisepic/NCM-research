@@ -164,6 +164,11 @@ def sha256_file(path):
     return h.hexdigest()
 
 
+def sha256_json(obj):
+    """Canonical JSON content hash, independent of checkout line endings."""
+    return hashlib.sha256(json.dumps(obj, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+
+
 def fkey(f):
     return f"{float(f):g}"
 
@@ -601,6 +606,7 @@ def run_gx(env, out_dir, P, seed=0, log=print):
     refs, bad = load_references(os.path.join(ROOT, "results", "colab"), env.ckpt_sha256)
     if bad:
         sys.exit("W2M-GX reference rejected: " + "; ".join(bad))
+    env.identity = {**env.identity, "w2mgr_reference_sha256": {str(s): sha256_json(refs[s]) for s in G.GX_SEEDS}}
     os.makedirs(out_dir, exist_ok=True)
     cdir = os.path.join(out_dir, "cells")
     os.makedirs(cdir, exist_ok=True)

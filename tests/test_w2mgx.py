@@ -30,7 +30,9 @@ def metric(ll):
 def synthetic():
     refs = {s: make_result(s) for s in G.GX_SEEDS}
     env = SimpleNamespace(runs=A.expected_runs(), ckpt_sha256={f"{a}_s{s}": ("a" if a == "m2" else "b") * 64
-                          for s in G.GX_SEEDS for a in ("m2", "m3")}, identity={"gpu": "NVIDIA L4", "device": "cuda"})
+                          for s in G.GX_SEEDS for a in ("m2", "m3")},
+                          identity={"gpu": "NVIDIA L4", "device": "cuda",
+                                    "w2mgr_reference_sha256": {str(s): S.sha256_json(refs[s]) for s in G.GX_SEEDS}})
     cells = {}
     for spec in S.cell_specs(G.GXProtocol(), arms=G.GX_ARMS):
         cells[spec["key"]] = {"spec": copy.deepcopy(spec), "n": 2048, "n_groups": 8, "group_seeds": list(range(8))}
@@ -327,6 +329,16 @@ def test_manifest_refuses_changed_checkpoint_assignment_or_protocol(tmp_path):
     env.ckpt_sha256 = {**env.ckpt_sha256, "m2_s1": "f" * 64}
     with pytest.raises(SystemExit, match="manifest"):
         S.check_manifest(str(tmp_path), env, G.GXProtocol(), 0, G.GX_ARMS)
+
+
+def test_changed_gr_reference_content_is_refused_without_platform_line_ending_dependency(tmp_path):
+    r, refs = synthetic()
+    write_inputs(tmp_path, r, refs)
+    refs[1]["i"]["reading"] = "changed reference"
+    write_inputs(tmp_path, r, refs)
+    out = A.analyze_w2mgx(str(tmp_path))
+    assert not out["available"] and "reference content digest" in ";".join(out["problems"])
+    assert S.sha256_json(refs[1]) == S.sha256_json(json.loads(json.dumps(refs[1], indent=1).replace("\n", "\r\n")))
 
 
 def test_load_env_pins_all_six_checkpoint_digests(tmp_path, monkeypatch, world):

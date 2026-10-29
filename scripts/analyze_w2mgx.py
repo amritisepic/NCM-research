@@ -73,6 +73,10 @@ def check_result(r):
     gpu = identity.get("gpu") if isinstance(identity, dict) else None
     if not (isinstance(gpu, str) and re.search(r"\bL4\b", gpu)):
         bad.append("GPU must be an L4")
+    ref_hashes = identity.get("w2mgr_reference_sha256") if isinstance(identity, dict) else None
+    if not isinstance(ref_hashes, dict) or set(ref_hashes) != {"1", "2", "3"} or not all(
+            isinstance(h, str) and SHA.fullmatch(h) for h in (ref_hashes or {}).values()):
+        bad.append("need canonical SHA256 identities of all three W2M-GR reference results")
     cells = r.get("cells")
     if not isinstance(cells, dict):
         return bad + ["no cells"]
@@ -92,7 +96,7 @@ def check_result(r):
     return bad
 
 
-def load_references(root, hashes):
+def load_references(root, hashes, reference_hashes=None):
     """W2M-GR's admitted runs must use the exact checkpoint hashes of this GX run."""
     refs, bad = {}, []
     for seed in G.GX_SEEDS:
@@ -107,6 +111,8 @@ def load_references(root, hashes):
         if reasons:
             bad.extend(f"W2M-GR seed {seed}: {v}" for v in reasons)
             continue
+        if reference_hashes is not None and E.sha256_json(r) != reference_hashes.get(str(seed)):
+            bad.append(f"W2M-GR seed {seed}: reference content digest differs")
         for arm in ("m2", "m3"):
             if r["protocol"]["ckpt_sha256"][arm] != hashes.get(f"{arm}_s{seed}"):
                 bad.append(f"W2M-GR seed {seed}: {arm} checkpoint digest differs")
@@ -137,7 +143,8 @@ def analyze_w2mgx(root=DEFAULT_ROOT):
     bad = [why] if why else check_result(r)
     refs = {}
     if not bad:
-        refs, bad = load_references(root, r["protocol"]["ckpt_sha256"])
+        refs, bad = load_references(root, r["protocol"]["ckpt_sha256"],
+                                    r["protocol"]["identity"]["w2mgr_reference_sha256"])
     out = {"available": False, "file": f"{NB}/{NB}__result.json", "problems": bad}
     if bad:
         return out
