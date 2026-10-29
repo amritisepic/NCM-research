@@ -1639,3 +1639,41 @@ contrast below recomputed independently from the cells' per-group Gen-PPL.
   frequency-matched control; one model, domain and protocol).
 - Every seed reproduces seed 0's values within ~0.03, so the localization is not a seed-0 accident; it is still a
   property of these two arms under this protocol, measured with this crossed-replay instrument.
+
+## R066 — Astra round 4 triaged (plan section 11): consolidate and write; no purchase now; cross-seed / single-level replay and the marginal-preserving association kill proposed; Colab CLI and GPU providers checked (2026-10-28; process)
+- Answer saved as `docs/research_review_2026-10-28_round4.md`; triage in `docs/plan_2026-10-27.md` section 11
+  (adopt / change / reject with reasons). Its W2M-GR recomputation equals `results/w2mgr_analysis.json`'s seed means.
+  Its budget arithmetic checks (1 EFLOP = 38.84 CU at 37.9 TFLOPS and 5.3 CU/h; six 3.47-EFLOP runs 816 CU, 1020 with
+  25%; T0 sums to 77; twelve confirmations 43.8 CU). Its CU figures are at run-time rates; at the panel's ~1.25x burn
+  the T0 maximum is ~96 CU, about the whole balance.
+- Literature (one check, abstract pages):
+  - arXiv 2605.26436 is withdrawn and superseded by arXiv 2604.18738, a training-free remasking method. Cite the
+    successor, as related work only.
+  - The other eight cited papers exist as cited.
+  - None reports our result.
+- Adopted:
+  - Write the paper now.
+  - No CU purchase before a T0 method gate passes at three fresh seeds.
+  - Narrower claim wordings for C-E1 (posterior path surprisal on the evaluated items) and C-W2C (crossed replay
+    attached), as options.
+  - Two proposals: the marginal-preserving association control (P/D) before plausibility is called causal, and
+    cross-seed plus single-level replay (eval-only, ~4 CU), which tests the localization's instrument.
+  - The duplicate-label toy for the paper.
+  - The figure plan and the cut list.
+- Held for the user: the E0 / U0 erasure kill (the only route to T1 / T2).
+- Deferred: the path-recombination pilot (new path-collection code).
+- Rejected for now: the proposed criterion (e), since success criteria are the user's to change.
+- Reserved: the other ideas.
+- Proposed package: ~52 CU at run-time rates (~62 at the burn) of ~97 if everything triggers. Nothing is registered.
+- `docs/compute_options.md` (checked 2026-10-28):
+  - Colab CLI: the official `googlecolab/google-colab-cli` provisions a chosen GPU (`--gpu A100 / L4`), runs
+    notebooks, moves files, mounts Drive and reports CU usage. It runs on Linux and macOS only, so here it would go
+    through WSL (untested). Drive needs one browser click per VM. Recommended after a < 0.1-CU smoke pilot.
+  - colab-mcp only bridges a browser tab and has no GPU choice. The two third-party servers lack A100. None of the
+    three is recommended.
+  - Provider prices:
+    - Confirmed: Thunder, Runpod (Secure tier; Community is cheaper), Lambda, Modal.
+    - Changed: Verda is higher than quoted (A100-40GB spot $0.80).
+    - Still unverified: Colab's $ per CU, Kaggle's quota, Vast's live prices.
+  - Recommendation: Colab for T0. Benchmark one alternative (~$2) only if a paper-scale run is approved. Never move a
+    comparison across GPU families.
