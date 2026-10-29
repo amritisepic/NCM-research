@@ -2,11 +2,11 @@
 
 You reviewed this project three times (`docs/research_review_2026-10-26.md`, `docs/research_review_2026-10-27.md`, and
 round 3, triaged in R055 / `docs/plan_2026-10-27.md` section 10). Everything round 3 queued has now reported. Two results
-meet a pre-registered criterion-(c) bar and have each survived a deep code audit; a third (W2M-GR, section 3) decides
-whether one of them is a finding about the levels.
+meet a pre-registered criterion-(c) bar and have each survived a deep code audit, and a third (W2M-GR, registered before
+it ran) replicated the level localization of one of them at three fresh seeds (section 3, anomaly 6).
 
 This round asks for **a wide, unconstrained brainstorm**, and for a hard look at where we stand against the field. It has
-four parts, to be done in this order:
+five parts, to be done in this order:
 
 - **Part A — Frontier map (short):** where our findings sit relative to 2024-2026 work; what is new, what is a
   rediscovery, and which assumption of the field our results contradict.
@@ -14,6 +14,8 @@ four parts, to be done in this order:
   anomalies in section 3. Rules in section 7.
 - **Part C — Convergence:** pick two or three directions, then (and only then) fit them to our constraints (section 9).
 - **Part D — Hostile review of the two claims, and the paper (short).**
+- **Part E — Compute sources (research, short):** where else we could buy GPU time than Colab, at what effective price
+  for our workload (section 12).
 
 Ground rules (as before): label every statement **[ours]** (a number from this brief), **[source]** (a published paper
 or official code: authors, year, venue or arXiv id, and the setting a number comes from) or **[speculation]**. If you
@@ -71,14 +73,23 @@ propose a sharper criterion, say why it would matter more, and estimate how reac
 4. **Provenance helps, partially, and acts as a switch:** truthful row-level flags (M4) halve the damage (rescue 0.53);
    M4 uses them (-35 nats/window); a constant flag f = 1 on every input turns M4 into M2; f = 0 is its best setting.
 5. **The damaged models treat generated contexts differently:** M2 and M3's predictive distributions (Jensen-Shannon,
-   levels 2-5) differ 0.0126 nats on real contexts and 5.5-6.9x more on generated ones (W2M-G (i)).
-6. **Where the damage forms (W2M-G (ii), crossed replay, prefix model samples levels 1..c-1, suffix model c..11; shares
-   of the M2-M3 log-loss contrast):** M2's prefix through L1 carries 0.009; through L3 0.220; through L5 0.511; M2's
-   suffix after L5 alone carries 0.061; the interaction is 0.47 / 0.43 at cuts 4 / 6. Damage forms at levels 2-5 and is
-   amplified by M2's own later levels. **W2M-GR at seeds 1-3 (registered thresholds): [TO FILL FROM R065 BEFORE
-   SENDING].**
-7. **The channel prediction that was right and irrelevant:** M2's level 1 leans 41% less on the root code (as a
-   Bayesian channel model of the corruption predicts), yet the L1 prefix carries ~1% of the damage.
+   levels 2-5) differ ~0.012 nats on real contexts and 5.4-7.0x more on generated ones (W2M-G (i) at seed 0; replicated
+   at seeds 1-3 by W2M-GR, every lower CI bound >= 5.16).
+6. **Where the damage forms (crossed replay: the prefix model samples levels 1..c-1, the suffix model c..11; shares of
+   the M2-M3 log-loss contrast under GPT-2 large). Replicated at seeds 1-3 (W2M-GR, thresholds registered before the run;
+   all conditions met with wide margins):**
+
+   | | pi_2 (M2 prefix through L1) | pi_4 (through L3) | pi_6 (through L5) | sigma_6 (M2 levels 6-11 only) | interaction c4 / c6 |
+   |---|---|---|---|---|---|
+   | seeds 1-3, mean (seed SD) | 0.016 (0.008) | 0.223 (0.011) | 0.527 (0.012) | 0.053 (0.013) | 0.444 / 0.420 |
+   | seed 0 | 0.009 | 0.220 | 0.511 | 0.061 | 0.469 / 0.428 |
+
+   TinyStories-33M agrees (seed means pi_2 0.012, pi_6 0.490, sigma_6 0.042). Damage forms at levels 2-5 and is amplified
+   by M2's own later levels, which are nearly harmless on M3's prefixes; level 1 carries almost none. Every seed lies
+   within ~0.03 of seed 0.
+7. **The channel prediction that was right and irrelevant (replicated):** M2's level 1 leans less on the root code
+   (root reliance M2 2.0 vs M3 3.4 nats/window at every seed 0-3, as a Bayesian channel model of the corruption
+   predicts), yet the L1 prefix carries ~1-2% of the damage.
 8. **Clean rows:** without the 25% clean rows the uniform-wrong control returns to the released model's quality (16.50 vs
    21.69 Gen-PPL; released 16.16) while its clean code NLL gets 106 nats/window worse, 78% of it at L8-L11 (M3-0).
    Uniform corruption is essential to NCM [source], yet some uncorrupted training makes generation worse.
@@ -123,12 +134,15 @@ propose a sharper criterion, say why it would matter more, and estimate how reac
 **C-E1** (drafted, awaiting the user): in each of the three released NCM models, given the canonical levels 0-7, at
 least 80% of the canonical code NLL of levels 8 and finer is spent choosing among code paths that decode to the same
 output (anomaly 11).
-**C-W2C** (wording after audit 12; not claimed): under one continuation protocol, plausible-wrong replacement causes
-additional generation degradation relative to uniform-wrong replacement in the same slots while canonical
-teacher-forced NLL barely distinguishes them (anomaly 1); if W2M-GR replicates, the damage forms at levels 2-5 and is
-amplified by the damaged model's own later levels. Audit 12's limits: comparative only (the uniform-wrong arm is itself
-5.5 Gen-PPL above the released model, because of the clean rows); no temperature-, frequency- or length-matched control;
-M2 costs one extra forward per step; one model, domain and protocol.
+**C-W2C + W2M-GR** (wording after audit 12; the localization added after W2M-GR; not claimed, a claim audit of the
+combined wording is next): under one continuation protocol, plausible-wrong replacement causes additional generation
+degradation relative to uniform-wrong replacement in the same slots, which canonical teacher-forced NLL barely
+registers (anomaly 1); the damage forms at levels 2-5 (M2's prefix through L5 carries ~53% of the log-loss contrast,
+through L1 ~2%) and is amplified by the damaged model's own later levels (interaction ~0.42-0.44), which alone carry ~5%
+(anomaly 6). Audit 12's limits: comparative only (the uniform-wrong arm is itself 5.5 Gen-PPL above the released model,
+because of the clean rows); no temperature-, frequency- or length-matched control; M2 costs one extra forward per step;
+one model, domain and protocol; the localization is measured with one instrument (crossed replay of whole level
+ranges).
 
 ## 5. Part A — Frontier map
 Quick searches (not a novelty clearance) suggest:
@@ -215,7 +229,7 @@ falsifiable prediction with a number or a sign; your probability that the predic
      sampler; J2 / J2-F; the Sudoku analogue).
 4. **Then, against the best direction, argue the opposite:** is consolidating C-E1 and C-W2C and writing them up a
    better use of the time than any new direction? Say which you would do and why.
-5. **Three budget tiers (section 9).** Give the best programme for each: (T0) the ~96 CU we have; (T1) +500 CU; (T2)
+5. **Three budget tiers (section 9).** Give the best programme for each: (T0) the ~97 CU we have; (T1) +500 CU; (T2)
    +1000 CU. For T1 and T2: what experiment the money buys that T0 cannot (name the arms, the matched control, the seeds,
    the training protocol and its EFLOP, and the CU at our measured throughput); which criterion it targets; your
    probability of a clean positive result; what we learn if it fails; and the gate it must pass at T0 first (a kill test
@@ -234,7 +248,7 @@ falsifiable prediction with a number or a sign; your probability that the predic
    36.4M tokenizer plus a generator from scratch) against T1 / T2.
 
 ## 9. Constraints (for Part C only)
-- **Compute:** ~96 CU after W2M-GR (Colab; A100-40GB ~5.3 CU/h, L4 1.71 CU/h; our estimates now hold within ~25%). A
+- **Compute:** ~97 CU after W2M-GR (Colab; A100-40GB ~5.3 CU/h, L4 1.71 CU/h; our estimates now hold within ~25%). A
   600-step tier-L fine-tune of the 88.6M model costs ~2.7 CU (uniform) to ~4.6 CU (with proposal forwards) per seed;
   eval-only passes over the released models ~1-2 CU. Any single run > 15 CU needs the user's approval.
 - **Optional purchase: +500 or +1000 CU**, for a paper-scale experiment only, and only if it is warranted (section 8.5).
@@ -275,12 +289,33 @@ falsifiable prediction with a number or a sign; your probability that the predic
 3. The paper: its one-sentence contribution as things stand; the same sentence if your top direction succeeds; the
    three figures that carry it; what to cut.
 
+## 12. Part E — Compute sources (research; mark every price with its source and date)
+We have used only Google Colab (pay-as-you-go compute units, launched by hand from notebooks that clone the repository
+and keep checkpoints on Google Drive). Before buying +500-1000 CU there, compare the alternatives for **our** workload:
+- **Workload profile [ours]:** PyTorch 2.11, CUDA 13; single-GPU jobs; the 88.6M generator trains in bf16 autocast at
+  37.9 TFLOPS effective on an A100-40GB (no `torch.compile`); evaluation runs in fp32 with TF32 off (so fp32 throughput
+  matters, and sampling / scoring are memory-light); runs of 0.3-2 h today, 13-25 h each for a paper-protocol run; every
+  run resumes from an atomic checkpoint, so preemptible / spot capacity is usable; data ~1-2 GB (TinyStories tokens,
+  released checkpoints, scorer models GPT-2 large and TinyStories-33M from Hugging Face); results are small JSON files.
+  Colab: A100-40GB ~5.3 CU/h, L4 1.71 CU/h; we believe pay-as-you-go is about $10 per 100 CU [unverified, check it].
+- **Compare:** effective cost per A100-40GB-equivalent hour and per EFLOP of our training workload (state the
+  throughput you assume per GPU type: A100, H100, L4, L40S, RTX 4090 / 5090, others), availability of single GPUs,
+  preemption and how our checkpointing copes, storage and egress, setup effort, whether runs can be launched and
+  monitored unattended from a script or CLI (we want an agent to launch and collect runs without a person clicking), and
+  research / academic credit programmes we might qualify for (an independent, public research repository). Include
+  hyperscaler spot instances, GPU clouds and marketplaces, serverless GPU platforms, free tiers (e.g. Kaggle), and any
+  option you think we are missing.
+- **Answer:** the cheapest source that is reliable enough for (i) the current small runs and (ii) a T1 / T2 programme
+  of six 13-25 h runs in parallel; whether H100s lower the cost per EFLOP for an 88.6M model or just finish sooner; and
+  whether moving off Colab is worth the porting effort at T0, T1 and T2.
+
 ## 11. Output format
 - Part A: at most 15 lines plus the per-finding novelty table.
 - Part B: the numbered idea list (>= 25), each labelled with its move(s), anomalies used, prediction and probability.
 - Part C: the theme list, the ranking table, two or three deep dives, the consolidate-vs-explore argument, the three
   budget tiers with a purchase verdict, and the redundancy question.
 - Part D: at most 20 lines.
-- End with one queue per budget tier (T0 ~96 CU; T1 +500; T2 +1000): item, CU, gate, what it decides.
+- Part E: the provider table and at most 10 lines of recommendation.
+- End with one queue per budget tier (T0 ~97 CU; T1 +500; T2 +1000): item, CU, gate, what it decides.
 - Dense: mechanisms, numbers, experiments; no general encouragement. Being boldly wrong with a clear prediction beats
   being vaguely safe.
