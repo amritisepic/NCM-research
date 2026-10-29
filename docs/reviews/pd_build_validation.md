@@ -45,3 +45,14 @@ that collection and release both happen before the exception.
 
 The CPU coverage report and final complete-suite summary are recorded separately when those checks finish. No GPU
 training or launch clearance is implied by this build.
+
+## CPU coverage memory bound
+
+The initial real-model CPU coverage attempt completed no step or report before memory/pagefile pressure exhausted
+local disk space; it was interrupted and provides no coverage evidence. The coverage-only frozen eval forward now
+uses eight-row chunks, concatenating the logits before the original 64-row canonical exclusion, softmax and sampling
+draw. Training's P/D/U micro-batch partition and all root/fine draw shapes and order remain unchanged. The report
+identity records `cpu_forward_batch`. The tiny-model regression compares split/unsplit logits at fp32 precision,
+checks identical sampled codes and replacement RNG states, and records the unchanged complete fine-draw shape.
+The updated coverage/launch focused tests gave **5 passed in 11.03s**. No simulated probabilities or reduced step
+count were used.

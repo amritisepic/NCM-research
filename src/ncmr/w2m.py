@@ -349,8 +349,9 @@ def pd_permutation(proposals, canonical, generator):
     """PDa: uniform initial derangement, then lowest-collision swap repair or cycle-shortening fixed point.
 
     Rejection sampling from uniform permutations gives a uniform derangement. Repair terminates: every step
-    strictly decreases the collision count; creating a fixed point cannot introduce a collision at its predecessor
-    because otherwise that predecessor would have been an eligible two-target swap.
+    strictly decreases the collision count. With valid own proposals a swap always exists: a colliding code's
+    multiplicity cannot exceed the number of rows with a different canonical code, so one such row must receive
+    a noncolliding code and clear both targets. The registered fixed-point fallback is retained defensively.
     """
     n, device = len(proposals), proposals.device
     identity = torch.arange(n, device=device)

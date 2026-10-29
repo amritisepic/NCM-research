@@ -38,13 +38,31 @@ def check_coverage(report):
     return value
 
 
+def chunk_frozen_forward(mech, forward_batch):
+    """Bound CPU attention memory; keep each original 64-row root/fine sampling draw unchanged.
+
+    Only the deterministic fp32 eval forward is partitioned. Logits are concatenated before the existing
+    canonical exclusion, softmax and single draw_fine call for the complete registered micro-batch.
+    """
+    original = mech._logits
+
+    def logits(model, fwd, canonical):
+        return torch.cat([original(model, fwd, canonical[start:start + forward_batch])
+                          for start in range(0, len(canonical), forward_batch)])
+
+    mech._logits = logits
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--out", default="results/pd_coverage.json")
     ap.add_argument("--data_dir", default=str(ROOT / "data/tinystories"))
     ap.add_argument("--threads", type=int, default=4)
+    ap.add_argument("--forward_batch", type=int, default=8, help="CPU-only deterministic frozen-forward rows")
     ap.add_argument("--verify", action="store_true", help="check an existing CPU report without model work")
     a = ap.parse_args()
+    if a.forward_batch <= 0:
+        ap.error("forward_batch must be positive")
     cfg = OmegaConf.load(ROOT / "configs/scale/L_ts_pd_d.yaml")
     art, data = ROOT / "artifacts/tinystories", Path(a.data_dir)
     assets = {f"base/{name}": art / name for name in ("config.yaml", "generator.pt", "tokenizer.pt")}
@@ -53,7 +71,8 @@ def main():
     if missing:
         sys.exit("PD CPU coverage not run: released assets absent: " + ", ".join(missing))
     identity = {"asset_sha256": {name: digest(path) for name, path in assets.items()},
-                "config": OmegaConf.to_container(cfg, resolve=True), "micro_batch": 64}
+                "config": OmegaConf.to_container(cfg, resolve=True), "micro_batch": 64,
+                "cpu_forward_batch": a.forward_batch}
     if a.verify:
         report = json.loads(Path(a.out).read_text(encoding="utf-8"))
         if report["identity"] != identity:
@@ -70,6 +89,7 @@ def main():
     prefix = lambda b: tok.encoder.wte(torch.full((b, 1), EOS, dtype=torch.long))
     m = MechArm("pd", tok, net, prior, prefix, "cpu", 0, CorruptionCfg(mode="mech").rates(len(tok.vq.levels)),
                 frozen=MechArm.frozen_copy(net))
+    chunk_frozen_forward(m, a.forward_batch)
     stream, rng, started = TrainStream(str(data)), np.random.default_rng(0), time.monotonic()
     for step in range(20):
         x = torch.from_numpy(stream.batch(rng, 256))

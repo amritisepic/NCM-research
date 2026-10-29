@@ -27,6 +27,36 @@ def test_coverage_cpu_gate_inclusive_boundary():
             coverage.check_coverage(broken)
 
 
+def test_cpu_coverage_forward_subbatch_preserves_eval_logits_and_sampling_draw_shapes():
+    import torch
+    from w2m_support import make_arm, tiny_case
+
+    coverage = module("pd_coverage_split", "scripts/pd_coverage.py")
+    tok, net = tiny_case()
+    original = make_arm("pd", tok, net, seed=0)
+    split = make_arm("pd", tok, net, seed=0)
+    coverage.chunk_frozen_forward(split, 2)
+    x = torch.randint(0, 32, (8, 128), generator=torch.Generator().manual_seed(123))
+    canon = original.canonical(x)
+    plan = original.draw_plan(8)
+    with torch.no_grad():
+        full_logits = original._logits(original.frozen, original.frozen, canon)
+        split_logits = split._logits(split.frozen, split.frozen, canon)
+    torch.testing.assert_close(split_logits, full_logits, rtol=1e-6, atol=1e-6)
+    shapes = []
+    draw = split.draw_fine
+
+    def record(probs):
+        shapes.append(tuple(probs.shape))
+        return draw(probs)
+
+    split.draw_fine = record
+    p, q = original.proposals(canon, plan), split.proposals(canon, plan)
+    assert shapes == [(8, original.S - original.l0, int(net.max_vocab))]
+    assert torch.equal(p, q)
+    assert torch.equal(original.repl_gen.get_state(), split.repl_gen.get_state())
+
+
 def test_pd_budget_includes_resumes_and_outstanding_concurrent_reservations():
     budget = module("pilot_budget", "scripts/run_pilot_budget.py")
     ledger = {"sessions": []}
