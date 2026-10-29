@@ -56,3 +56,8 @@ identity records `cpu_forward_batch`. The tiny-model regression compares split/u
 checks identical sampled codes and replacement RNG states, and records the unchanged complete fine-draw shape.
 The updated coverage/launch focused tests gave **5 passed in 11.03s**. No simulated probabilities or reduced step
 count were used.
+
+Budget exhaustion before a command launches was reproduced returning exit 1 (a string `SystemExit`), which bypassed
+the notebook's cap-release branch. It now prints the reason and returns 124. A lightweight standard-library check
+confirmed exit 124, no child launched, unchanged ledger and released ledger lock; the equivalent pytest regression
+is `test_exhausted_budget_returns_cap_exit_without_launching_command`.

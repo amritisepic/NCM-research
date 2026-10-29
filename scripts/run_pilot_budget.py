@@ -62,7 +62,8 @@ def main():
     def reserve(ledger):
         seconds = available(ledger, a.experiment, a.arm)
         if seconds <= 0:
-            raise SystemExit("registered cumulative pilot budget exhausted; no command launched")
+            print("registered cumulative pilot budget exhausted; no command launched", flush=True)
+            raise SystemExit(124)
         ledger["experiment"] = a.experiment
         ledger["sessions"].append({"id": identifier, "arm": a.arm, "reserved_s": seconds})
         return seconds

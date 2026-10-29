@@ -71,6 +71,23 @@ def test_pd_budget_includes_resumes_and_outstanding_concurrent_reservations():
     assert budget.available(ledger, "pd", "u") == 0
 
 
+def test_exhausted_budget_returns_cap_exit_without_launching_command(tmp_path, monkeypatch):
+    import sys
+
+    budget = module("pilot_budget_exhausted", "scripts/run_pilot_budget.py")
+    ledger = {"sessions": [{"arm": "p", "reserved_s": 1500, "elapsed_s": 1500}]}
+    path = tmp_path / "pd_budget.json"
+    path.write_text(json.dumps(ledger))
+    monkeypatch.setattr(sys, "argv", ["run_pilot_budget.py", "--experiment", "pd", "--arm", "p",
+                                     "--run_root", str(tmp_path), "--", "never-launch"])
+    monkeypatch.setattr(budget.subprocess, "Popen", lambda *a, **kw: pytest.fail("exhausted budget launched command"))
+    with pytest.raises(SystemExit) as error:
+        budget.main()
+    assert error.value.code == 124
+    assert json.loads(path.read_text()) == ledger
+    assert not path.with_suffix(".lock").exists()
+
+
 def test_pd_generated_notebooks_have_guard_gate_budget_provenance_release():
     maker = module("pd_notebooks", "notebooks/make_notebooks.py")
     for arm in "pdu":
