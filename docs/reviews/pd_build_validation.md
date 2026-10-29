@@ -43,8 +43,8 @@ to spend an unverified remaining allocation after an abrupt runtime loss. A cap 
 releases the Colab runtime before preserving the incomplete failure status. The executed cap-path regression checks
 that collection and release both happen before the exception.
 
-The CPU coverage report and final complete-suite summary are recorded separately when those checks finish. No GPU
-training or launch clearance is implied by this build.
+The completed CPU coverage report and final complete-suite summary are recorded below. No GPU training or
+launch clearance is implied by this build.
 
 ## CPU coverage memory bound
 
@@ -78,3 +78,38 @@ requirement and guard-before-download/run ordering. PD's own tests still require
 The complete notebook and PD-launch subset then passed: **101 passed, 20 warnings in 2.42s**. No production code,
 registered protocol or historical notebook was changed by these test updates. The warnings come from existing
 synthetic empty-distribution checks in `scripts/w1_sample_stats.py`.
+
+## Final complete CPU suite
+
+On tested tree `f881173ff49909d5b4403a184e837dd3b68d90e6`, preserved at `5681704` after a metadata-only
+identity sanitization, with `CUDA_VISIBLE_DEVICES=-1`, `PYTHONUTF8=1`, and
+`PYTHONPATH=tests/_deps;tests;src`, the required command was:
+
+```text
+python -m pytest tests --ignore=tests/_deps -q
+1080 passed, 32 warnings in 503.52s (0:08:23)
+```
+
+No tests were skipped. The warnings are existing synthetic empty-distribution and one-item variance cases in
+`scripts/w1_sample_stats.py` and `tests/test_e1_equivalence.py`; the complete suite exited successfully.
+
+
+## Completed real-data CPU coverage gate
+
+`results/pd_coverage.json` is tracked with this build so a fresh checkout can run the notebook's verification gate.
+The first twenty real seed-0 batches used released TinyStories assets, the registered W2M masks and frozen M2
+proposals, micro-batch 64 and deterministic eight-row CPU forward chunks. The run completed in **3592.188 s**.
+
+| Level | Reassigned masked slots | Masked slots | Coverage |
+|---|---:|---:|---:|
+| L2 | 39954 | 39962 | 0.9997998098193284 |
+| L3 | 55316 | 55323 | 0.9998734703468720 |
+| L4 | 67243 | 67256 | 0.9998067086951350 |
+| L5 | 77291 | 77301 | 0.9998706355674570 |
+| Overall | 239804 | 239842 | **0.9998415623618883** |
+
+The overall coverage exceeds the registered **0.80** gate. `python scripts/pd_coverage.py --verify` passed against
+all five current released asset SHA-256 values and the exact current registered D config. The report records those
+hashes and the CPU forward partition; it contains no machine-specific paths. Integer-count recomputation also
+matches every recorded per-level value and the overall value. This completes the CPU pre-launch gate only; the
+independent deep audit and merge decision remain outstanding.
